@@ -1,7 +1,7 @@
 # `jeongmyeong_client` Git 규칙
 
 ## 1) 저장소 역할
-- `origin`: `https://github.com/leeminjun1/jeongmyeong_client.git` (내 작업 저장소)
+- `origin`: `https://github.com/자신의깃허브아이디/jeongmyeong_client.git` (내 작업 저장소)
 - `upstream`: `https://github.com/JeongMyeongDev/jeongmyeong_client.git` (원본 저장소)
 - 일상적인 작업 결과는 모두 `origin`에 푸시한다.
 - 브랜치 이력을 맞추기 위해 `upstream`을 주기적으로 동기화한다.
