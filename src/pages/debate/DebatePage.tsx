@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
+import DebateMetadataModal from '../../components/debate/DebateMetadataModal';
 import { useDebate } from '../../hooks/useDebate';
 import type { Debate } from '../../types/debate';
 
@@ -76,6 +77,7 @@ const DebatePage = () => {
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
 
   useEffect(() => {
     if (debateId) return;
@@ -114,6 +116,14 @@ const DebatePage = () => {
   }, [debateId, fetchDebate, fetchMessages]);
 
   const cards = useMemo(() => debates.slice(0, 8).map(mapToRoomCard), [debates]);
+  const openDebateMetadata = (id: string) => {
+    setSelectedDebate(debates.find((debate) => debate.id === id) ?? null);
+  };
+
+  const handleJoinDebate = () => {
+    if (!selectedDebate) return;
+    navigate(`/debate/${selectedDebate.id}`);
+  };
 
   const handleSend = async () => {
     if (!debateId || !draft.trim() || isSending) return;
@@ -236,7 +246,7 @@ const DebatePage = () => {
         {listError && <ErrorText>{listError}</ErrorText>}
         {!listError && cards.length === 0 && <ErrorText>등록된 토론이 없습니다.</ErrorText>}
         {cards.map((card) => (
-          <Card key={card.id} onClick={() => navigate(`/debate/${card.id}`)}>
+          <Card key={card.id} onClick={() => openDebateMetadata(card.id)}>
             <CardTop>
               <StatusBadge $running={card.statusLabel === '진행중'}>{card.statusLabel}</StatusBadge>
               <ChatCircleIcon />
@@ -246,6 +256,13 @@ const DebatePage = () => {
           </Card>
         ))}
       </ListWrap>
+      {selectedDebate && (
+        <DebateMetadataModal
+          debate={selectedDebate}
+          onClose={() => setSelectedDebate(null)}
+          onJoin={handleJoinDebate}
+        />
+      )}
     </Wrapper>
   );
 };

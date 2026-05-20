@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
+import DebateMetadataModal from '../../components/debate/DebateMetadataModal';
 import { useDebate } from '../../hooks/useDebate';
 import type { Debate } from '../../types/debate';
 
@@ -126,6 +127,7 @@ const MainPage = () => {
   const [activeCategory, setActiveCategory] = useState('예술');
   const [activeDot, setActiveDot] = useState(0);
   const [listError, setListError] = useState('');
+  const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -169,6 +171,14 @@ const MainPage = () => {
   }));
 
   const currentDot = Math.min(activeDot, Math.max(0, featuredItems.length - 1));
+  const openDebateMetadata = (id: string) => {
+    setSelectedDebate(debates.find((debate) => debate.id === id) ?? null);
+  };
+
+  const handleJoinDebate = () => {
+    if (!selectedDebate) return;
+    navigate(`/debate/${selectedDebate.id}`);
+  };
 
   return (
     <Wrapper>
@@ -194,7 +204,7 @@ const MainPage = () => {
         <SectionSub>지금 사람들이 많이 보고 있는 토론들이에요.</SectionSub>
         <CarouselWrapper ref={scrollRef} onScroll={handleScroll}>
           {featuredItems.map((item) => (
-            <FeaturedCard key={item.id} item={item} onClick={() => navigate(`/debate/${item.id}`)} />
+            <FeaturedCard key={item.id} item={item} onClick={() => openDebateMetadata(item.id)} />
           ))}
         </CarouselWrapper>
         <Dots>
@@ -227,9 +237,16 @@ const MainPage = () => {
         {listError && <ListError>{listError}</ListError>}
         {!listError && debateItems.length === 0 && <ListError>표시할 토론이 없습니다.</ListError>}
         {debateItems.map((item) => (
-          <DebateCard key={item.id} item={item} onClick={() => navigate(`/debate/${item.id}`)} />
+          <DebateCard key={item.id} item={item} onClick={() => openDebateMetadata(item.id)} />
         ))}
       </DebateList>
+      {selectedDebate && (
+        <DebateMetadataModal
+          debate={selectedDebate}
+          onClose={() => setSelectedDebate(null)}
+          onJoin={handleJoinDebate}
+        />
+      )}
     </Wrapper>
   );
 };
