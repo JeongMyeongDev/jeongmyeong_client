@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
+import iconAlarm2 from '../../assets/icon_alarm2.svg';
+import btnDscionControl from '../../assets/btn_dscion_control.svg';
+import iconChat from '../../assets/icon_chat.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
-import DebateMetadataModal from '../../components/debate/DebateMetadataModal';
+import iconStar from '../../assets/icon_star.svg';
+import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import type { Debate } from '../../types/debate';
 
@@ -16,31 +19,7 @@ const SearchIcon = () => <img src={iconSearch} width="18" height="18" alt="" />;
 
 const BellIcon = () => <img src={iconAlarm} width="22" height="22" alt="" />;
 
-const FilterIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="6" y1="12" x2="18" y2="12" />
-    <line x1="9" y1="18" x2="15" y2="18" />
-  </svg>
-);
-
-const DebateIcon = () => (
-  <svg width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="42" cy="42" r="40" stroke="#A9A9A9" strokeWidth="3" />
-    <path
-      d="M28 39H53V49.5H37.7L28 55.8V39Z"
-      stroke="#A9A9A9"
-      strokeWidth="3"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M34 28H59V38.4H43.8"
-      stroke="#A9A9A9"
-      strokeWidth="3"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
+const FilterIcon = () => <img src={btnDscionControl} width="48" height="34" alt="" />;
 
 const PersonIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -49,11 +28,38 @@ const PersonIcon = () => (
   </svg>
 );
 
+const BackIcon = () => (
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#353535" strokeWidth="2.2">
+    <line x1="20" y1="12" x2="4" y2="12" />
+    <polyline points="10 6 4 12 10 18" />
+  </svg>
+);
+
+const ModalMenuIcon = () => (
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#353535" strokeWidth="2.2">
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="9" y1="18" x2="21" y2="18" />
+  </svg>
+);
+
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
 const CATEGORIES = ['예술', '연애', '요리', '게임', '스포츠', '정치'];
 
-type DebateListItem = Pick<Debate, 'id' | 'title' | 'description' | 'status'>;
+type ModalDebateItem = {
+  title: string;
+  description: string;
+  creatorName: string;
+  debateTypeLabel: string;
+  participants: number;
+  tag: string;
+  createdDateLabel: string;
+};
+
+type DebateListItem = Pick<Debate, 'id' | 'title' | 'description' | 'status'> & {
+  modalData: ModalDebateItem;
+};
 type FeaturedItem = {
   id: string;
   title: string;
@@ -62,6 +68,7 @@ type FeaturedItem = {
   participants: number;
   status: string;
   tag: string;
+  modalData: ModalDebateItem;
 };
 
 // ─── Sub Components ────────────────────────────────────────────────────────────
@@ -73,6 +80,29 @@ const STATUS_LABEL: Record<string, string> = {
   IN_PROGRESS: '진행중',
   WAITING: '준비중',
 };
+
+const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
+  PROS_CONS: '찬반토론',
+  CONSENSUS: '합의토론',
+  FREE: '댓글토론',
+};
+
+const formatCreatedDate = (createdAt?: string) => {
+  if (!createdAt) return '20XX. YY. ZZ';
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return '20XX. YY. ZZ';
+  return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
+  title: debate.title,
+  description: debate.description,
+  creatorName: debate.creator?.nickname ?? '사용자 이름',
+  debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
+  participants: 3,
+  tag: `#${debate.tagMaps?.[0]?.tag.name ?? '기술'}`,
+  createdDateLabel: formatCreatedDate(debate.createdAt),
+});
 
 const StatusBadge = ({ status }: { status: string }) => {
   const label = STATUS_LABEL[status] ?? status;
@@ -86,7 +116,7 @@ const FeaturedCard = ({
   item: FeaturedItem;
   onClick: () => void;
 }) => (
-  <FCard onClick={onClick}>
+  <FCard data-feature-card="true" onClick={onClick}>
     <FTitle>{item.title}</FTitle>
     <FDesc>{item.description}</FDesc>
     <FMeta>
@@ -115,20 +145,24 @@ const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => vo
       <DTitle>{item.title}</DTitle>
       <DDesc>{item.description}</DDesc>
     </DLeft>
-    <DebateIcon />
+    <DebateIconImg src={iconChat} alt="" />
   </DCard>
 );
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 const MainPage = () => {
-  const navigate = useNavigate();
   const { debates, fetchDebates } = useDebate();
   const [activeCategory, setActiveCategory] = useState('예술');
   const [activeDot, setActiveDot] = useState(0);
+  const [searchKeyword, setSearchKeyword] = useState('');
   const [listError, setListError] = useState('');
-  const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
+  const [selectedCard, setSelectedCard] = useState<ModalDebateItem | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isPointerDownRef = useRef(false);
+  const startXRef = useRef(0);
+  const startScrollLeftRef = useRef(0);
+  const suppressCardClickRef = useRef(false);
 
   useEffect(() => {
     const loadDebates = async () => {
@@ -149,18 +183,70 @@ const MainPage = () => {
 
   const handleScroll = () => {
     if (!scrollRef.current) return;
-    const { scrollLeft, offsetWidth } = scrollRef.current;
-    setActiveDot(Math.round(scrollLeft / offsetWidth));
+    const cardEl = scrollRef.current.querySelector('[data-feature-card="true"]') as HTMLElement | null;
+    const snapWidth = cardEl ? cardEl.offsetWidth + 12 : scrollRef.current.offsetWidth;
+    setActiveDot(Math.round(scrollRef.current.scrollLeft / snapWidth));
   };
 
-  const debateItems: DebateListItem[] = debates.map((debate) => ({
+  const handleCarouselPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!scrollRef.current) return;
+    isPointerDownRef.current = true;
+    suppressCardClickRef.current = false;
+    startXRef.current = event.clientX;
+    startScrollLeftRef.current = scrollRef.current.scrollLeft;
+  };
+
+  const handleCarouselPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!scrollRef.current || !isPointerDownRef.current) return;
+    const deltaX = event.clientX - startXRef.current;
+    if (Math.abs(deltaX) > 6) {
+      suppressCardClickRef.current = true;
+    }
+    scrollRef.current.scrollLeft = startScrollLeftRef.current - deltaX;
+  };
+
+  const handleCarouselPointerEnd = () => {
+    isPointerDownRef.current = false;
+  };
+
+  const openFeaturedModal = (item: ModalDebateItem) => {
+    if (suppressCardClickRef.current) {
+      suppressCardClickRef.current = false;
+      return;
+    }
+    setSelectedCard(item);
+  };
+
+  const filteredDebates = useMemo(() => {
+    const normalizedKeyword = searchKeyword.trim().toLowerCase();
+    if (!normalizedKeyword) return debates;
+    return debates.filter((debate) => {
+      const searchableText = [
+        debate.title,
+        debate.description,
+        debate.creator?.nickname ?? '',
+        debate.tagMaps?.map((tagMap) => tagMap.tag.name).join(' ') ?? '',
+      ].join(' ').toLowerCase();
+      return searchableText.includes(normalizedKeyword);
+    });
+  }, [debates, searchKeyword]);
+
+  useEffect(() => {
+    setActiveDot(0);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ left: 0, behavior: 'auto' });
+    }
+  }, [searchKeyword]);
+
+  const debateItems: DebateListItem[] = filteredDebates.map((debate) => ({
     id: debate.id,
     title: debate.title,
     description: debate.description,
     status: debate.status,
+    modalData: mapDebateToModalItem(debate),
   }));
 
-  const featuredItems: FeaturedItem[] = debates.slice(0, 5).map((debate) => ({
+  const featuredItems: FeaturedItem[] = filteredDebates.slice(0, 5).map((debate) => ({
     id: debate.id,
     title: debate.title,
     description: debate.description,
@@ -168,22 +254,15 @@ const MainPage = () => {
     participants: 0,
     status: debate.status === 'OPEN' ? 'OPEN' : 'WAITING',
     tag: `#${debate.tagMaps?.[0]?.tag.name ?? activeCategory}`,
+    modalData: mapDebateToModalItem(debate),
   }));
 
   const currentDot = Math.min(activeDot, Math.max(0, featuredItems.length - 1));
-  const openDebateMetadata = (id: string) => {
-    setSelectedDebate(debates.find((debate) => debate.id === id) ?? null);
-  };
-
-  const handleJoinDebate = () => {
-    if (!selectedDebate) return;
-    navigate(`/debate/${selectedDebate.id}`);
-  };
 
   return (
     <Wrapper>
       {/* Logo */}
-      <Logo>정명</Logo>
+      <Logo src={logoSymbol} alt="정명" />
 
       {/* Header */}
       <Header>
@@ -192,6 +271,12 @@ const MainPage = () => {
         </IconBtn>
         <SearchBar>
           <SearchIcon />
+          <SearchInput
+            value={searchKeyword}
+            onChange={(event) => setSearchKeyword(event.target.value)}
+            placeholder="토론을 검색하세요."
+            aria-label="토론 검색"
+          />
         </SearchBar>
         <IconBtn>
           <BellIcon />
@@ -202,9 +287,17 @@ const MainPage = () => {
       <Section>
         <SectionTitle>뜨는 토론</SectionTitle>
         <SectionSub>지금 사람들이 많이 보고 있는 토론들이에요.</SectionSub>
-        <CarouselWrapper ref={scrollRef} onScroll={handleScroll}>
+        <CarouselWrapper
+          ref={scrollRef}
+          onPointerDown={handleCarouselPointerDown}
+          onPointerMove={handleCarouselPointerMove}
+          onPointerUp={handleCarouselPointerEnd}
+          onPointerCancel={handleCarouselPointerEnd}
+          onPointerLeave={handleCarouselPointerEnd}
+          onScroll={handleScroll}
+        >
           {featuredItems.map((item) => (
-            <FeaturedCard key={item.id} item={item} onClick={() => openDebateMetadata(item.id)} />
+            <FeaturedCard key={item.id} item={item} onClick={() => openFeaturedModal(item.modalData)} />
           ))}
         </CarouselWrapper>
         <Dots>
@@ -237,15 +330,46 @@ const MainPage = () => {
         {listError && <ListError>{listError}</ListError>}
         {!listError && debateItems.length === 0 && <ListError>표시할 토론이 없습니다.</ListError>}
         {debateItems.map((item) => (
-          <DebateCard key={item.id} item={item} onClick={() => openDebateMetadata(item.id)} />
+          <DebateCard key={item.id} item={item} onClick={() => setSelectedCard(item.modalData)} />
         ))}
       </DebateList>
-      {selectedDebate && (
-        <DebateMetadataModal
-          debate={selectedDebate}
-          onClose={() => setSelectedDebate(null)}
-          onJoin={handleJoinDebate}
-        />
+
+      {selectedCard && (
+        <ModalOverlay onClick={() => setSelectedCard(null)}>
+          <ModalCard onClick={(e) => e.stopPropagation()}>
+            <ModalTop>
+              <ModalIconButton type="button" aria-label="닫기" onClick={() => setSelectedCard(null)}>
+                <BackIcon />
+              </ModalIconButton>
+              <ModalIconButton type="button" aria-label="메뉴">
+                <ModalMenuIcon />
+              </ModalIconButton>
+            </ModalTop>
+
+            <ModalTitle>{selectedCard.title}</ModalTitle>
+            <ModalDesc>{selectedCard.description}</ModalDesc>
+            <ModalTag>{selectedCard.tag}</ModalTag>
+
+            <ModalAuthorRow>
+              <ModalAvatar />
+              <span>{selectedCard.creatorName}</span>
+            </ModalAuthorRow>
+
+            <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
+            <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
+            <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
+
+            <ModalActionRow>
+              <ModalActionIconButton type="button" aria-label="저장">
+                <ModalActionIcon src={iconStar} alt="" />
+              </ModalActionIconButton>
+              <ModalActionIconButton type="button" aria-label="알림">
+                <ModalAlarmIcon src={iconAlarm2} alt="" />
+              </ModalActionIconButton>
+              <JoinButton type="button">참여하기</JoinButton>
+            </ModalActionRow>
+          </ModalCard>
+        </ModalOverlay>
       )}
     </Wrapper>
   );
@@ -280,20 +404,32 @@ const SearchBar = styled.div`
   height: 40px;
   display: flex;
   align-items: center;
+  gap: 8px;
   background: #ffffff;
   border-radius: 999px;
   padding: 0 18px;
   box-sizing: border-box;
 `;
 
-const Logo = styled.h1`
-  margin: 0;
-  font-size: 36px;
-  font-weight: 800;
-  color: #4dc891;
-  text-align: center;
-  padding: 62px 0 16px;
-  letter-spacing: -1px;
+const SearchInput = styled.input`
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: #666666;
+
+  &::placeholder {
+    color: #b4b4b4;
+  }
+`;
+
+const Logo = styled.img`
+  width: 68px;
+  height: 40px;
+  display: block;
+  margin: 62px auto 16px;
 `;
 
 const Section = styled.div`
@@ -339,6 +475,8 @@ const FCard = styled.div`
   padding: 22px 20px 18px;
   cursor: pointer;
   box-sizing: border-box;
+  overflow: hidden;
+  touch-action: pan-y;
 `;
 
 const FTitle = styled.h3`
@@ -348,6 +486,9 @@ const FTitle = styled.h3`
   line-height: 1.2;
   font-weight: 700;
   color: #2f3238;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const FDesc = styled.p`
@@ -356,6 +497,12 @@ const FDesc = styled.p`
   font-size: 14px;
   line-height: 1.3;
   color: #939393;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
 const FMeta = styled.div`
@@ -371,6 +518,13 @@ const FAuthor = styled.div`
   gap: 10px;
   font-size: 14px;
   color: #adadad;
+  min-width: 0;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 `;
 
 const Avatar = styled.div`
@@ -386,6 +540,7 @@ const FParticipants = styled.div`
   gap: 6px;
   font-size: 14px;
   color: #adadad;
+  flex-shrink: 0;
 `;
 
 const FTags = styled.div`
@@ -504,6 +659,13 @@ const DCard = styled.div`
   margin: 0 auto;
   box-sizing: border-box;
   cursor: pointer;
+  overflow: hidden;
+`;
+
+const DebateIconImg = styled.img`
+  width: 67px;
+  height: 67px;
+  flex-shrink: 0;
 `;
 
 const DLeft = styled.div`
@@ -515,12 +677,12 @@ const DLeft = styled.div`
 `;
 
 const DStatusBadge = styled.span`
-  height: 34px;
-  padding: 0 24px;
+  height: 22px;
+  padding: 0 16px;
   border-radius: 999px;
-  border: 2px solid #2dcd97;
+  border: 1.3px solid #2dcd97;
   color: #2dcd97;
-  font-size: 20px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
   display: inline-flex;
@@ -534,6 +696,9 @@ const DTitle = styled.h4`
   line-height: 1.2;
   font-weight: 700;
   color: #2f3238;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const DDesc = styled.p`
@@ -541,6 +706,147 @@ const DDesc = styled.p`
   font-size: 16px;
   line-height: 1.3;
   color: #8f8f8f;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 300;
+`;
+
+const ModalCard = styled.div`
+  width: min(100%, 354px);
+  background: #ffffff;
+  border-radius: 42px;
+  padding: 22px 20px 22px;
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+`;
+
+const ModalTop = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+`;
+
+const ModalIconButton = styled.button`
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+`;
+
+const ModalTitle = styled.h2`
+  margin: 0;
+  text-align: center;
+  font-size: 40px;
+  font-weight: 700;
+  color: #2f3238;
+  line-height: 1.2;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const ModalDesc = styled.p`
+  margin: 10px 0 16px;
+  text-align: center;
+  font-size: 17px;
+  color: #8f8f8f;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const ModalTag = styled.span`
+  display: inline-flex;
+  height: 42px;
+  align-items: center;
+  border: 1.5px solid #a7a7a7;
+  border-radius: 999px;
+  color: #9f9f9f;
+  font-size: 20px;
+  font-weight: 600;
+  padding: 0 20px;
+  margin-bottom: 14px;
+`;
+
+const ModalAuthorRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  color: #a4a4a4;
+  margin-bottom: 20px;
+`;
+
+const ModalAvatar = styled.div`
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #b8b8b8;
+`;
+
+const ModalMeta = styled.p`
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: #9a9a9a;
+`;
+
+const ModalActionRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 26px;
+`;
+
+const ModalActionIconButton = styled.button`
+  width: 48px;
+  height: 48px;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+`;
+
+const ModalActionIcon = styled.img`
+  width: 36px;
+  height: 36px;
+`;
+
+const ModalAlarmIcon = styled(ModalActionIcon)`
+  width: 25px;
+  height: 25px;
+`;
+
+const JoinButton = styled.button`
+  flex: 1;
+  height: 56px;
+  border-radius: 999px;
+  border: none;
+  background: #2dcd97;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
 `;
 
 export default MainPage;

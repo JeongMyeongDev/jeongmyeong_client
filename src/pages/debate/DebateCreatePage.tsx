@@ -2,12 +2,20 @@ import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import iconChat from '../../assets/icon_chat copy.svg';
+import iconChatActivate from '../../assets/icon_chat_activate.svg';
+import iconDebate from '../../assets/icon_debate.svg';
+import iconDebateActivate from '../../assets/icon_debate_activate.svg';
+import iconTalk from '../../assets/icon_talk.svg';
+import iconTalkActivate from '../../assets/icon_talk_activate.svg';
 import { useDebate } from '../../hooks/useDebate';
 import { useAuthStore } from '../../stores/authStore';
 
 type DebateMode = 'pro-con' | 'consensus' | 'comment';
 
 const TAG_OPTIONS = ['연애', '컴퓨터기술', '음악', '사회', '시사', '역사', '음식조리', '공예', '벌크업', '스트레칭'];
+const TITLE_MAX_LENGTH = 40;
+const DESCRIPTION_MAX_LENGTH = 120;
 
 const MODE_DESCRIPTION: Record<DebateMode, string> = {
   'pro-con': '찬반 토론은 토론 후 결론에 대해 찬성 / 반대 의견을 내비치는 토론 방식입니다.',
@@ -20,72 +28,25 @@ const MODE_TO_DEBATE_TYPE: Record<DebateMode, 'PROS_CONS' | 'CONSENSUS' | 'FREE'
   comment: 'FREE',
 };
 
+const MODE_ICONS: Record<DebateMode, { active: string; inactive: string }> = {
+  'pro-con': {
+    active: iconDebateActivate,
+    inactive: iconDebate,
+  },
+  consensus: {
+    active: iconTalkActivate,
+    inactive: iconTalk,
+  },
+  comment: {
+    active: iconChatActivate,
+    inactive: iconChat,
+  },
+};
+
 const BackIcon = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b3b3b" strokeWidth="2.2">
     <line x1="20" y1="12" x2="4" y2="12" />
     <polyline points="10 6 4 12 10 18" />
-  </svg>
-);
-
-const ProConIcon = ({ active }: { active: boolean }) => (
-  <svg width="46" height="46" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="14" cy="13" r="7.5" stroke={active ? '#2dcd97' : '#adadad'} strokeWidth="2.2" />
-    <line x1="10" y1="39" x2="29" y2="7" stroke={active ? '#2dcd97' : '#adadad'} strokeWidth="2.4" />
-    <line x1="27" y1="24" x2="40" y2="37" stroke={active ? '#2dcd97' : '#adadad'} strokeWidth="2.4" />
-    <line x1="40" y1="24" x2="27" y2="37" stroke={active ? '#2dcd97' : '#adadad'} strokeWidth="2.4" />
-  </svg>
-);
-
-const ConsensusIcon = ({ active }: { active: boolean }) => (
-  <svg width="46" height="46" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M13 24.5L7.8 29.8C6.5 31.1 6.5 33.2 7.8 34.5C9.1 35.8 11.2 35.8 12.5 34.5L17 30"
-      stroke={active ? '#2dcd97' : '#adadad'}
-      strokeWidth="2.2"
-      strokeLinecap="round"
-    />
-    <path
-      d="M33 21.5L38.2 26.8C39.5 28.1 39.5 30.2 38.2 31.5C36.9 32.8 34.8 32.8 33.5 31.5L29 27"
-      stroke={active ? '#2dcd97' : '#adadad'}
-      strokeWidth="2.2"
-      strokeLinecap="round"
-    />
-    <path
-      d="M17.5 31.6L22.3 36.4C23.6 37.7 25.7 37.7 27 36.4C28.3 35.1 28.3 33 27 31.7L22.2 26.9"
-      stroke={active ? '#2dcd97' : '#adadad'}
-      strokeWidth="2.2"
-      strokeLinecap="round"
-    />
-    <path
-      d="M6.8 22.4L16.5 12.7C17.4 11.8 18.7 11.5 19.9 11.9L24.1 13.3C24.7 13.5 25.4 13.4 26 13.1L29 11.5C30.2 10.8 31.7 11 32.7 12L39.2 18.5C40.7 20 40.7 22.4 39.2 23.9L37.1 26"
-      stroke={active ? '#2dcd97' : '#adadad'}
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M6.8 22.4C5.3 20.9 5.3 18.5 6.8 17L8.9 14.9C10.4 13.4 12.8 13.4 14.3 14.9L17.4 18"
-      stroke={active ? '#2dcd97' : '#adadad'}
-      strokeWidth="2.2"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-
-const CommentIcon = ({ active }: { active: boolean }) => (
-  <svg width="46" height="46" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M6 11.5H30.5V22H15.5L6 29V11.5Z"
-      stroke={active ? '#2dcd97' : '#adadad'}
-      strokeWidth="2.4"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M15 24.5H40V34.5H24.5L19 38.5"
-      stroke={active ? '#2dcd97' : '#adadad'}
-      strokeWidth="2.4"
-      strokeLinejoin="round"
-    />
   </svg>
 );
 
@@ -163,7 +124,9 @@ const DebateCreatePage = () => {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="토론 제목을 입력하세요..."
+            maxLength={TITLE_MAX_LENGTH}
           />
+          <CountText>{title.length}/{TITLE_MAX_LENGTH}</CountText>
         </SectionCard>
 
         <SectionCard>
@@ -172,7 +135,9 @@ const DebateCreatePage = () => {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="설명을 입력하세요..."
+            maxLength={DESCRIPTION_MAX_LENGTH}
           />
+          <CountText>{description.length}/{DESCRIPTION_MAX_LENGTH}</CountText>
         </SectionCard>
 
         <SectionCard>
@@ -200,22 +165,22 @@ const DebateCreatePage = () => {
           <SectionTitle>토론 방식</SectionTitle>
           <ModeRow>
             <ModeItem>
-              <ModeButton type="button" $active={mode === 'pro-con'} onClick={() => setMode('pro-con')}>
-                <ProConIcon active={mode === 'pro-con'} />
+              <ModeButton type="button" onClick={() => setMode('pro-con')}>
+                <ModeIcon src={mode === 'pro-con' ? MODE_ICONS['pro-con'].active : MODE_ICONS['pro-con'].inactive} alt="" />
               </ModeButton>
               <ModeLabel $active={mode === 'pro-con'}>찬반 토론</ModeLabel>
             </ModeItem>
 
             <ModeItem>
-              <ModeButton type="button" $active={mode === 'consensus'} onClick={() => setMode('consensus')}>
-                <ConsensusIcon active={mode === 'consensus'} />
+              <ModeButton type="button" onClick={() => setMode('consensus')}>
+                <ModeIcon src={mode === 'consensus' ? MODE_ICONS.consensus.active : MODE_ICONS.consensus.inactive} alt="" />
               </ModeButton>
               <ModeLabel $active={mode === 'consensus'}>합의 토론</ModeLabel>
             </ModeItem>
 
             <ModeItem>
-              <ModeButton type="button" $active={mode === 'comment'} onClick={() => setMode('comment')}>
-                <CommentIcon active={mode === 'comment'} />
+              <ModeButton type="button" onClick={() => setMode('comment')}>
+                <ModeIcon src={mode === 'comment' ? MODE_ICONS.comment.active : MODE_ICONS.comment.inactive} alt="" />
               </ModeButton>
               <ModeLabel $active={mode === 'comment'}>댓글 토론</ModeLabel>
             </ModeItem>
@@ -333,6 +298,13 @@ const DescriptionInput = styled.textarea`
   }
 `;
 
+const CountText = styled.p`
+  margin: 8px 2px 0;
+  text-align: right;
+  font-size: 12px;
+  color: #9b9b9b;
+`;
+
 const SelectedTagChip = styled.button`
   height: 36px;
   border-radius: 999px;
@@ -388,15 +360,21 @@ const ModeItem = styled.div`
   gap: 8px;
 `;
 
-const ModeButton = styled.button<{ $active: boolean }>`
-  width: 84px;
-  height: 84px;
-  border-radius: 16px;
-  border: 2px solid ${({ $active }) => ($active ? '#2dcd97' : '#b7b7b7')};
-  background: transparent;
+const ModeButton = styled.button`
+  width: 72px;
+  height: 72px;
+  border: none;
+  background: none;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+`;
+
+const ModeIcon = styled.img`
+  width: 72px;
+  height: 72px;
+  display: block;
 `;
 
 const ModeLabel = styled.span<{ $active: boolean }>`

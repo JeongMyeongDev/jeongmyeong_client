@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
+import logoSymbol from '../../assets/logo_symbol.svg';
 import { useMessage } from '../../hooks/useMessage';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -62,7 +63,7 @@ const MessagePage = () => {
 
   return (
     <Wrapper>
-      <Logo>정명</Logo>
+      <Logo src={logoSymbol} alt="정명" />
 
       <RoomTabs>
         {chatRooms.map((room) => (
@@ -127,13 +128,11 @@ const Wrapper = styled.div`
   padding: 62px 14px 90px;
 `;
 
-const Logo = styled.h1`
-  margin: 0 0 16px;
-  font-size: 36px;
-  font-weight: 800;
-  color: #4dc891;
-  text-align: center;
-  letter-spacing: -1px;
+const Logo = styled.img`
+  width: 68px;
+  height: 40px;
+  display: block;
+  margin: 0 auto 16px;
 `;
 
 const RoomTabs = styled.div`

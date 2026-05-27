@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
+import btnDscionControl from '../../assets/btn_dscion_control.svg';
 import iconAlarm from '../../assets/icon_alarm.svg';
+import iconChat from '../../assets/icon_chat.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
+import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import type { Debate } from '../../types/debate';
 
@@ -25,34 +28,7 @@ const mapToArchiveCard = (debate: Debate): ArchiveCardItem => ({
   description: debate.description,
 });
 
-const FilterIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M3 6H21" stroke="#9C9C9C" strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M3 12H21" stroke="#9C9C9C" strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M3 18H21" stroke="#9C9C9C" strokeWidth="1.8" strokeLinecap="round" />
-    <circle cx="8" cy="6" r="1.8" fill="#F4F4F4" stroke="#9C9C9C" strokeWidth="1.8" />
-    <circle cx="14.5" cy="12" r="1.8" fill="#F4F4F4" stroke="#9C9C9C" strokeWidth="1.8" />
-    <circle cx="11" cy="18" r="1.8" fill="#F4F4F4" stroke="#9C9C9C" strokeWidth="1.8" />
-  </svg>
-);
-
-const ChatCircleIcon = () => (
-  <svg width="62" height="62" viewBox="0 0 62 62" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="31" cy="31" r="29.5" stroke="#A9A9A9" strokeWidth="2" />
-    <path
-      d="M19.7 27.4H39.3V36.1H26.7L19.7 41.4V27.4Z"
-      stroke="#A9A9A9"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M23.5 19.6H43.1V28.3H31.4"
-      stroke="#A9A9A9"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
+const FilterIcon = () => <img src={btnDscionControl} width="48" height="34" alt="" />;
 
 const DebateArchivePage = () => {
   const { debates, fetchArchivedDebates } = useDebate();
@@ -80,7 +56,7 @@ const DebateArchivePage = () => {
 
   return (
     <Wrapper>
-      <Logo>정명</Logo>
+      <Logo src={logoSymbol} alt="정명" />
 
       <HeaderRow>
         <SideButton type="button" aria-label="메뉴">
@@ -119,7 +95,7 @@ const DebateArchivePage = () => {
           <Card key={card.id}>
             <CardTop>
               <ClosedBadge>종결됨</ClosedBadge>
-              <ChatCircleIcon />
+              <ChatCircleIconImg src={iconChat} alt="" />
             </CardTop>
             <CardTitle>{card.title}</CardTitle>
             <CardDesc>{card.description}</CardDesc>
@@ -136,14 +112,12 @@ const Wrapper = styled.div`
   padding: 62px 14px 90px;
 `;
 
-const Logo = styled.h1`
-  margin: 0;
-  font-size: 36px;
-  font-weight: 800;
-  color: #4dc891;
-  text-align: center;
+const Logo = styled.img`
+  width: 68px;
+  height: 40px;
+  display: block;
+  margin: 0 auto;
   margin-bottom: 16px;
-  letter-spacing: -1px;
 `;
 
 const HeaderRow = styled.div`
@@ -183,11 +157,11 @@ const FilterRow = styled.div`
 `;
 
 const FilterButton = styled.button`
-  width: 44px;
-  height: 30px;
-  border-radius: 999px;
-  border: 1.5px solid #ababab;
-  background: #f3f3f3;
+  width: 48px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -222,6 +196,7 @@ const Card = styled.article`
   background: #f8f8f8;
   border-radius: 24px;
   padding: 16px 16px 14px;
+  overflow: hidden;
 `;
 
 const CardTop = styled.div`
@@ -229,6 +204,12 @@ const CardTop = styled.div`
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 6px;
+`;
+
+const ChatCircleIconImg = styled.img`
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
 `;
 
 const ClosedBadge = styled.span`
@@ -250,12 +231,21 @@ const CardTitle = styled.h3`
   font-weight: 700;
   color: #2f3238;
   letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const CardDesc = styled.p`
   margin: 0;
   font-size: 14px;
   color: #8f8f8f;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
 export default DebateArchivePage;

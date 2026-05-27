@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import logoSymbol from '../../assets/logo_symbol.svg';
 import { useAuth } from '../../hooks/useAuth';
 
 const EyeIcon = () => (
@@ -52,7 +53,7 @@ const LoginPage = () => {
 
   return (
     <Wrapper>
-      <Logo>정명</Logo>
+      <Logo src={logoSymbol} alt="정명" />
       <Form onSubmit={handleSubmit}>
         <FieldGroup>
           <Label>이메일</Label>
@@ -109,13 +110,12 @@ const Wrapper = styled.div`
   background: #f5f5f5;
 `;
 
-const Logo = styled.h1`
+const Logo = styled.img`
+  width: 68px;
+  height: 40px;
+  display: block;
   margin-top: 62px;
-  font-size: 52px;
-  font-weight: 800;
-  color: #4dc891;
   margin-bottom: 56px;
-  letter-spacing: -1px;
 `;
 
 const Form = styled.form`

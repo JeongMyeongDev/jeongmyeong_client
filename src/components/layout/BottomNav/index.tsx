@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import iconBtnGenerate from '../../../assets/icon_btn_generate.svg';
 
 const HomeIcon = ({ active }: { active: boolean }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? '#4dc891' : 'none'} stroke={active ? '#4dc891' : '#bbb'} strokeWidth="2">
@@ -51,11 +52,8 @@ const BottomNav = () => {
       ))}
 
       <FabWrapper>
-        <Fab onClick={() => navigate('/debate/create')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
+        <Fab type="button" aria-label="토론 생성" onClick={() => navigate('/debate/create')}>
+          <FabIcon src={iconBtnGenerate} alt="" />
         </Fab>
       </FabWrapper>
 
@@ -114,16 +112,21 @@ const FabWrapper = styled.div`
 `;
 
 const Fab = styled.button`
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: #4dc891;
+  width: 44px;
+  height: 60px;
   border: none;
+  background: transparent;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(77, 200, 145, 0.4);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+`;
+
+const FabIcon = styled.img`
+  width: 44px;
+  height: 60px;
+  display: block;
 `;
 
 export default BottomNav;

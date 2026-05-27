@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
+import btnDscionControl from '../../assets/btn_dscion_control.svg';
 import iconAlarm from '../../assets/icon_alarm.svg';
+import iconAlarm2 from '../../assets/icon_alarm2.svg';
+import iconChat from '../../assets/icon_chat.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
-import DebateMetadataModal from '../../components/debate/DebateMetadataModal';
+import iconStar from '../../assets/icon_star.svg';
+import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import type { Debate } from '../../types/debate';
 
@@ -13,6 +16,11 @@ type DebateRoomCard = {
   title: string;
   description: string;
   statusLabel: '준비중' | '진행중';
+  creatorName: string;
+  debateTypeLabel: string;
+  participants: number;
+  tagLabel: string;
+  createdDateLabel: string;
 };
 
 const FILTER_ITEMS = ['찬반토론', '합의토론', '댓글토론'];
@@ -21,67 +29,55 @@ const FILTER_TYPE_MAP: Record<string, 'PROS_CONS' | 'CONSENSUS' | 'FREE'> = {
   합의토론: 'CONSENSUS',
   댓글토론: 'FREE',
 };
+const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
+  PROS_CONS: '찬반토론',
+  CONSENSUS: '합의토론',
+  FREE: '댓글토론',
+};
+
+const formatCreatedDate = (createdAt?: string) => {
+  if (!createdAt) return '20XX. YY. ZZ';
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return '20XX. YY. ZZ';
+  return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
+};
 
 const mapToRoomCard = (debate: Debate): DebateRoomCard => ({
   id: debate.id,
   title: debate.title,
   description: debate.description,
   statusLabel: debate.status === 'OPEN' ? '진행중' : '준비중',
+  creatorName: debate.creator?.nickname ?? '사용자 이름',
+  debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
+  participants: 3,
+  tagLabel: `#${debate.tagMaps?.[0]?.tag.name ?? '기술'}`,
+  createdDateLabel: formatCreatedDate(debate.createdAt),
 });
 
-const FilterIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-    <path d="M3 6H21" stroke="#9C9C9C" strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M3 12H21" stroke="#9C9C9C" strokeWidth="1.8" strokeLinecap="round" />
-    <path d="M3 18H21" stroke="#9C9C9C" strokeWidth="1.8" strokeLinecap="round" />
-    <circle cx="8" cy="6" r="1.8" fill="#F4F4F4" stroke="#9C9C9C" strokeWidth="1.8" />
-    <circle cx="14.5" cy="12" r="1.8" fill="#F4F4F4" stroke="#9C9C9C" strokeWidth="1.8" />
-    <circle cx="11" cy="18" r="1.8" fill="#F4F4F4" stroke="#9C9C9C" strokeWidth="1.8" />
+const FilterIcon = () => <img src={btnDscionControl} width="48" height="34" alt="" />;
+
+const BackIcon = () => (
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#353535" strokeWidth="2.2">
+    <line x1="20" y1="12" x2="4" y2="12" />
+    <polyline points="10 6 4 12 10 18" />
   </svg>
 );
 
-const ChatCircleIcon = () => (
-  <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
-    <circle cx="19" cy="19" r="18" stroke="#A9A9A9" strokeWidth="1.5" />
-    <path
-      d="M12 16.8H24V22.3H16.3L12 25.5V16.8Z"
-      stroke="#A9A9A9"
-      strokeWidth="1.5"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M14.5 12H26.5V17.4H19.3"
-      stroke="#A9A9A9"
-      strokeWidth="1.5"
-      strokeLinejoin="round"
-    />
+const ModalMenuIcon = () => (
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#353535" strokeWidth="2.2">
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="9" y1="18" x2="21" y2="18" />
   </svg>
 );
 
 const DebatePage = () => {
-  const navigate = useNavigate();
-  const { id: debateId } = useParams();
-  const {
-    debates,
-    currentDebate,
-    messages,
-    fetchDebates,
-    fetchDebate,
-    fetchMessages,
-    createMessage,
-    archiveDebate,
-  } = useDebate();
-  const [activeFilter, setActiveFilter] = useState(FILTER_ITEMS[0]);
+  const { debates, fetchDebates } = useDebate();
+  const [activeFilter, setActiveFilter] = useState('찬반토론');
   const [listError, setListError] = useState('');
-  const [detailError, setDetailError] = useState('');
-  const [draft, setDraft] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [isArchiving, setIsArchiving] = useState(false);
-  const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
+  const [selectedCard, setSelectedCard] = useState<DebateRoomCard | null>(null);
 
   useEffect(() => {
-    if (debateId) return;
-
     const loadDebates = async () => {
       try {
         await fetchDebates({
@@ -96,121 +92,17 @@ const DebatePage = () => {
         setListError('토론 목록을 불러오지 못했습니다.');
       }
     };
-
     void loadDebates();
-  }, [activeFilter, debateId, fetchDebates]);
+  }, [activeFilter, fetchDebates]);
 
-  useEffect(() => {
-    if (!debateId) return;
-
-    const loadDebateDetail = async () => {
-      try {
-        await Promise.all([fetchDebate(debateId), fetchMessages(debateId)]);
-        setDetailError('');
-      } catch {
-        setDetailError('토론 정보를 불러오지 못했습니다.');
-      }
-    };
-
-    void loadDebateDetail();
-  }, [debateId, fetchDebate, fetchMessages]);
-
-  const cards = useMemo(() => debates.slice(0, 8).map(mapToRoomCard), [debates]);
-  const openDebateMetadata = (id: string) => {
-    setSelectedDebate(debates.find((debate) => debate.id === id) ?? null);
-  };
-
-  const handleJoinDebate = () => {
-    if (!selectedDebate) return;
-    navigate(`/debate/${selectedDebate.id}`);
-  };
-
-  const handleSend = async () => {
-    if (!debateId || !draft.trim() || isSending) return;
-
-    setIsSending(true);
-    try {
-      await createMessage(debateId, draft.trim());
-      setDraft('');
-      setDetailError('');
-    } catch {
-      setDetailError('의견 등록에 실패했습니다.');
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleArchive = async () => {
-    if (!debateId || isArchiving) return;
-
-    setIsArchiving(true);
-    try {
-      await archiveDebate(debateId);
-      setDetailError('');
-    } catch {
-      setDetailError('토론 보관에 실패했습니다. 종료된 토론만 보관할 수 있습니다.');
-    } finally {
-      setIsArchiving(false);
-    }
-  };
-
-  if (debateId) {
-    return (
-      <Wrapper>
-        <Logo>정명</Logo>
-
-        <DetailHeader>
-          <BackButton type="button" onClick={() => navigate(-1)}>
-            뒤로
-          </BackButton>
-          {currentDebate?.status === 'CLOSED' && (
-            <ArchiveButton type="button" onClick={handleArchive} disabled={isArchiving}>
-              {isArchiving ? '보관 중...' : '보관'}
-            </ArchiveButton>
-          )}
-        </DetailHeader>
-
-        {detailError && <ErrorText>{detailError}</ErrorText>}
-
-        <DetailPanel>
-          <DetailTitle>{currentDebate?.title ?? '토론을 불러오는 중입니다.'}</DetailTitle>
-          <DetailDesc>{currentDebate?.description}</DetailDesc>
-          <DetailMeta>{currentDebate?.status ?? ''}</DetailMeta>
-        </DetailPanel>
-
-        <PostList>
-          {messages.length === 0 && <EmptyText>아직 등록된 의견이 없습니다.</EmptyText>}
-          {messages.map((message) => (
-            <PostCard key={message.id}>
-              <PostAuthor>{message.author.nickname}</PostAuthor>
-              <PostContent>{message.content}</PostContent>
-            </PostCard>
-          ))}
-        </PostList>
-
-        <Composer>
-          <ComposerInput
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="의견을 입력하세요."
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-          />
-          <SendButton type="button" onClick={() => void handleSend()} disabled={isSending || !draft.trim()}>
-            등록
-          </SendButton>
-        </Composer>
-      </Wrapper>
-    );
-  }
+  const cards = useMemo(
+    () => debates.slice(0, 8).map(mapToRoomCard),
+    [debates],
+  );
 
   return (
     <Wrapper>
-      <Logo>정명</Logo>
+      <Logo src={logoSymbol} alt="정명" />
 
       <HeaderRow>
         <SideButton type="button" aria-label="메뉴">
@@ -246,22 +138,55 @@ const DebatePage = () => {
         {listError && <ErrorText>{listError}</ErrorText>}
         {!listError && cards.length === 0 && <ErrorText>등록된 토론이 없습니다.</ErrorText>}
         {cards.map((card) => (
-          <Card key={card.id} onClick={() => openDebateMetadata(card.id)}>
+          <Card key={card.id} onClick={() => setSelectedCard(card)}>
             <CardTop>
-              <StatusBadge $running={card.statusLabel === '진행중'}>{card.statusLabel}</StatusBadge>
-              <ChatCircleIcon />
+              <StatusBadge $running={card.statusLabel === '진행중'}>
+                {card.statusLabel}
+              </StatusBadge>
+              <ChatCircleIconImg src={iconChat} alt="" />
             </CardTop>
             <CardTitle>{card.title}</CardTitle>
             <CardDesc>{card.description}</CardDesc>
           </Card>
         ))}
       </ListWrap>
-      {selectedDebate && (
-        <DebateMetadataModal
-          debate={selectedDebate}
-          onClose={() => setSelectedDebate(null)}
-          onJoin={handleJoinDebate}
-        />
+
+      {selectedCard && (
+        <ModalOverlay onClick={() => setSelectedCard(null)}>
+          <ModalCard onClick={(e) => e.stopPropagation()}>
+            <ModalTop>
+              <ModalIconButton type="button" aria-label="닫기" onClick={() => setSelectedCard(null)}>
+                <BackIcon />
+              </ModalIconButton>
+              <ModalIconButton type="button" aria-label="메뉴">
+                <ModalMenuIcon />
+              </ModalIconButton>
+            </ModalTop>
+
+            <ModalTitle>{selectedCard.title}</ModalTitle>
+            <ModalDesc>{selectedCard.description}</ModalDesc>
+            <ModalTag>{selectedCard.tagLabel}</ModalTag>
+
+            <ModalAuthorRow>
+              <ModalAvatar />
+              <span>{selectedCard.creatorName}</span>
+            </ModalAuthorRow>
+
+            <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
+            <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
+            <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
+
+            <ModalActionRow>
+              <ModalActionIconButton type="button" aria-label="저장">
+                <ModalActionIcon src={iconStar} alt="" />
+              </ModalActionIconButton>
+              <ModalActionIconButton type="button" aria-label="알림">
+                <ModalAlarmIcon src={iconAlarm2} alt="" />
+              </ModalActionIconButton>
+              <JoinButton type="button">참여하기</JoinButton>
+            </ModalActionRow>
+          </ModalCard>
+        </ModalOverlay>
       )}
     </Wrapper>
   );
@@ -273,14 +198,12 @@ const Wrapper = styled.div`
   padding: 62px 14px 90px;
 `;
 
-const Logo = styled.h1`
-  margin: 0;
-  font-size: 36px;
-  font-weight: 800;
-  color: #4dc891;
-  text-align: center;
+const Logo = styled.img`
+  width: 68px;
+  height: 40px;
+  display: block;
+  margin: 0 auto;
   margin-bottom: 16px;
-  letter-spacing: -1px;
 `;
 
 const HeaderRow = styled.div`
@@ -320,11 +243,11 @@ const FilterRow = styled.div`
 `;
 
 const FilterButton = styled.button`
-  width: 56px;
-  height: 38px;
-  border-radius: 999px;
-  border: 1.5px solid #9f9f9f;
-  background: #f3f3f3;
+  width: 48px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -350,15 +273,16 @@ const ListWrap = styled.div`
 `;
 
 const ErrorText = styled.p`
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 12px;
   color: #f04444;
 `;
 
 const Card = styled.article`
-  background: #f8f8f8;
+  background: #ffffff;
   border-radius: 20px;
   padding: 12px 14px 14px;
+  overflow: hidden;
   cursor: pointer;
 `;
 
@@ -369,17 +293,26 @@ const CardTop = styled.div`
   margin-bottom: 6px;
 `;
 
-const StatusBadge = styled.span<{ $running: boolean }>`
+const ChatCircleIconImg = styled.img`
+  width: 30px;
   height: 30px;
-  padding: 0 14px;
+  flex-shrink: 0;
+`;
+
+const StatusBadge = styled.span<{ $running: boolean }>`
+  width: 43px;
+  height: 26px;
+  padding: 0;
   border-radius: 999px;
-  border: 1.5px solid #2dcd97;
+  border: 1.2px solid #2dcd97;
   background: ${({ $running }) => ($running ? '#2dcd97' : 'transparent')};
   color: ${({ $running }) => ($running ? '#ffffff' : '#2dcd97')};
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 `;
 
 const CardTitle = styled.h3`
@@ -389,135 +322,156 @@ const CardTitle = styled.h3`
   color: #333333;
   font-weight: 700;
   letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const CardDesc = styled.p`
   margin: 0;
   font-size: 14px;
   color: #8f8f8f;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
-const DetailHeader = styled.div`
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  justify-content: center;
+  padding: 18px;
+  z-index: 300;
 `;
 
-const BackButton = styled.button`
+const ModalCard = styled.div`
+  width: min(100%, 354px);
+  background: #ffffff;
+  border-radius: 42px;
+  padding: 22px 20px 22px;
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+`;
+
+const ModalTop = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+`;
+
+const ModalIconButton = styled.button`
+  width: 40px;
+  height: 40px;
   border: none;
   background: transparent;
-  color: #2f3238;
-  font-size: 14px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 `;
 
-const ArchiveButton = styled.button`
-  height: 34px;
-  border: none;
-  border-radius: 999px;
-  background: #2dcd97;
-  color: #ffffff;
-  padding: 0 16px;
-  font-size: 13px;
-  font-weight: 700;
-
-  &:disabled {
-    opacity: 0.65;
-  }
-`;
-
-const DetailPanel = styled.section`
-  background: #ffffff;
-  border-radius: 20px;
-  padding: 16px;
-  margin-bottom: 12px;
-`;
-
-const DetailTitle = styled.h2`
-  margin: 0 0 8px;
-  font-size: 22px;
-  color: #2f3238;
-`;
-
-const DetailDesc = styled.p`
-  margin: 0 0 10px;
-  font-size: 14px;
-  line-height: 1.5;
-  color: #666666;
-`;
-
-const DetailMeta = styled.span`
-  font-size: 12px;
-  color: #2dcd97;
-  font-weight: 700;
-`;
-
-const PostList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 12px;
-`;
-
-const EmptyText = styled.p`
-  text-align: center;
-  color: #9b9b9b;
-  font-size: 13px;
-  padding: 24px 0;
-`;
-
-const PostCard = styled.article`
-  background: #ffffff;
-  border: 1px solid #e2e2e2;
-  border-radius: 16px;
-  padding: 12px;
-`;
-
-const PostAuthor = styled.p`
-  margin: 0 0 6px;
-  color: #2dcd97;
-  font-size: 12px;
-  font-weight: 700;
-`;
-
-const PostContent = styled.p`
+const ModalTitle = styled.h2`
   margin: 0;
+  text-align: center;
+  font-size: 40px;
+  font-weight: 700;
   color: #2f3238;
-  font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.2;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const ModalDesc = styled.p`
+  margin: 10px 0 16px;
+  text-align: center;
+  font-size: 17px;
+  color: #8f8f8f;
+  line-height: 1.35;
   white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
-const Composer = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const ComposerInput = styled.input`
-  flex: 1;
+const ModalTag = styled.span`
+  display: inline-flex;
   height: 42px;
+  align-items: center;
+  border: 1.5px solid #a7a7a7;
   border-radius: 999px;
-  border: 1.5px solid #c8c8c8;
-  background: #ffffff;
-  padding: 0 14px;
-  font-size: 14px;
-  outline: none;
+  color: #9f9f9f;
+  font-size: 20px;
+  font-weight: 600;
+  padding: 0 20px;
+  margin-bottom: 14px;
 `;
 
-const SendButton = styled.button`
-  width: 70px;
+const ModalAuthorRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  color: #a4a4a4;
+  margin-bottom: 20px;
+`;
+
+const ModalAvatar = styled.div`
+  width: 42px;
   height: 42px;
+  border-radius: 50%;
+  background: #b8b8b8;
+`;
+
+const ModalMeta = styled.p`
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: #9a9a9a;
+`;
+
+const ModalActionRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 26px;
+`;
+
+const ModalActionIconButton = styled.button`
+  width: 48px;
+  height: 48px;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+`;
+
+const ModalActionIcon = styled.img`
+  width: 32px;
+  height: 32px;
+`;
+
+const ModalAlarmIcon = styled(ModalActionIcon)`
+  width: 22px;
+  height: 22px;
+`;
+
+const JoinButton = styled.button`
+  flex: 1;
+  height: 56px;
   border-radius: 999px;
   border: none;
   background: #2dcd97;
   color: #ffffff;
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 700;
-
-  &:disabled {
-    opacity: 0.65;
-  }
 `;
 
 export default DebatePage;
