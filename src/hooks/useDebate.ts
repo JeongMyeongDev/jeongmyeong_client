@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useDebateStore } from '../stores/debateStore';
 import { debateService } from '../services/debateService';
 import type {
+  CreateChildDebateRequest,
   CreateConsensusRequest,
   CreateDebateRequest,
   CreateSelectionTargetRequest,
@@ -37,6 +38,19 @@ export const useDebate = () => {
     return data.debate;
   }, []);
 
+  const joinDebate = useCallback(async (id: string) => {
+    const { data } = await debateService.join(id);
+    setCurrentDebate(
+      currentDebate?.id === id ? { ...currentDebate, participantCount: data.participantCount } : currentDebate,
+    );
+    setDebates(
+      debates.map((debate) =>
+        debate.id === id ? { ...debate, participantCount: data.participantCount } : debate,
+      ),
+    );
+    return data.participantCount;
+  }, [currentDebate, debates, setCurrentDebate, setDebates]);
+
   const createMessage = useCallback(async (id: string, content: string) => {
     const { data } = await debateService.createPost(id, { content });
     await fetchMessages(id);
@@ -60,6 +74,14 @@ export const useDebate = () => {
     return data.consensus;
   }, []);
 
+  const createChildDebateFromSelection = useCallback(async (
+    selectionTargetId: string,
+    payload: CreateChildDebateRequest,
+  ) => {
+    const { data } = await debateService.createChildDebateFromSelection(selectionTargetId, payload);
+    return data.debate;
+  }, []);
+
   return {
     debates,
     currentDebate,
@@ -69,10 +91,12 @@ export const useDebate = () => {
     fetchDebate,
     fetchMessages,
     createDebate,
+    joinDebate,
     createMessage,
     archiveDebate,
     createSelectionTarget,
     createConsensus,
+    createChildDebateFromSelection,
     addMessage,
   };
 };

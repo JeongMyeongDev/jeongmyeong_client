@@ -2,7 +2,7 @@ export type DebateType = 'FREE' | 'CONSENSUS' | 'PROS_CONS';
 export type DebateStatus = 'OPEN' | 'CLOSED' | 'ARCHIVED';
 export type PostStatus = 'VISIBLE' | 'HIDDEN' | 'DELETED';
 export type SelectionSource = 'POST' | 'COMMENT';
-export type ConsensusStatus = 'OPEN' | 'CLOSED' | 'ARCHIVED';
+export type ConsensusStatus = 'OPEN' | 'APPROVED' | 'REJECTED' | 'CLOSED' | 'ARCHIVED';
 export type ConsensusVoteType = 'APPROVE' | 'REJECT' | 'COMMENT';
 
 export interface DebateTag {
@@ -18,6 +18,7 @@ export interface Debate {
   status: DebateStatus;
   createdAt?: string;
   archivedAt?: string | null;
+  participantCount?: number;
   tagMaps?: Array<{ tag: DebateTag }>;
   creator?: {
     id: string;
@@ -80,6 +81,17 @@ export interface Consensus {
   title: string;
   content: string;
   status: ConsensusStatus;
+  resultSummary?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  selectionTarget?: Pick<SelectionTarget, 'id' | 'selectedText'>;
+  creator?: {
+    id: string;
+    nickname: string;
+  };
+  approveCount?: number;
+  rejectCount?: number;
+  commentCount?: number;
 }
 
 export interface ConsensusVote {
@@ -88,7 +100,38 @@ export interface ConsensusVote {
   userId: string;
   voteType: ConsensusVoteType;
   comment?: string | null;
+  createdAt?: string;
   updatedAt: string;
+  user?: {
+    id: string;
+    nickname: string;
+  };
+}
+
+export interface Definition {
+  id: string;
+  term: string;
+  content: string;
+  scope: 'IN_DEBATE' | 'GLOBAL_REFERENCE';
+  status: 'ACTIVE' | 'ARCHIVED';
+  sourceDebateId: string;
+  sourceConsensusId?: string | null;
+  selectionTargetId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  sourceDebate?: {
+    id: string;
+    title: string;
+  };
+  sourceConsensus?: {
+    id: string;
+    title: string;
+    status: ConsensusStatus;
+  } | null;
+  selectionTarget?: {
+    id: string;
+    selectedText: string;
+  } | null;
 }
 
 export interface CommentSelection {

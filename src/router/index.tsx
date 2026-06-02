@@ -8,6 +8,7 @@ import MainPage from '../pages/main/MainPage';
 import DebatePage from '../pages/debate/DebatePage';
 import DebateCreatePage from '../pages/debate/DebateCreatePage';
 import DebateArchivePage from '../pages/debate/DebateArchivePage';
+import DefinitionSearchPage from '../pages/definitions/DefinitionSearchPage';
 import MessagePage from '../pages/message/MessagePage';
 import ProfilePage from '../pages/profile/ProfilePage';
 
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
           { path: 'debate/:id', element: <DebatePage /> },
           { path: 'debate/create', element: <DebateCreatePage /> },
           { path: 'debate/archive', element: <DebateArchivePage /> },
+          { path: 'definitions', element: <DefinitionSearchPage /> },
           { path: 'message', element: <MessagePage /> },
           { path: 'profile', element: <ProfilePage /> },
         ],

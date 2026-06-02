@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconAlarm2 from '../../assets/icon_alarm2.svg';
@@ -48,6 +49,7 @@ const ModalMenuIcon = () => (
 const CATEGORIES = ['예술', '연애', '요리', '게임', '스포츠', '정치'];
 
 type ModalDebateItem = {
+  id: string;
   title: string;
   description: string;
   creatorName: string;
@@ -95,11 +97,12 @@ const formatCreatedDate = (createdAt?: string) => {
 };
 
 const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
+  id: debate.id,
   title: debate.title,
   description: debate.description,
   creatorName: debate.creator?.nickname ?? '사용자 이름',
   debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
-  participants: 3,
+  participants: debate.participantCount ?? 0,
   tag: `#${debate.tagMaps?.[0]?.tag.name ?? '기술'}`,
   createdDateLabel: formatCreatedDate(debate.createdAt),
 });
@@ -152,12 +155,15 @@ const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => vo
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 const MainPage = () => {
-  const { debates, fetchDebates } = useDebate();
+  const navigate = useNavigate();
+  const { debates, fetchDebates, joinDebate } = useDebate();
   const [activeCategory, setActiveCategory] = useState('예술');
   const [activeDot, setActiveDot] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [listError, setListError] = useState('');
   const [selectedCard, setSelectedCard] = useState<ModalDebateItem | null>(null);
+  const [joinError, setJoinError] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isPointerDownRef = useRef(false);
   const startXRef = useRef(0);
@@ -214,7 +220,25 @@ const MainPage = () => {
       suppressCardClickRef.current = false;
       return;
     }
+    setJoinError('');
     setSelectedCard(item);
+  };
+
+  const handleJoinDebate = async () => {
+    if (!selectedCard || isJoining) return;
+
+    setIsJoining(true);
+    setJoinError('');
+
+    try {
+      await joinDebate(selectedCard.id);
+      setSelectedCard(null);
+      navigate(`/message?roomId=${selectedCard.id}`);
+    } catch {
+      setJoinError('토론 참여에 실패했습니다. 로그인 상태를 확인한 뒤 다시 시도해주세요.');
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   const filteredDebates = useMemo(() => {
@@ -251,7 +275,7 @@ const MainPage = () => {
     title: debate.title,
     description: debate.description,
     author: debate.creator?.nickname ?? '사용자',
-    participants: 0,
+    participants: debate.participantCount ?? 0,
     status: debate.status === 'OPEN' ? 'OPEN' : 'WAITING',
     tag: `#${debate.tagMaps?.[0]?.tag.name ?? activeCategory}`,
     modalData: mapDebateToModalItem(debate),
@@ -330,7 +354,14 @@ const MainPage = () => {
         {listError && <ListError>{listError}</ListError>}
         {!listError && debateItems.length === 0 && <ListError>표시할 토론이 없습니다.</ListError>}
         {debateItems.map((item) => (
-          <DebateCard key={item.id} item={item} onClick={() => setSelectedCard(item.modalData)} />
+          <DebateCard
+            key={item.id}
+            item={item}
+            onClick={() => {
+              setJoinError('');
+              setSelectedCard(item.modalData);
+            }}
+          />
         ))}
       </DebateList>
 
@@ -358,6 +389,7 @@ const MainPage = () => {
             <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
             <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
             <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
+            {joinError && <JoinError>{joinError}</JoinError>}
 
             <ModalActionRow>
               <ModalActionIconButton type="button" aria-label="저장">
@@ -366,7 +398,9 @@ const MainPage = () => {
               <ModalActionIconButton type="button" aria-label="알림">
                 <ModalAlarmIcon src={iconAlarm2} alt="" />
               </ModalActionIconButton>
-              <JoinButton type="button">참여하기</JoinButton>
+              <JoinButton type="button" disabled={isJoining} onClick={() => void handleJoinDebate()}>
+                {isJoining ? '참여 중' : '참여하기'}
+              </JoinButton>
             </ModalActionRow>
           </ModalCard>
         </ModalOverlay>
@@ -810,6 +844,13 @@ const ModalMeta = styled.p`
   color: #9a9a9a;
 `;
 
+const JoinError = styled.p`
+  margin: 10px 0 0;
+  color: #f04444;
+  font-size: 12px;
+  line-height: 1.45;
+`;
+
 const ModalActionRow = styled.div`
   display: flex;
   align-items: center;
@@ -847,6 +888,11 @@ const JoinButton = styled.button`
   color: #ffffff;
   font-size: 20px;
   font-weight: 700;
+
+  &:disabled {
+    background: #9edec8;
+    cursor: not-allowed;
+  }
 `;
 
 export default MainPage;

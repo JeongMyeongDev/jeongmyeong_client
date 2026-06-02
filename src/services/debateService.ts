@@ -17,6 +17,13 @@ export interface CreateDebateRequest {
   closeAt?: string;
 }
 
+export interface CreateChildDebateRequest {
+  title: string;
+  description: string;
+  debateType?: 'FREE' | 'CONSENSUS' | 'PROS_CONS';
+  tags?: string[];
+}
+
 export interface ListDebatesParams {
   keyword?: string;
   tag?: string;
@@ -44,6 +51,11 @@ interface DebateDetailResponse {
 interface ArchiveDebateResponse {
   success: boolean;
   debate: Pick<Debate, 'id' | 'status' | 'archivedAt'>;
+}
+
+interface JoinDebateResponse {
+  success: boolean;
+  participantCount: number;
 }
 
 interface DebatePostsResponse {
@@ -91,6 +103,7 @@ export const debateService = {
   getList: (params?: ListDebatesParams) => api.get<DebateListResponse>('/debates', { params }),
   getById: (id: string) => api.get<DebateDetailResponse>(`/debates/${id}`),
   create: (data: CreateDebateRequest) => api.post<DebateDetailResponse>('/debates', data),
+  join: (id: string) => api.post<JoinDebateResponse>(`/debates/${id}/participants`),
   archive: (id: string) => api.post<ArchiveDebateResponse>(`/debates/${id}/archive`),
   getMessages: (id: string, params?: Pick<ListDebatesParams, 'page' | 'limit'>) =>
     api.get<DebatePostsResponse>(`/debates/${id}/posts`, { params }),
@@ -100,6 +113,8 @@ export const debateService = {
     api.post<CreateSelectionTargetResponse>(`/debates/${id}/selection-targets`, data),
   createConsensus: (id: string, data: CreateConsensusRequest) =>
     api.post<CreateConsensusResponse>(`/debates/${id}/consensuses`, data),
+  createChildDebateFromSelection: (selectionTargetId: string, data: CreateChildDebateRequest) =>
+    api.post<DebateDetailResponse>(`/selection-targets/${selectionTargetId}/child-debates`, data),
   getArchived: (params?: Omit<ListDebatesParams, 'status'>) =>
     api.get<DebateListResponse>('/debates/archive', { params }),
 };

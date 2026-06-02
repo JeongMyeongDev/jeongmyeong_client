@@ -4,7 +4,8 @@ import BottomNav from './components/layout/BottomNav';
 
 const App = () => {
   const location = useLocation();
-  const hideBottomNav = location.pathname.startsWith('/debate/create');
+  const hideBottomNav =
+    location.pathname.startsWith('/debate/create') || location.pathname.startsWith('/message');
 
   return (
     <Layout>
