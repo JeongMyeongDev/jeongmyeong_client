@@ -190,27 +190,68 @@ const MessagePage = () => {
     window.getSelection()?.removeAllRanges();
   };
 
+  useEffect(() => {
+    if (!selectionDraft && !selectionAction) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest('[data-selection-layer="true"]')) return;
+      closeSelectionFlow();
+    };
+
+    const handleSelectionChange = () => {
+      if (selectionAction) return;
+      window.setTimeout(() => {
+        const selectedText = window.getSelection()?.toString().trim() ?? '';
+        if (!selectedText) setSelectionDraft(null);
+      }, 0);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('selectionchange', handleSelectionChange);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [selectionAction, selectionDraft]);
+
   const handleTextSelection = () => {
     const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      setSelectionDraft(null);
+      return;
+    }
 
     const range = selection.getRangeAt(0);
     const selectedText = selection.toString().trim();
-    if (!selectedText) return;
+    if (!selectedText) {
+      setSelectionDraft(null);
+      return;
+    }
 
     const frame = frameRef.current;
-    if (!frame || !frame.contains(range.commonAncestorContainer)) return;
+    if (!frame || !frame.contains(range.commonAncestorContainer)) {
+      setSelectionDraft(null);
+      return;
+    }
 
     const node =
       range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
         ? (range.commonAncestorContainer as Element)
         : range.commonAncestorContainer.parentElement;
     const messageElement = node?.closest<HTMLElement>('[data-message-id]');
-    if (!messageElement) return;
+    if (!messageElement) {
+      setSelectionDraft(null);
+      return;
+    }
 
     const fullText = messageElement.dataset.messageContent ?? messageElement.textContent ?? '';
     const startOffset = fullText.indexOf(selectedText);
-    if (startOffset < 0) return;
+    if (startOffset < 0) {
+      setSelectionDraft(null);
+      return;
+    }
 
     const rect = range.getBoundingClientRect();
     const frameRect = frame.getBoundingClientRect();
@@ -354,8 +395,13 @@ const MessagePage = () => {
         </ThreadArea>
 
         {selectionDraft && !selectionAction && (
-          <SelectionPopover $x={selectionDraft.x} $y={selectionDraft.y}>
-            <SelectionPreview>{selectionDraft.selectedText}</SelectionPreview>
+          <SelectionPopover
+            data-selection-layer="true"
+            $x={selectionDraft.x}
+            $y={selectionDraft.y}
+            onMouseDown={(event) => event.preventDefault()}
+            onTouchStart={(event) => event.preventDefault()}
+          >
             <SelectionActions>
               <SelectionButton type="button" onClick={() => openSelectionAction('CONSENSUS')}>
                 합의안 생성
@@ -463,8 +509,8 @@ const MessagePage = () => {
         )}
 
         {selectionAction && selectionDraft && (
-          <ModalOverlay onClick={closeSelectionFlow}>
-            <SelectionModal onClick={(event) => event.stopPropagation()}>
+          <ModalOverlay data-selection-layer="true" onClick={closeSelectionFlow}>
+            <SelectionModal data-selection-layer="true" onClick={(event) => event.stopPropagation()}>
               <ModalHeader>
                 <strong>{selectionAction === 'CONSENSUS' ? '합의안 생성' : '하위 토론 생성'}</strong>
                 <button type="button" onClick={closeSelectionFlow}>
@@ -829,36 +875,16 @@ const SelectionPopover = styled.div<{ $x: number; $y: number }>`
   left: ${({ $x }) => $x}px;
   top: ${({ $y }) => $y}px;
   z-index: 120;
-  width: 224px;
+  width: 174px;
   transform: translateX(-50%);
-  border-radius: 18px;
+  border-radius: 999px;
   background: #ffffff;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
-  padding: 10px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
+  padding: 4px;
 
   &::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    bottom: -7px;
-    width: 14px;
-    height: 14px;
-    background: #ffffff;
-    transform: translateX(-50%) rotate(45deg);
+    display: none;
   }
-`;
-
-const SelectionPreview = styled.p`
-  position: relative;
-  z-index: 1;
-  margin: 0 0 8px;
-  color: #606060;
-  font-size: 12px;
-  line-height: 16px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 `;
 
 const SelectionActions = styled.div`
@@ -866,21 +892,33 @@ const SelectionActions = styled.div`
   z-index: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 4px;
 `;
 
 const SelectionButton = styled.button`
-  min-height: 34px;
+  min-height: 32px;
   border: 0;
   border-radius: 999px;
-  background: #efefef;
+  background: transparent;
   color: #333333;
-  font-size: 12px;
+  font-size: 0;
   font-weight: 700;
 
   &:first-child {
     background: #2dcd97;
     color: #ffffff;
+  }
+
+  &::after {
+    font-size: 12px;
+  }
+
+  &:first-child::after {
+    content: '합의안';
+  }
+
+  &:last-child::after {
+    content: '하위 토론';
   }
 `;
 
