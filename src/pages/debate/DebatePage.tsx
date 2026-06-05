@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import btnDscionControl from '../../assets/btn_dscion_control.svg';
 import iconAlarm from '../../assets/icon_alarm.svg';
@@ -6,6 +7,7 @@ import iconAlarm2 from '../../assets/icon_alarm2.svg';
 import iconChat from '../../assets/icon_chat.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
+import iconShowInfo from '../../assets/icon_show_info.svg';
 import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
@@ -63,15 +65,10 @@ const BackIcon = () => (
   </svg>
 );
 
-const ModalMenuIcon = () => (
-  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#353535" strokeWidth="2.2">
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="9" y1="18" x2="21" y2="18" />
-  </svg>
-);
+const ModalMenuIcon = () => <img src={iconShowInfo} width="34" height="34" alt="" />;
 
 const DebatePage = () => {
+  const navigate = useNavigate();
   const { debates, fetchDebates } = useDebate();
   const [activeFilter, setActiveFilter] = useState('찬반토론');
   const [listError, setListError] = useState('');
@@ -158,7 +155,14 @@ const DebatePage = () => {
               <ModalIconButton type="button" aria-label="닫기" onClick={() => setSelectedCard(null)}>
                 <BackIcon />
               </ModalIconButton>
-              <ModalIconButton type="button" aria-label="메뉴">
+              <ModalIconButton
+                type="button"
+                aria-label="토론 정보 보기"
+                onClick={() => {
+                  navigate(`/debate/${selectedCard.id}/info`);
+                  setSelectedCard(null);
+                }}
+              >
                 <ModalMenuIcon />
               </ModalIconButton>
             </ModalTop>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconAlarm2 from '../../assets/icon_alarm2.svg';
@@ -6,6 +7,7 @@ import btnDscionControl from '../../assets/btn_dscion_control.svg';
 import iconChat from '../../assets/icon_chat.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
+import iconShowInfo from '../../assets/icon_show_info.svg';
 import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
@@ -35,19 +37,14 @@ const BackIcon = () => (
   </svg>
 );
 
-const ModalMenuIcon = () => (
-  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#353535" strokeWidth="2.2">
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="9" y1="18" x2="21" y2="18" />
-  </svg>
-);
+const ModalMenuIcon = () => <img src={iconShowInfo} width="34" height="34" alt="" />;
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
 const CATEGORIES = ['예술', '연애', '요리', '게임', '스포츠', '정치'];
 
 type ModalDebateItem = {
+  id: string;
   title: string;
   description: string;
   creatorName: string;
@@ -95,6 +92,7 @@ const formatCreatedDate = (createdAt?: string) => {
 };
 
 const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
+  id: debate.id,
   title: debate.title,
   description: debate.description,
   creatorName: debate.creator?.nickname ?? '사용자 이름',
@@ -152,6 +150,7 @@ const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => vo
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 const MainPage = () => {
+  const navigate = useNavigate();
   const { debates, fetchDebates } = useDebate();
   const [activeCategory, setActiveCategory] = useState('예술');
   const [activeDot, setActiveDot] = useState(0);
@@ -341,7 +340,14 @@ const MainPage = () => {
               <ModalIconButton type="button" aria-label="닫기" onClick={() => setSelectedCard(null)}>
                 <BackIcon />
               </ModalIconButton>
-              <ModalIconButton type="button" aria-label="메뉴">
+              <ModalIconButton
+                type="button"
+                aria-label="토론 정보 보기"
+                onClick={() => {
+                  navigate(`/debate/${selectedCard.id}/info`);
+                  setSelectedCard(null);
+                }}
+              >
                 <ModalMenuIcon />
               </ModalIconButton>
             </ModalTop>
