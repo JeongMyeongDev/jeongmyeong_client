@@ -2,46 +2,13 @@ import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import iconChat from '../../assets/icon_chat copy.svg';
-import iconChatActivate from '../../assets/icon_chat_activate.svg';
-import iconDebate from '../../assets/icon_debate.svg';
-import iconDebateActivate from '../../assets/icon_debate_activate.svg';
-import iconTalk from '../../assets/icon_talk.svg';
-import iconTalkActivate from '../../assets/icon_talk_activate.svg';
 import { useDebate } from '../../hooks/useDebate';
 import { useAuthStore } from '../../stores/authStore';
-
-type DebateMode = 'pro-con' | 'consensus' | 'comment';
 
 const TAG_OPTIONS = ['연애', '컴퓨터기술', '음악', '사회', '시사', '역사', '음식조리', '공예', '벌크업', '스트레칭'];
 const TITLE_MAX_LENGTH = 40;
 const DESCRIPTION_MAX_LENGTH = 120;
-
-const MODE_DESCRIPTION: Record<DebateMode, string> = {
-  'pro-con': '찬반 토론은 토론 후 결론에 대해 찬성 / 반대 의견을 내비치는 토론 방식입니다.',
-  consensus: '합의 토론은 서로의 의견 차이를 좁히며 공통된 결론을 찾아가는 토론 방식입니다.',
-  comment: '댓글 토론은 글과 댓글로 자유롭게 의견을 주고받는 토론 방식입니다.',
-};
-const MODE_TO_DEBATE_TYPE: Record<DebateMode, 'PROS_CONS' | 'CONSENSUS' | 'FREE'> = {
-  'pro-con': 'PROS_CONS',
-  consensus: 'CONSENSUS',
-  comment: 'FREE',
-};
-
-const MODE_ICONS: Record<DebateMode, { active: string; inactive: string }> = {
-  'pro-con': {
-    active: iconDebateActivate,
-    inactive: iconDebate,
-  },
-  consensus: {
-    active: iconTalkActivate,
-    inactive: iconTalk,
-  },
-  comment: {
-    active: iconChatActivate,
-    inactive: iconChat,
-  },
-};
+const DEFAULT_DEBATE_TYPE: 'PROS_CONS' = 'PROS_CONS';
 
 const BackIcon = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b3b3b" strokeWidth="2.2">
@@ -57,7 +24,6 @@ const DebateCreatePage = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedTag, setSelectedTag] = useState('미술');
-  const [mode, setMode] = useState<DebateMode>('pro-con');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -94,7 +60,7 @@ const DebateCreatePage = () => {
       await createDebate({
         title: title.trim(),
         description: description.trim(),
-        debateType: MODE_TO_DEBATE_TYPE[mode],
+        debateType: DEFAULT_DEBATE_TYPE,
         tags: [selectedTag],
         closeConditionType: 'MANUAL',
       });
@@ -159,36 +125,6 @@ const DebateCreatePage = () => {
               </TagChip>
             ))}
           </TagPanel>
-        </SectionCard>
-
-        <SectionCard>
-          <SectionTitle>토론 방식</SectionTitle>
-          <ModeRow>
-            <ModeItem>
-              <ModeButton type="button" onClick={() => setMode('pro-con')}>
-                <ModeIcon src={mode === 'pro-con' ? MODE_ICONS['pro-con'].active : MODE_ICONS['pro-con'].inactive} alt="" />
-              </ModeButton>
-              <ModeLabel $active={mode === 'pro-con'}>찬반 토론</ModeLabel>
-            </ModeItem>
-
-            <ModeItem>
-              <ModeButton type="button" onClick={() => setMode('consensus')}>
-                <ModeIcon src={mode === 'consensus' ? MODE_ICONS.consensus.active : MODE_ICONS.consensus.inactive} alt="" />
-              </ModeButton>
-              <ModeLabel $active={mode === 'consensus'}>합의 토론</ModeLabel>
-            </ModeItem>
-
-            <ModeItem>
-              <ModeButton type="button" onClick={() => setMode('comment')}>
-                <ModeIcon src={mode === 'comment' ? MODE_ICONS.comment.active : MODE_ICONS.comment.inactive} alt="" />
-              </ModeButton>
-              <ModeLabel $active={mode === 'comment'}>댓글 토론</ModeLabel>
-            </ModeItem>
-          </ModeRow>
-
-          <ModeDescBox>
-            <ModeDescText>• {MODE_DESCRIPTION[mode]}</ModeDescText>
-          </ModeDescBox>
         </SectionCard>
 
         <ActionRow>
@@ -343,56 +279,6 @@ const TagChip = styled.button<{ $active: boolean }>`
   padding: 0 14px;
   font-size: 14px;
   font-weight: 500;
-`;
-
-const ModeRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-`;
-
-const ModeItem = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-`;
-
-const ModeButton = styled.button`
-  width: 72px;
-  height: 72px;
-  border: none;
-  background: none;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const ModeIcon = styled.img`
-  width: 72px;
-  height: 72px;
-  display: block;
-`;
-
-const ModeLabel = styled.span<{ $active: boolean }>`
-  font-size: 15px;
-  font-weight: 600;
-  color: ${({ $active }) => ($active ? '#2dcd97' : '#a0a0a0')};
-`;
-
-const ModeDescBox = styled.div`
-  border: 2px solid #b7b7b7;
-  border-radius: 16px;
-  padding: 12px 14px;
-`;
-
-const ModeDescText = styled.p`
-  font-size: 14px;
-  line-height: 1.45;
-  color: #9f9f9f;
 `;
 
 const ActionRow = styled.div`

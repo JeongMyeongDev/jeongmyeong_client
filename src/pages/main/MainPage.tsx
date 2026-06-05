@@ -7,6 +7,7 @@ import btnDscionControl from '../../assets/btn_dscion_control.svg';
 import iconChat from '../../assets/icon_chat.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
+import iconShowInfo from '../../assets/icon_show_info.svg';
 import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
@@ -36,13 +37,7 @@ const BackIcon = () => (
   </svg>
 );
 
-const ModalMenuIcon = () => (
-  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#353535" strokeWidth="2.2">
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="9" y1="18" x2="21" y2="18" />
-  </svg>
-);
+const ModalMenuIcon = () => <img src={iconShowInfo} width="34" height="34" alt="" />;
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -156,7 +151,11 @@ const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => vo
 
 const MainPage = () => {
   const navigate = useNavigate();
+<<<<<<< HEAD
   const { debates, fetchDebates, joinDebate } = useDebate();
+=======
+  const { debates, fetchDebates } = useDebate();
+>>>>>>> main
   const [activeCategory, setActiveCategory] = useState('예술');
   const [activeDot, setActiveDot] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -372,7 +371,14 @@ const MainPage = () => {
               <ModalIconButton type="button" aria-label="닫기" onClick={() => setSelectedCard(null)}>
                 <BackIcon />
               </ModalIconButton>
-              <ModalIconButton type="button" aria-label="메뉴">
+              <ModalIconButton
+                type="button"
+                aria-label="토론 정보 보기"
+                onClick={() => {
+                  navigate(`/debate/${selectedCard.id}/info`);
+                  setSelectedCard(null);
+                }}
+              >
                 <ModalMenuIcon />
               </ModalIconButton>
             </ModalTop>
