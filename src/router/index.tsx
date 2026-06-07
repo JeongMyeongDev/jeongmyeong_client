@@ -8,11 +8,8 @@ import MainPage from '../pages/main/MainPage';
 import DebatePage from '../pages/debate/DebatePage';
 import DebateCreatePage from '../pages/debate/DebateCreatePage';
 import DebateArchivePage from '../pages/debate/DebateArchivePage';
-<<<<<<< HEAD
 import DefinitionSearchPage from '../pages/definitions/DefinitionSearchPage';
-=======
 import DebateInfoPage from '../pages/debate/DebateInfoPage';
->>>>>>> main
 import MessagePage from '../pages/message/MessagePage';
 import ProfilePage from '../pages/profile/ProfilePage';
 

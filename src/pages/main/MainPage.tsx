@@ -151,11 +151,7 @@ const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => vo
 
 const MainPage = () => {
   const navigate = useNavigate();
-<<<<<<< HEAD
   const { debates, fetchDebates, joinDebate } = useDebate();
-=======
-  const { debates, fetchDebates } = useDebate();
->>>>>>> main
   const [activeCategory, setActiveCategory] = useState('예술');
   const [activeDot, setActiveDot] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState('');
