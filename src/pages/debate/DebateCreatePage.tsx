@@ -1,13 +1,14 @@
 import { isAxiosError } from 'axios';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useDebate } from '../../hooks/useDebate';
 import { useAuthStore } from '../../stores/authStore';
 
-const TAG_OPTIONS = ['연애', '컴퓨터기술', '음악', '사회', '시사', '역사', '음식조리', '공예', '벌크업', '스트레칭'];
 const TITLE_MAX_LENGTH = 40;
 const DESCRIPTION_MAX_LENGTH = 120;
+const TAG_MAX_LENGTH = 12;
+const TAG_MAX_COUNT = 5;
 const DEFAULT_DEBATE_TYPE: 'PROS_CONS' = 'PROS_CONS';
 
 const BackIcon = () => (
@@ -23,9 +24,28 @@ const DebateCreatePage = () => {
   const { isAuthenticated } = useAuthStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedTag, setSelectedTag] = useState('미술');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const addTag = () => {
+    const trimmed = tagInput.trim();
+    if (!trimmed || tags.includes(trimmed) || tags.length >= TAG_MAX_COUNT) return;
+    setTags((prev) => [...prev, trimmed]);
+    setTagInput('');
+  };
+
+  const removeTag = (tag: string) => {
+    setTags((prev) => prev.filter((t) => t !== tag));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTag();
+    }
+  };
 
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
@@ -61,7 +81,7 @@ const DebateCreatePage = () => {
         title: title.trim(),
         description: description.trim(),
         debateType: DEFAULT_DEBATE_TYPE,
-        tags: [selectedTag],
+        tags,
         closeConditionType: 'MANUAL',
       });
       navigate('/debate-room');
@@ -108,23 +128,33 @@ const DebateCreatePage = () => {
 
         <SectionCard>
           <SectionTitle>토론 태그</SectionTitle>
-          <SelectedTagChip type="button">
-            <CloseMark aria-hidden>x</CloseMark>
-            <span>{selectedTag}</span>
-          </SelectedTagChip>
-
-          <TagPanel>
-            {TAG_OPTIONS.map((tag) => (
-              <TagChip
-                key={tag}
-                type="button"
-                $active={selectedTag === tag}
-                onClick={() => setSelectedTag(tag)}
-              >
-                {tag}
-              </TagChip>
-            ))}
-          </TagPanel>
+          <TagInputRow>
+            <TagTextInput
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value.slice(0, TAG_MAX_LENGTH))}
+              onKeyDown={handleTagKeyDown}
+              placeholder="태그를 입력하세요"
+              disabled={tags.length >= TAG_MAX_COUNT}
+            />
+            <TagAddButton
+              type="button"
+              onClick={addTag}
+              disabled={!tagInput.trim() || tags.length >= TAG_MAX_COUNT}
+            >
+              추가
+            </TagAddButton>
+          </TagInputRow>
+          <TagCountText>{tags.length}/{TAG_MAX_COUNT}</TagCountText>
+          {tags.length > 0 && (
+            <TagList>
+              {tags.map((tag) => (
+                <TagChip key={tag} type="button" onClick={() => removeTag(tag)}>
+                  <span>{tag}</span>
+                  <CloseMark aria-hidden>×</CloseMark>
+                </TagChip>
+              ))}
+            </TagList>
+          )}
         </SectionCard>
 
         <ActionRow>
@@ -241,44 +271,77 @@ const CountText = styled.p`
   color: #9b9b9b;
 `;
 
-const SelectedTagChip = styled.button`
+const TagInputRow = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+`;
+
+const TagTextInput = styled.input`
+  flex: 1;
+  height: 42px;
+  border: none;
+  border-bottom: 2px solid #b7b7b7;
+  background: transparent;
+  font-size: 15px;
+  color: #2f3238;
+  outline: none;
+
+  &::placeholder {
+    color: #b3b3b3;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+  }
+`;
+
+const TagAddButton = styled.button`
   height: 36px;
+  padding: 0 16px;
   border-radius: 999px;
   border: 2px solid #2dcd97;
-  color: #2dcd97;
+  background: #2dcd97;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  align-self: center;
+
+  &:disabled {
+    opacity: 0.4;
+  }
+`;
+
+const TagCountText = styled.p`
+  margin: 0 2px 10px;
+  text-align: right;
+  font-size: 12px;
+  color: #9b9b9b;
+`;
+
+const TagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+
+const TagChip = styled.button`
+  height: 34px;
+  border-radius: 999px;
+  border: 2px solid #2dcd97;
   background: #b9f0db;
+  color: #2dcd97;
   display: inline-flex;
   align-items: center;
-  padding: 0 14px;
   gap: 6px;
-  font-size: 16px;
+  padding: 0 12px;
+  font-size: 14px;
   font-weight: 600;
-  margin-bottom: 12px;
 `;
 
 const CloseMark = styled.span`
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
-`;
-
-const TagPanel = styled.div`
-  border: 2px solid #b7b7b7;
-  border-radius: 24px;
-  padding: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-`;
-
-const TagChip = styled.button<{ $active: boolean }>`
-  height: 36px;
-  border-radius: 999px;
-  border: 2px solid ${({ $active }) => ($active ? '#2dcd97' : '#b7b7b7')};
-  background: ${({ $active }) => ($active ? '#b9f0db' : 'transparent')};
-  color: ${({ $active }) => ($active ? '#2dcd97' : '#a6a6a6')};
-  padding: 0 14px;
-  font-size: 14px;
-  font-weight: 500;
 `;
 
 const ActionRow = styled.div`

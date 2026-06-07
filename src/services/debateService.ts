@@ -102,4 +102,6 @@ export const debateService = {
     api.post<CreateConsensusResponse>(`/debates/${id}/consensuses`, data),
   getArchived: (params?: Omit<ListDebatesParams, 'status'>) =>
     api.get<DebateListResponse>('/debates/archive', { params }),
+  getMyDebates: (params?: ListDebatesParams) =>
+    api.get<DebateListResponse>('/debates/my', { params }),
 };

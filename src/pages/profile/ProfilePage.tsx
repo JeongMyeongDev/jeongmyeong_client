@@ -6,7 +6,15 @@ import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
 import { useAuthStore } from '../../stores/authStore';
 
-const MENU_ITEMS = ['내 토론', '고객센터', '알림설정', '개인/보안', '공지사항', '앱 정보'];
+type MenuItem = { label: string; action: 'navigate' | 'toast'; value?: string };
+const MENU_ITEMS: MenuItem[] = [
+  { label: '내 토론', action: 'navigate', value: '/my-debates' },
+  { label: '고객센터', action: 'toast' },
+  { label: '알림설정', action: 'navigate', value: '/notifications' },
+  { label: '개인/보안', action: 'toast' },
+  { label: '공지사항', action: 'toast' },
+  { label: '앱 정보', action: 'toast' },
+];
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -15,6 +23,7 @@ const ProfilePage = () => {
   const [profileError, setProfileError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   const displayName = isAuthenticated ? user?.nickname ?? '사용자' : '사용자 이름';
   const helperText = isAuthenticated
@@ -42,6 +51,19 @@ const ProfilePage = () => {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(''), 2500);
+  };
+
+  const handleMenuClick = (item: MenuItem) => {
+    if (item.action === 'navigate' && item.value) {
+      navigate(item.value);
+    } else {
+      showToast('준비 중입니다.');
     }
   };
 
@@ -108,9 +130,13 @@ const ProfilePage = () => {
 
       <MenuCard>
         {MENU_ITEMS.map((item) => (
-          <MenuItem key={item}>{item}</MenuItem>
+          <MenuItem key={item.label} onClick={() => handleMenuClick(item)}>
+            {item.label}
+          </MenuItem>
         ))}
       </MenuCard>
+
+      {toastMessage && <Toast>{toastMessage}</Toast>}
 
       {isAuthenticated && (
         <LogoutButton type="button" onClick={handleLogout} disabled={isSubmitting}>
@@ -251,6 +277,22 @@ const MenuItem = styled.button`
   font-weight: 500;
   line-height: 1.45;
   padding: 0;
+  cursor: pointer;
+`;
+
+const Toast = styled.div`
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  white-space: nowrap;
+  z-index: 600;
+  pointer-events: none;
 `;
 
 const LogoutButton = styled.button`

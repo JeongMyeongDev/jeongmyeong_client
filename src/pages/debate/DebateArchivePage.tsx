@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import SideDrawer from '../../components/common/SideDrawer';
 import btnDscionControl from '../../assets/btn_dscion_control.svg';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconChat from '../../assets/icon_chat.svg';
@@ -31,9 +33,11 @@ const mapToArchiveCard = (debate: Debate): ArchiveCardItem => ({
 const FilterIcon = () => <img src={btnDscionControl} width="48" height="34" alt="" />;
 
 const DebateArchivePage = () => {
+  const navigate = useNavigate();
   const { debates, fetchArchivedDebates } = useDebate();
   const [activeFilter, setActiveFilter] = useState('찬반토론');
   const [listError, setListError] = useState('');
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     const loadDebates = async () => {
@@ -56,17 +60,18 @@ const DebateArchivePage = () => {
 
   return (
     <Wrapper>
+      <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
       <Logo src={logoSymbol} alt="정명" />
 
       <HeaderRow>
-        <SideButton type="button" aria-label="메뉴">
+        <SideButton type="button" aria-label="메뉴" onClick={() => setIsDrawerOpen(true)}>
           <TopIcon src={iconMenu} alt="" />
         </SideButton>
         <HeaderRight>
           <SideButton type="button" aria-label="검색">
             <TopIcon src={iconSearch} alt="" />
           </SideButton>
-          <SideButton type="button" aria-label="알림">
+          <SideButton type="button" aria-label="알림" onClick={() => navigate('/message')}>
             <TopIcon src={iconAlarm} alt="" />
           </SideButton>
         </HeaderRight>
@@ -172,11 +177,11 @@ const FilterChip = styled.button<{ $active: boolean }>`
   height: 32px;
   padding: 0 14px;
   border-radius: 999px;
-  border: 1.5px solid #ababab;
-  background: #f3f3f3;
-  color: #8f8f8f;
+  border: 1.5px solid ${({ $active }) => ($active ? '#2dcd97' : '#ababab')};
+  background: ${({ $active }) => ($active ? '#2dcd97' : '#f3f3f3')};
+  color: ${({ $active }) => ($active ? '#ffffff' : '#8f8f8f')};
   font-size: 14px;
-  font-weight: 500;
+  font-weight: ${({ $active }) => ($active ? '600' : '500')};
   white-space: nowrap;
 `;
 

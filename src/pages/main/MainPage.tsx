@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import SideDrawer from '../../components/common/SideDrawer';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconAlarm2 from '../../assets/icon_alarm2.svg';
 import btnDscionControl from '../../assets/btn_dscion_control.svg';
@@ -41,7 +42,7 @@ const ModalMenuIcon = () => <img src={iconShowInfo} width="34" height="34" alt="
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
-const CATEGORIES = ['예술', '연애', '요리', '게임', '스포츠', '정치'];
+const CATEGORIES = ['전체', '예술', '연애', '요리', '게임', '스포츠', '정치'];
 
 type ModalDebateItem = {
   id: string;
@@ -152,7 +153,8 @@ const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => vo
 const MainPage = () => {
   const navigate = useNavigate();
   const { debates, fetchDebates } = useDebate();
-  const [activeCategory, setActiveCategory] = useState('예술');
+  const [activeCategory, setActiveCategory] = useState('전체');
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeDot, setActiveDot] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [listError, setListError] = useState('');
@@ -217,9 +219,15 @@ const MainPage = () => {
   };
 
   const filteredDebates = useMemo(() => {
+    let result = debates;
+    if (activeCategory !== '전체') {
+      result = result.filter((debate) =>
+        debate.tagMaps?.some((tagMap) => tagMap.tag.name === activeCategory),
+      );
+    }
     const normalizedKeyword = searchKeyword.trim().toLowerCase();
-    if (!normalizedKeyword) return debates;
-    return debates.filter((debate) => {
+    if (!normalizedKeyword) return result;
+    return result.filter((debate) => {
       const searchableText = [
         debate.title,
         debate.description,
@@ -228,7 +236,7 @@ const MainPage = () => {
       ].join(' ').toLowerCase();
       return searchableText.includes(normalizedKeyword);
     });
-  }, [debates, searchKeyword]);
+  }, [debates, searchKeyword, activeCategory]);
 
   useEffect(() => {
     setActiveDot(0);
@@ -260,12 +268,13 @@ const MainPage = () => {
 
   return (
     <Wrapper>
+      <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
       {/* Logo */}
       <Logo src={logoSymbol} alt="정명" />
 
       {/* Header */}
       <Header>
-        <IconBtn>
+        <IconBtn onClick={() => setIsDrawerOpen(true)} aria-label="메뉴">
           <MenuIcon />
         </IconBtn>
         <SearchBar>
@@ -277,7 +286,7 @@ const MainPage = () => {
             aria-label="토론 검색"
           />
         </SearchBar>
-        <IconBtn>
+        <IconBtn onClick={() => navigate('/notifications')} aria-label="알림">
           <BellIcon />
         </IconBtn>
       </Header>
