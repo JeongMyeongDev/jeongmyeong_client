@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import SideDrawer from '../../components/common/SideDrawer';
 import styled from 'styled-components';
 import btnDscionControl from '../../assets/btn_dscion_control.svg';
 import iconAlarm from '../../assets/icon_alarm.svg';
@@ -73,6 +74,7 @@ const DebatePage = () => {
   const [activeFilter, setActiveFilter] = useState('찬반토론');
   const [listError, setListError] = useState('');
   const [selectedCard, setSelectedCard] = useState<DebateRoomCard | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     const loadDebates = async () => {
@@ -99,17 +101,18 @@ const DebatePage = () => {
 
   return (
     <Wrapper>
+      <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
       <Logo src={logoSymbol} alt="정명" />
 
       <HeaderRow>
-        <SideButton type="button" aria-label="메뉴">
+        <SideButton type="button" aria-label="메뉴" onClick={() => setIsDrawerOpen(true)}>
           <TopIcon src={iconMenu} alt="" />
         </SideButton>
         <HeaderRight>
           <SideButton type="button" aria-label="검색">
             <TopIcon src={iconSearch} alt="" />
           </SideButton>
-          <SideButton type="button" aria-label="알림">
+          <SideButton type="button" aria-label="알림" onClick={() => navigate('/notifications')}>
             <TopIcon src={iconAlarm} alt="" />
           </SideButton>
         </HeaderRight>

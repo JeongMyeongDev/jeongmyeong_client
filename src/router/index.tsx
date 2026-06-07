@@ -14,6 +14,8 @@ import DebateInfoPage from '../pages/debate/DebateInfoPage';
 import DebateThreadPage from '../pages/debate/DebateThreadPage';
 import MessagePage from '../pages/message/MessagePage';
 import ProfilePage from '../pages/profile/ProfilePage';
+import NotificationPage from '../pages/notification/NotificationPage';
+import MyDebatesPage from '../pages/myDebates/MyDebatesPage';
 
 const router = createBrowserRouter([
   {
@@ -40,6 +42,8 @@ const router = createBrowserRouter([
           { path: 'debate/archive', element: <DebateArchivePage /> },
           { path: 'message', element: <MessagePage /> },
           { path: 'profile', element: <ProfilePage /> },
+          { path: 'notifications', element: <NotificationPage /> },
+          { path: 'my-debates', element: <MyDebatesPage /> },
         ],
       },
     ],
