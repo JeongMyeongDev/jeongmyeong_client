@@ -423,6 +423,16 @@ const SearchBar = styled.div`
   border-radius: 999px;
   padding: 0 18px;
   box-sizing: border-box;
+
+  @media (max-width: 430px) {
+    width: 210px;
+    height: 36px;
+    padding: 0 16px;
+  }
+
+  @media (max-width: 360px) {
+    width: 190px;
+  }
 `;
 
 const SearchInput = styled.input`
@@ -451,10 +461,18 @@ const Logo = styled.img`
     margin-top: 44px;
     margin-bottom: 14px;
   }
+
+  @media (max-width: 430px) {
+    margin-top: 48px;
+  }
 `;
 
 const Section = styled.div`
   padding: 0 16px;
+
+  @media (max-width: 430px) {
+    padding: 0 22px;
+  }
 `;
 
 const SectionTitle = styled.h2`
@@ -484,8 +502,8 @@ const CarouselWrapper = styled.div`
 `;
 
 const FCard = styled.div`
-  width: min(330px, calc(100vw - 32px));
-  min-width: min(330px, calc(100vw - 32px));
+  width: min(330px, 100%);
+  min-width: min(330px, 100%);
   height: 248px;
   display: flex;
   flex-direction: column;
@@ -503,6 +521,18 @@ const FCard = styled.div`
     height: 224px;
     padding: 18px 16px 16px;
   }
+
+  @media (max-width: 430px) {
+    width: 304px;
+    min-width: 304px;
+    height: 220px;
+    border-radius: 22px;
+  }
+
+  @media (max-width: 360px) {
+    width: 288px;
+    min-width: 288px;
+  }
 `;
 
 const FTitle = styled.h3`
@@ -515,6 +545,10 @@ const FTitle = styled.h3`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @media (max-width: 430px) {
+    font-size: 18px;
+  }
 `;
 
 const FDesc = styled.p`
@@ -567,6 +601,11 @@ const Avatar = styled.div`
   height: 40px;
   border-radius: 50%;
   background: #b3b3b3;
+
+  @media (max-width: 430px) {
+    width: 34px;
+    height: 34px;
+  }
 `;
 
 const FParticipants = styled.div`
@@ -653,6 +692,10 @@ const CategoryRow = styled.div`
   gap: 8px;
   padding: 0 16px;
   margin-bottom: 12px;
+
+  @media (max-width: 430px) {
+    padding: 0 22px;
+  }
 `;
 
 const FilterBtn = styled.button`
@@ -685,6 +728,11 @@ const CategoryPill = styled.button<{ $active: boolean }>`
   background: ${({ $active }) => ($active ? '#4dc891' : '#f3f3f3')};
   color: ${({ $active }) => ($active ? '#fff' : '#666')};
   cursor: pointer;
+
+  @media (max-width: 430px) {
+    padding: 5px 14px;
+    font-size: 12px;
+  }
 `;
 
 const DebateList = styled.div`
@@ -692,6 +740,10 @@ const DebateList = styled.div`
   flex-direction: column;
   padding: 0 16px;
   gap: 10px;
+
+  @media (max-width: 430px) {
+    padding: 0 28px;
+  }
 `;
 
 const ListError = styled.p`
@@ -717,6 +769,12 @@ const DCard = styled.div`
   @media (max-width: 375px) {
     height: 128px;
     padding: 16px 14px;
+  }
+
+  @media (max-width: 430px) {
+    width: min(304px, 100%);
+    height: 126px;
+    border-radius: 22px;
   }
 `;
 

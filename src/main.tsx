@@ -18,9 +18,11 @@ const GlobalStyle = createGlobalStyle`
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #d9d9d9;
+    background: #f5f5f5;
     color: #1a1a1a;
     -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   button {
@@ -40,6 +42,16 @@ const MobileShell = styled.div`
 
   @media (max-width: 390px) {
     box-shadow: none;
+  }
+
+  @media (max-width: 430px) {
+    width: calc(100% - 32px);
+    max-width: 360px;
+    box-shadow: none;
+  }
+
+  @media (max-width: 360px) {
+    width: calc(100% - 20px);
   }
 `;
 

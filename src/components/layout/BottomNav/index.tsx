@@ -88,6 +88,15 @@ const Wrapper = styled.nav`
   @media (max-width: 375px) {
     height: 58px;
   }
+
+  @media (max-width: 430px) {
+    width: calc(100% - 32px);
+    max-width: 360px;
+  }
+
+  @media (max-width: 360px) {
+    width: calc(100% - 20px);
+  }
 `;
 
 const Tab = styled(NavLink)`
