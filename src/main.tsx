@@ -1,4 +1,3 @@
-import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { createGlobalStyle, styled } from 'styled-components';
@@ -44,12 +43,12 @@ const MobileShell = styled.div`
 `;
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+  <>
     <GlobalStyle />
     <MobileShell>
       <AuthInitializer>
         <RouterProvider router={router} />
       </AuthInitializer>
     </MobileShell>
-  </StrictMode>,
+  </>,
 );

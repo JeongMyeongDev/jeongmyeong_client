@@ -21,11 +21,35 @@ export const useAuth = () => {
     setInitialized();
   }, [setInitialized, setUser]);
 
+  const googleLogin = useCallback(async (idToken: string) => {
+    const { data } = await authService.googleLogin({ idToken });
+    localStorage.setItem('accessToken', data.accessToken);
+    setUser(data.user);
+    setInitialized();
+  }, [setInitialized, setUser]);
+
+  const googleSignup = useCallback(async (
+    idToken: string,
+    nickname: string,
+    password: string,
+    passwordConfirm: string,
+  ) => {
+    const { data } = await authService.googleSignup({
+      idToken,
+      nickname,
+      password,
+      passwordConfirm,
+    });
+    localStorage.setItem('accessToken', data.accessToken);
+    setUser(data.user);
+    setInitialized();
+  }, [setInitialized, setUser]);
+
   const logout = useCallback(async () => {
     await authService.logout();
     localStorage.removeItem('accessToken');
     clearAuth();
   }, [clearAuth]);
 
-  return { user, isAuthenticated, signup, login, logout };
+  return { user, isAuthenticated, signup, login, googleLogin, googleSignup, logout };
 };

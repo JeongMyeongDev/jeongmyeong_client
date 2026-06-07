@@ -1,9 +1,42 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useAuth } from '../../hooks/useAuth';
+
+type GoogleCredentialResponse = {
+  credential?: string;
+};
+
+type GoogleAccounts = {
+  id: {
+    initialize: (options: {
+      client_id: string;
+      callback: (response: GoogleCredentialResponse) => void;
+    }) => void;
+    renderButton: (
+      parent: HTMLElement,
+      options: {
+        theme: 'outline' | 'filled_blue' | 'filled_black';
+        size: 'large' | 'medium' | 'small';
+        shape: 'pill' | 'rectangular' | 'circle' | 'square';
+        text: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
+        width: string;
+      },
+    ) => void;
+  };
+};
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: GoogleAccounts;
+    };
+  }
+}
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
 const EyeIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -21,7 +54,8 @@ const CloseIcon = () => (
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
+  const googleButtonRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -36,6 +70,70 @@ const LoginPage = () => {
     }
     return '로그인에 실패했습니다. 입력 정보를 확인해 주세요.';
   };
+
+  const handleGoogleCredential = useCallback(
+    async (response: GoogleCredentialResponse) => {
+      if (!response.credential) {
+        setError('Google 로그인 정보를 받을 수 없습니다.');
+        return;
+      }
+
+      setError('');
+      setIsSubmitting(true);
+      try {
+        await googleLogin(response.credential);
+        navigate('/', { replace: true });
+      } catch (error) {
+        if (isAxiosError(error) && error.response?.status === 404) {
+          const googleEmail = error.response.data?.email;
+          if (typeof googleEmail === 'string') {
+            navigate('/google-signup', {
+              state: { idToken: response.credential, email: googleEmail },
+              replace: true,
+            });
+            return;
+          }
+        }
+        setError(getErrorMessage(error));
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [googleLogin, navigate],
+  );
+
+  useEffect(() => {
+    if (!googleClientId || !googleButtonRef.current) return;
+
+    const renderGoogleButton = () => {
+      if (!window.google || !googleButtonRef.current) return;
+
+      googleButtonRef.current.innerHTML = '';
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCredential,
+      });
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        shape: 'pill',
+        text: 'continue_with',
+        width: '320',
+      });
+    };
+
+    if (window.google) {
+      renderGoogleButton();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = renderGoogleButton;
+    document.head.appendChild(script);
+  }, [handleGoogleCredential]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +157,7 @@ const LoginPage = () => {
           <Label>이메일</Label>
           <UnderlineInput
             type="email"
-            placeholder="이메일을 입력하세요..."
+            placeholder="이메일을 입력하세요."
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -70,7 +168,7 @@ const LoginPage = () => {
           <InputRow>
             <UnderlineInput
               type={showPassword ? 'text' : 'password'}
-              placeholder="비밀번호를 입력하세요..."
+              placeholder="비밀번호를 입력하세요."
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -91,7 +189,11 @@ const LoginPage = () => {
         <LoginButton type="submit" disabled={isSubmitting}>
           {isSubmitting ? '로그인 중...' : '로그인하기'}
         </LoginButton>
-        <GoogleButton type="button">Google로 연동하기</GoogleButton>
+        {googleClientId ? (
+          <GoogleButtonContainer ref={googleButtonRef} aria-disabled={isSubmitting} />
+        ) : (
+          <ErrorText>Google 클라이언트 ID가 설정되지 않았습니다.</ErrorText>
+        )}
         <SignUpLink type="button" onClick={() => navigate('/signup')}>
           회원가입
         </SignUpLink>
@@ -120,6 +222,7 @@ const Logo = styled.img`
 
 const Form = styled.form`
   width: 100%;
+  max-width: 360px;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -153,7 +256,6 @@ const UnderlineInput = styled.input`
   outline: none;
   background: transparent;
 
-  /* InputRow 내부일 때는 border-bottom 제거 */
   ${InputRow} & {
     border-bottom: none;
   }
@@ -177,6 +279,7 @@ const IconButton = styled.button`
   border: none;
   color: #999;
   padding: 0;
+  cursor: pointer;
 
   &:hover {
     color: #555;
@@ -186,7 +289,7 @@ const IconButton = styled.button`
 const ErrorText = styled.p`
   font-size: 13px;
   color: #f04444;
-  margin-top: -12px;
+  margin: -12px 0 0;
 `;
 
 const LoginButton = styled.button<{ disabled?: boolean }>`
@@ -202,15 +305,13 @@ const LoginButton = styled.button<{ disabled?: boolean }>`
   cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
 `;
 
-const GoogleButton = styled.button`
+const GoogleButtonContainer = styled.div`
   width: 100%;
-  height: 52px;
-  background: #ffffff;
-  color: #1a1a1a;
-  border: 1.5px solid #1a1a1a;
-  border-radius: 999px;
-  font-size: 16px;
-  font-weight: 500;
+  min-height: 44px;
+  display: flex;
+  justify-content: center;
+  opacity: ${({ 'aria-disabled': ariaDisabled }) => (ariaDisabled ? 0.6 : 1)};
+  pointer-events: ${({ 'aria-disabled': ariaDisabled }) => (ariaDisabled ? 'none' : 'auto')};
 `;
 
 const SignUpLink = styled.button`
@@ -221,6 +322,7 @@ const SignUpLink = styled.button`
   color: #888;
   text-decoration: underline;
   text-underline-offset: 3px;
+  cursor: pointer;
 `;
 
 export default LoginPage;

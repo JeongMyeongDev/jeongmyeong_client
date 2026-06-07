@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../../hooks/useAuth';
+
+const EMAIL_VERIFIED_EVENT_KEY = 'emailVerifiedEvent';
 
 const EyeIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -18,7 +20,8 @@ const CloseIcon = () => (
   </svg>
 );
 
-const TERMS_TEXT = `본 약관은 「전자상거래 등에서의 소비자보호에 관한 법률」, 「약관의 규제에 관한 법률」, 「정보통신망 이용촉진 및 정보보호 등에 관한 법률」, 「개인정보 보호법」 등 관계 법령을 준수하여, 토론 플랫폼 서비스 이용에 관한 사항을 규정합니다.`;
+const TERMS_TEXT =
+  '정명 서비스 이용을 위해 개인정보 수집 및 이용에 동의해 주세요. 수집된 정보는 회원 식별, 로그인, 서비스 제공 목적에만 사용됩니다.';
 
 interface PasswordFieldProps {
   label: string;
@@ -64,13 +67,35 @@ const SignUpPage = () => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== EMAIL_VERIFIED_EVENT_KEY || !event.newValue) return;
+
+      try {
+        const payload = JSON.parse(event.newValue) as { email?: string };
+        if (payload.email === email) {
+          setIsEmailVerified(true);
+          setSuccessMessage('이메일 인증이 완료되었습니다. 이제 로그인할 수 있습니다.');
+        }
+      } catch {
+        return;
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [email]);
 
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
       const message = error.response?.data?.message;
       if (Array.isArray(message)) return message.join(', ');
       if (typeof message === 'string') return message;
+      if (!error.response) return '서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요.';
     }
     return '회원가입에 실패했습니다. 잠시 후 다시 시도해 주세요.';
   };
@@ -78,6 +103,9 @@ const SignUpPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
+    setIsEmailVerified(false);
+
     if (!agreed) return;
     if (password !== passwordConfirm) {
       setError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
@@ -87,7 +115,7 @@ const SignUpPage = () => {
     setIsSubmitting(true);
     try {
       await signup(email, nickname, password, passwordConfirm);
-      navigate('/login', { replace: true });
+      setSuccessMessage('인증 메일을 보냈습니다. 이메일 인증을 완료하면 계정이 생성됩니다.');
     } catch (error) {
       setError(getErrorMessage(error));
     } finally {
@@ -100,10 +128,10 @@ const SignUpPage = () => {
       <Title>회원가입</Title>
       <Form onSubmit={handleSubmit}>
         <FieldGroup>
-          <Label>이름</Label>
+          <Label>닉네임</Label>
           <UnderlineInput
             type="text"
-            placeholder="이름을 지어주세요..."
+            placeholder="닉네임을 입력하세요."
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             required
@@ -113,7 +141,7 @@ const SignUpPage = () => {
           <Label>이메일</Label>
           <UnderlineInput
             type="email"
-            placeholder="이메일을 입력하세요..."
+            placeholder="이메일을 입력하세요."
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -121,18 +149,18 @@ const SignUpPage = () => {
         </FieldGroup>
         <PasswordField
           label="비밀번호"
-          placeholder="비밀번호를 입력하세요..."
+          placeholder="비밀번호를 입력하세요."
           value={password}
           onChange={setPassword}
         />
         <PasswordField
           label="비밀번호 확인"
-          placeholder="작성한 비밀번호를 입력하세요..."
+          placeholder="비밀번호를 다시 입력하세요."
           value={passwordConfirm}
           onChange={setPasswordConfirm}
         />
         <ConsentSection>
-          <ConsentTitle>개인정보 약관에 동의하세요</ConsentTitle>
+          <ConsentTitle>개인정보 수집 및 이용에 동의해 주세요.</ConsentTitle>
           <CheckboxRow>
             <Checkbox
               type="checkbox"
@@ -140,14 +168,21 @@ const SignUpPage = () => {
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
             />
-            <CheckboxLabel htmlFor="agree">네, 동의하겠습니다.</CheckboxLabel>
+            <CheckboxLabel htmlFor="agree">동의합니다.</CheckboxLabel>
           </CheckboxRow>
           <TermsBox>{TERMS_TEXT}</TermsBox>
         </ConsentSection>
         {error && <ErrorText>{error}</ErrorText>}
-        <SubmitButton type="submit" disabled={!agreed || isSubmitting}>
-          {isSubmitting ? '가입 중...' : '계정 만들기'}
-        </SubmitButton>
+        {successMessage && <SuccessText>{successMessage}</SuccessText>}
+        {isEmailVerified ? (
+          <SubmitButton type="button" disabled={false} onClick={() => navigate('/login')}>
+            로그인하러 가기
+          </SubmitButton>
+        ) : (
+          <SubmitButton type="submit" disabled={!agreed || isSubmitting}>
+            {isSubmitting ? '가입 요청 중...' : '계정 만들기'}
+          </SubmitButton>
+        )}
       </Form>
     </Wrapper>
   );
@@ -224,6 +259,7 @@ const IconButton = styled.button`
   border: none;
   color: #999;
   padding: 0;
+  cursor: pointer;
 
   &:hover {
     color: #555;
@@ -275,6 +311,11 @@ const TermsBox = styled.div`
 const ErrorText = styled.p`
   font-size: 13px;
   color: #f04444;
+`;
+
+const SuccessText = styled.p`
+  font-size: 13px;
+  color: #1f9f6b;
 `;
 
 const SubmitButton = styled.button<{ disabled: boolean }>`
