@@ -210,6 +210,10 @@ const Wrapper = styled.div`
   min-height: 100dvh;
   padding: 0 32px;
   background: #f5f5f5;
+
+  @media (max-width: 375px) {
+    padding: 0 24px;
+  }
 `;
 
 const Logo = styled.img`
@@ -218,6 +222,13 @@ const Logo = styled.img`
   display: block;
   margin-top: 62px;
   margin-bottom: 56px;
+
+  @media (max-width: 375px) {
+    width: 58px;
+    height: 34px;
+    margin-top: 42px;
+    margin-bottom: 40px;
+  }
 `;
 
 const Form = styled.form`
@@ -226,6 +237,10 @@ const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 24px;
+
+  @media (max-width: 375px) {
+    gap: 20px;
+  }
 `;
 
 const FieldGroup = styled.div`

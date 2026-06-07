@@ -144,6 +144,10 @@ const Wrapper = styled.div`
   min-height: 100dvh;
   background: #f5f5f5;
   padding: 24px 14px 30px;
+
+  @media (max-width: 375px) {
+    padding: 20px 12px 26px;
+  }
 `;
 
 const HeaderRow = styled.div`
@@ -151,6 +155,10 @@ const HeaderRow = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 26px;
+
+  @media (max-width: 375px) {
+    margin-bottom: 18px;
+  }
 `;
 
 const HeaderActions = styled.div`
@@ -185,6 +193,10 @@ const Title = styled.h1`
   white-space: normal;
   word-break: keep-all;
   overflow-wrap: anywhere;
+
+  @media (max-width: 375px) {
+    font-size: 32px;
+  }
 `;
 
 const Description = styled.p`
@@ -196,6 +208,11 @@ const Description = styled.p`
   white-space: pre-wrap;
   word-break: keep-all;
   overflow-wrap: anywhere;
+
+  @media (max-width: 375px) {
+    margin: 10px 0 18px;
+    font-size: 14px;
+  }
 `;
 
 const ErrorText = styled.p`
@@ -208,6 +225,11 @@ const InfoCard = styled.section`
   background: #ffffff;
   border-radius: 24px;
   padding: 14px 14px 16px;
+
+  @media (max-width: 375px) {
+    border-radius: 20px;
+    padding: 12px 12px 14px;
+  }
 `;
 
 const Tag = styled.span`
@@ -237,6 +259,11 @@ const Avatar = styled.div`
   height: 42px;
   border-radius: 50%;
   background: #b8b8b8;
+
+  @media (max-width: 375px) {
+    width: 36px;
+    height: 36px;
+  }
 `;
 
 const AuthorName = styled.span`
@@ -255,6 +282,11 @@ const ParticipantsCard = styled.section`
   background: #ffffff;
   border-radius: 24px;
   padding: 16px 14px 12px;
+
+  @media (max-width: 375px) {
+    border-radius: 20px;
+    padding: 14px 12px 10px;
+  }
 `;
 
 const ParticipantsTitle = styled.h2`
@@ -282,6 +314,11 @@ const ParticipantAvatar = styled.div`
   border-radius: 50%;
   background: #b8b8b8;
   flex-shrink: 0;
+
+  @media (max-width: 375px) {
+    width: 36px;
+    height: 36px;
+  }
 `;
 
 const ParticipantName = styled.span`
@@ -297,6 +334,11 @@ const SummaryCard = styled.section`
   display: flex;
   flex-direction: column;
   gap: 12px;
+
+  @media (max-width: 375px) {
+    border-radius: 20px;
+    padding: 12px;
+  }
 `;
 
 const SummaryText = styled.p`

@@ -150,6 +150,11 @@ const Header = styled.header`
   align-items: center;
   padding: 12px 18px 0;
   background: #f5f5f5;
+
+  @media (max-width: 375px) {
+    height: 64px;
+    padding: 8px 14px 0;
+  }
 `;
 
 const BackButton = styled.button`
@@ -169,6 +174,10 @@ const HeaderTitle = styled.h1`
   font-weight: 700;
   color: #2f3238;
   letter-spacing: -0.04em;
+
+  @media (max-width: 375px) {
+    font-size: 18px;
+  }
 `;
 
 const HeaderSpacer = styled.div`
@@ -186,12 +195,22 @@ const Body = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
+
+  @media (max-width: 375px) {
+    padding: 16px 12px 24px;
+    gap: 10px;
+  }
 `;
 
 const SectionCard = styled.section`
   background: #efefef;
   border-radius: 24px;
   padding: 20px 18px;
+
+  @media (max-width: 375px) {
+    border-radius: 20px;
+    padding: 16px 14px;
+  }
 `;
 
 const SectionTitle = styled.h2`
@@ -200,6 +219,11 @@ const SectionTitle = styled.h2`
   font-weight: 700;
   color: #2f3238;
   letter-spacing: -0.02em;
+
+  @media (max-width: 375px) {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
 `;
 
 const TitleInput = styled.input`
@@ -231,6 +255,13 @@ const DescriptionInput = styled.textarea`
 
   &::placeholder {
     color: #b3b3b3;
+  }
+
+  @media (max-width: 375px) {
+    height: 124px;
+    border-radius: 18px;
+    padding: 12px;
+    font-size: 14px;
   }
 `;
 
@@ -268,6 +299,12 @@ const TagPanel = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+
+  @media (max-width: 375px) {
+    border-radius: 20px;
+    padding: 10px;
+    gap: 8px;
+  }
 `;
 
 const TagChip = styled.button<{ $active: boolean }>`
@@ -296,6 +333,11 @@ const SaveButton = styled.button`
   color: #1b1b1b;
   font-size: 18px;
   font-weight: 700;
+
+  @media (max-width: 375px) {
+    height: 50px;
+    font-size: 16px;
+  }
 `;
 
 const CreateButton = styled.button`
@@ -309,6 +351,11 @@ const CreateButton = styled.button`
   font-weight: 700;
   &:disabled {
     opacity: 0.7;
+  }
+
+  @media (max-width: 375px) {
+    height: 50px;
+    font-size: 16px;
   }
 `;
 

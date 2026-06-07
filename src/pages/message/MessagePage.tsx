@@ -126,6 +126,10 @@ const Wrapper = styled.div`
   min-height: 100dvh;
   background: #f5f5f5;
   padding: 62px 14px 90px;
+
+  @media (max-width: 375px) {
+    padding: 44px 12px 78px;
+  }
 `;
 
 const Logo = styled.img`
@@ -133,6 +137,12 @@ const Logo = styled.img`
   height: 40px;
   display: block;
   margin: 0 auto 16px;
+
+  @media (max-width: 375px) {
+    width: 58px;
+    height: 34px;
+    margin-bottom: 14px;
+  }
 `;
 
 const RoomTabs = styled.div`
@@ -165,6 +175,12 @@ const ChatPanel = styled.section`
   min-height: 520px;
   display: flex;
   flex-direction: column;
+
+  @media (max-width: 375px) {
+    min-height: 460px;
+    border-radius: 20px;
+    padding: 12px;
+  }
 `;
 
 const PanelHeader = styled.div`
@@ -257,6 +273,10 @@ const SendButton = styled.button`
 
   &:disabled {
     opacity: 0.65;
+  }
+
+  @media (max-width: 375px) {
+    width: 58px;
   }
 `;
 

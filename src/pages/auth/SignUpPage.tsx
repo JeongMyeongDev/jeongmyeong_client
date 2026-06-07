@@ -192,6 +192,10 @@ const Wrapper = styled.div`
   min-height: 100dvh;
   padding: 60px 32px 40px;
   background: #f5f5f5;
+
+  @media (max-width: 375px) {
+    padding: 42px 24px 32px;
+  }
 `;
 
 const Title = styled.h1`
@@ -200,12 +204,20 @@ const Title = styled.h1`
   text-align: center;
   color: #1a1a1a;
   margin-bottom: 40px;
+
+  @media (max-width: 375px) {
+    margin-bottom: 28px;
+  }
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 28px;
+
+  @media (max-width: 375px) {
+    gap: 22px;
+  }
 `;
 
 const FieldGroup = styled.div`

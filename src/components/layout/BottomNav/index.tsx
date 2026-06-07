@@ -73,8 +73,11 @@ const BottomNav = () => {
 
 const Wrapper = styled.nav`
   position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 0;
-  width: 390px;
+  width: 100%;
+  max-width: 390px;
   height: 64px;
   display: flex;
   align-items: center;
@@ -82,8 +85,17 @@ const Wrapper = styled.nav`
   border-top: 1px solid #f0f0f0;
   z-index: 100;
 
-  @media (max-width: 390px) {
-    width: 100%;
+  @media (max-width: 375px) {
+    height: 58px;
+  }
+
+  @media (max-width: 430px) {
+    width: calc(100% - 32px);
+    max-width: 360px;
+  }
+
+  @media (max-width: 360px) {
+    width: calc(100% - 20px);
   }
 `;
 
@@ -121,12 +133,22 @@ const Fab = styled.button`
   align-items: center;
   justify-content: center;
   margin-bottom: 10px;
+
+  @media (max-width: 375px) {
+    width: 40px;
+    height: 54px;
+  }
 `;
 
 const FabIcon = styled.img`
   width: 44px;
   height: 60px;
   display: block;
+
+  @media (max-width: 375px) {
+    width: 40px;
+    height: 54px;
+  }
 `;
 
 export default BottomNav;

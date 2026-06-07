@@ -208,6 +208,10 @@ const Wrapper = styled.div`
   min-height: 100dvh;
   background: #f5f5f5;
   padding: 62px 14px 90px;
+
+  @media (max-width: 375px) {
+    padding: 44px 12px 78px;
+  }
 `;
 
 const Logo = styled.img`
@@ -216,6 +220,12 @@ const Logo = styled.img`
   display: block;
   margin: 0 auto;
   margin-bottom: 16px;
+
+  @media (max-width: 375px) {
+    width: 58px;
+    height: 34px;
+    margin-bottom: 14px;
+  }
 `;
 
 const HeaderRow = styled.div`
@@ -276,6 +286,12 @@ const FilterChip = styled.button<{ $active: boolean }>`
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
+
+  @media (max-width: 375px) {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
 `;
 
 const ListWrap = styled.div`
@@ -296,6 +312,10 @@ const Card = styled.article`
   padding: 12px 14px 14px;
   overflow: hidden;
   cursor: pointer;
+
+  @media (max-width: 375px) {
+    padding: 10px 12px 12px;
+  }
 `;
 
 const CardTop = styled.div`
@@ -337,6 +357,10 @@ const CardTitle = styled.h3`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @media (max-width: 375px) {
+    font-size: 18px;
+  }
 `;
 
 const CardDesc = styled.p`
@@ -369,6 +393,11 @@ const ModalCard = styled.div`
   padding: 22px 20px 22px;
   max-height: calc(100dvh - 36px);
   overflow-y: auto;
+
+  @media (max-width: 375px) {
+    border-radius: 34px;
+    padding: 18px 18px 20px;
+  }
 `;
 
 const ModalTop = styled.div`
@@ -399,6 +428,10 @@ const ModalTitle = styled.h2`
   white-space: normal;
   word-break: keep-all;
   overflow-wrap: anywhere;
+
+  @media (max-width: 375px) {
+    font-size: 28px;
+  }
 `;
 
 const ModalDesc = styled.p`
@@ -410,6 +443,10 @@ const ModalDesc = styled.p`
   white-space: pre-wrap;
   word-break: keep-all;
   overflow-wrap: anywhere;
+
+  @media (max-width: 375px) {
+    font-size: 15px;
+  }
 `;
 
 const ModalTag = styled.span`
@@ -484,6 +521,11 @@ const JoinButton = styled.button`
   color: #ffffff;
   font-size: 20px;
   font-weight: 700;
+
+  @media (max-width: 375px) {
+    height: 50px;
+    font-size: 17px;
+  }
 `;
 
 export default DebatePage;

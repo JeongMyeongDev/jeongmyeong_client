@@ -229,6 +229,10 @@ const Wrapper = styled.div`
   min-height: 100dvh;
   background: #f5f5f5;
   padding: 0 0 90px;
+
+  @media (max-width: 375px) {
+    padding-bottom: 82px;
+  }
 `;
 
 const Logo = styled.img`
@@ -236,6 +240,12 @@ const Logo = styled.img`
   height: 40px;
   display: block;
   margin: 0 auto 58px;
+
+  @media (max-width: 375px) {
+    width: 58px;
+    height: 34px;
+    margin-bottom: 36px;
+  }
 `;
 
 const Header = styled.header`
@@ -246,6 +256,13 @@ const Header = styled.header`
   grid-template-columns: 40px 1fr 40px;
   align-items: center;
   gap: 12px;
+
+  @media (max-width: 375px) {
+    height: 68px;
+    padding: 0 18px;
+    grid-template-columns: 36px 1fr 36px;
+    gap: 8px;
+  }
 `;
 
 const IconButton = styled.button`
@@ -257,11 +274,21 @@ const IconButton = styled.button`
   align-items: center;
   justify-content: center;
   padding: 0;
+
+  @media (max-width: 375px) {
+    width: 36px;
+    height: 36px;
+  }
 `;
 
 const InfoIcon = styled.img`
   width: 34px;
   height: 34px;
+
+  @media (max-width: 375px) {
+    width: 30px;
+    height: 30px;
+  }
 `;
 
 const HeaderText = styled.div`
@@ -278,6 +305,10 @@ const Title = styled.h1`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @media (max-width: 375px) {
+    font-size: 18px;
+  }
 `;
 
 const Description = styled.p`
@@ -288,6 +319,10 @@ const Description = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @media (max-width: 375px) {
+    font-size: 12px;
+  }
 `;
 
 const PromptCard = styled.section`
@@ -302,6 +337,14 @@ const PromptCard = styled.section`
   align-items: center;
   justify-content: center;
   gap: 22px;
+
+  @media (max-width: 375px) {
+    width: calc(100% - 32px);
+    min-height: 88px;
+    margin: 14px auto 56px;
+    border-radius: 20px;
+    gap: 16px;
+  }
 `;
 
 const PromptText = styled.p`
@@ -323,6 +366,11 @@ const ThreadArea = styled.section`
   display: flex;
   flex-direction: column;
   gap: 14px;
+
+  @media (max-width: 375px) {
+    padding: 0 10px 20px;
+    gap: 12px;
+  }
 `;
 
 const MessageGroup = styled.div`
@@ -334,6 +382,10 @@ const MessageGroup = styled.div`
 const MessageNode = styled.div<{ $depth: number }>`
   position: relative;
   margin-left: ${({ $depth }) => `${Math.min($depth * 18, 108)}px`};
+
+  @media (max-width: 375px) {
+    margin-left: ${({ $depth }) => `${Math.min($depth * 14, 84)}px`};
+  }
 `;
 
 const Connector = styled.span`
@@ -356,6 +408,11 @@ const MessageCard = styled.button`
   padding: 12px 14px;
   overflow: hidden;
   text-align: left;
+
+  @media (max-width: 375px) {
+    min-height: 64px;
+    padding: 10px 12px;
+  }
 `;
 
 const MetaRow = styled.div`
@@ -418,6 +475,10 @@ const ComposerWrap = styled.div`
   background: #ffffff;
   padding: 10px 16px max(10px, env(safe-area-inset-bottom));
   box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.04);
+
+  @media (max-width: 375px) {
+    padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+  }
 `;
 
 const Composer = styled.form`
@@ -425,6 +486,10 @@ const Composer = styled.form`
   grid-template-columns: 40px 1fr 40px;
   align-items: center;
   gap: 8px;
+
+  @media (max-width: 375px) {
+    grid-template-columns: 36px 1fr 36px;
+  }
 `;
 
 const HashButton = styled.button`
@@ -436,6 +501,12 @@ const HashButton = styled.button`
   color: #a6a6a6;
   font-size: 22px;
   font-weight: 500;
+
+  @media (max-width: 375px) {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
 `;
 
 const MessageInput = styled.input`
@@ -452,6 +523,12 @@ const MessageInput = styled.input`
   &::placeholder {
     color: #9f9f9f;
   }
+
+  @media (max-width: 375px) {
+    height: 36px;
+    font-size: 14px;
+    padding: 0 14px;
+  }
 `;
 
 const SendButton = styled.button`
@@ -467,6 +544,11 @@ const SendButton = styled.button`
 
   &:disabled {
     opacity: 0.45;
+  }
+
+  @media (max-width: 375px) {
+    width: 36px;
+    height: 36px;
   }
 `;
 
