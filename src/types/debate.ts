@@ -1,9 +1,10 @@
-export type DebateType = 'FREE' | 'CONSENSUS' | 'PROS_CONS';
-export type DebateStatus = 'OPEN' | 'CLOSED' | 'ARCHIVED';
-export type PostStatus = 'VISIBLE' | 'HIDDEN' | 'DELETED';
-export type SelectionSource = 'POST' | 'COMMENT';
-export type ConsensusStatus = 'OPEN' | 'APPROVED' | 'REJECTED' | 'CLOSED';
-export type ConsensusVoteType = 'APPROVE' | 'REJECT' | 'COMMENT';
+export type DebateType = "FREE" | "CONSENSUS" | "PROS_CONS";
+export type DebateStatus = "OPEN" | "CLOSED" | "ARCHIVED";
+export type PostStatus = "VISIBLE" | "HIDDEN" | "DELETED";
+export type SelectionSource = "POST" | "COMMENT";
+export type SelectionSourceType = SelectionSource;
+export type ConsensusStatus = "OPEN" | "APPROVED" | "REJECTED" | "CLOSED";
+export type ConsensusVoteType = "APPROVE" | "REJECT" | "COMMENT";
 
 export interface DebateTag {
   id: string;
@@ -72,12 +73,17 @@ export interface DeletedPost {
 export interface SelectionTarget {
   id: string;
   debateId: string;
-  creatorId: string;
+  creatorId?: string;
   sourceType: SelectionSource;
   sourceId: string;
   selectedText: string;
   startOffset: number;
   endOffset: number;
+  creator?: {
+    id: string;
+    nickname: string;
+    profileImage?: string | null;
+  };
   createdAt?: string;
 }
 

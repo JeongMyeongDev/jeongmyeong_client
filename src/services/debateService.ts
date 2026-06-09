@@ -1,4 +1,4 @@
-import api from './api';
+import api from "./api";
 import type {
   Consensus,
   CreatedPost,
@@ -6,26 +6,26 @@ import type {
   DebateMessage,
   SelectionSource,
   SelectionTarget,
-} from '../types/debate';
+} from "../types/debate";
 
 export interface CreateDebateRequest {
   title: string;
   description: string;
-  debateType: 'FREE' | 'CONSENSUS' | 'PROS_CONS';
+  debateType: "FREE" | "CONSENSUS" | "PROS_CONS";
   tags?: string[];
-  closeConditionType?: 'TIME_LIMIT' | 'MANUAL' | 'TARGET_REACHED';
+  closeConditionType?: "TIME_LIMIT" | "MANUAL" | "TARGET_REACHED";
   closeAt?: string;
 }
 
 export interface ListDebatesParams {
   keyword?: string;
   tag?: string;
-  type?: 'FREE' | 'CONSENSUS' | 'PROS_CONS';
-  status?: 'OPEN' | 'CLOSED' | 'ARCHIVED';
+  type?: "FREE" | "CONSENSUS" | "PROS_CONS";
+  status?: "OPEN" | "CLOSED" | "ARCHIVED";
   page?: number;
   limit?: number;
-  sort?: 'createdAt' | 'archivedAt' | 'updatedAt';
-  direction?: 'asc' | 'desc';
+  sort?: "createdAt" | "archivedAt" | "updatedAt";
+  direction?: "asc" | "desc";
 }
 
 interface DebateListResponse {
@@ -49,14 +49,14 @@ interface JoinDebateResponse {
     userId: string;
     joinedAt: string;
     lastReadAt?: string | null;
-    roleInDebate: 'CREATOR' | 'PARTICIPANT' | 'MODERATOR';
+    roleInDebate: "CREATOR" | "PARTICIPANT" | "MODERATOR";
   };
   participantCount: number;
 }
 
 interface ArchiveDebateResponse {
   success: boolean;
-  debate: Pick<Debate, 'id' | 'status' | 'archivedAt'>;
+  debate: Pick<Debate, "id" | "status" | "archivedAt">;
 }
 
 interface DebatePostsResponse {
@@ -89,6 +89,11 @@ interface CreateSelectionTargetResponse {
   selectionTarget: SelectionTarget;
 }
 
+interface SelectionTargetListResponse {
+  success: boolean;
+  selectionTargets: SelectionTarget[];
+}
+
 export interface CreateConsensusRequest {
   title: string;
   content: string;
@@ -101,27 +106,38 @@ interface CreateConsensusResponse {
 }
 
 export const debateService = {
-  getList: (params?: ListDebatesParams) => api.get<DebateListResponse>('/debates', { params }),
+  getList: (params?: ListDebatesParams) =>
+    api.get<DebateListResponse>("/debates", { params }),
   getById: (id: string) => api.get<DebateDetailResponse>(`/debates/${id}`),
-  create: (data: CreateDebateRequest) => api.post<DebateDetailResponse>('/debates', data),
-  join: (id: string) => api.post<JoinDebateResponse>(`/debates/${id}/participants`),
-  archive: (id: string) => api.post<ArchiveDebateResponse>(`/debates/${id}/archive`),
+  create: (data: CreateDebateRequest) =>
+    api.post<DebateDetailResponse>("/debates", data),
+  join: (id: string) =>
+    api.post<JoinDebateResponse>(`/debates/${id}/participants`),
+  archive: (id: string) =>
+    api.post<ArchiveDebateResponse>(`/debates/${id}/archive`),
   bookmark: (id: string) => api.post(`/debates/${id}/bookmark`),
   unbookmark: (id: string) => api.delete(`/debates/${id}/bookmark`),
   subscribe: (id: string) => api.post(`/debates/${id}/subscription`),
   unsubscribe: (id: string) => api.delete(`/debates/${id}/subscription`),
-  getMessages: (id: string, params?: Pick<ListDebatesParams, 'page' | 'limit'>) =>
-    api.get<DebatePostsResponse>(`/debates/${id}/posts`, { params }),
+  getMessages: (
+    id: string,
+    params?: Pick<ListDebatesParams, "page" | "limit">,
+  ) => api.get<DebatePostsResponse>(`/debates/${id}/posts`, { params }),
   createPost: (id: string, data: CreatePostRequest) =>
     api.post<CreatePostResponse>(`/debates/${id}/posts`, data),
   createSelectionTarget: (id: string, data: CreateSelectionTargetRequest) =>
-    api.post<CreateSelectionTargetResponse>(`/debates/${id}/selection-targets`, data),
+    api.post<CreateSelectionTargetResponse>(
+      `/debates/${id}/selection-targets`,
+      data,
+    ),
+  getSelectionTargets: (id: string) =>
+    api.get<SelectionTargetListResponse>(`/debates/${id}/selection-targets`),
   createConsensus: (id: string, data: CreateConsensusRequest) =>
     api.post<CreateConsensusResponse>(`/debates/${id}/consensuses`, data),
-  getArchived: (params?: Omit<ListDebatesParams, 'status'>) =>
-    api.get<DebateListResponse>('/debates/archive', { params }),
+  getArchived: (params?: Omit<ListDebatesParams, "status">) =>
+    api.get<DebateListResponse>("/debates/archive", { params }),
   getMyDebates: (params?: ListDebatesParams) =>
-    api.get<DebateListResponse>('/debates/my', { params }),
+    api.get<DebateListResponse>("/debates/my", { params }),
   getBookmarks: (params?: ListDebatesParams) =>
-    api.get<DebateListResponse>('/debates/bookmarks', { params }),
+    api.get<DebateListResponse>("/debates/bookmarks", { params }),
 };

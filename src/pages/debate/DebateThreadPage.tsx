@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { isAxiosError } from "axios";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
 import iconShowInfo from "../../assets/icon_show_info.svg";
 import logoSymbol from "../../assets/logo_symbol.svg";
 import { useDebate } from "../../hooks/useDebate";
+import { debateService } from "../../services/debateService";
 import { postService } from "../../services/postService";
 import { useAuthStore } from "../../stores/authStore";
-import type { Comment } from "../../types/debate";
+import type { Comment, SelectionSource } from "../../types/debate";
 
 type ReplyTarget = {
   postId: string;
@@ -19,6 +20,21 @@ type ReplyTarget = {
 type CommentGroup = Comment & {
   replies: Comment[];
 };
+
+type PendingSelection = {
+  sourceType: SelectionSource;
+  sourceId: string;
+  selectedText: string;
+  startOffset: number;
+  endOffset: number;
+  menuX: number;
+  menuY: number;
+};
+
+type SelectionAction = "consensus" | "child";
+
+const SELECTION_SOURCE_SELECTOR =
+  "[data-selection-source-type][data-selection-source-id]";
 
 const getMentionPrefix = (name: string) => {
   const normalizedName = name.replace(/\s+/g, "") || "사용자";
@@ -73,6 +89,20 @@ const buildCommentGroups = (comments: Comment[]) => {
   return Array.from(groups.values());
 };
 
+const getSelectionSourceElement = (node: Node | null) => {
+  if (!node) return null;
+  const element =
+    node instanceof Element
+      ? node
+      : node.parentNode instanceof Element
+        ? node.parentNode
+        : null;
+  return element?.closest<HTMLElement>(SELECTION_SOURCE_SELECTOR) ?? null;
+};
+
+const clampMenuCoordinate = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
 const BackIcon = () => (
   <svg
     width="30"
@@ -103,8 +133,10 @@ const SendIcon = () => (
 
 const DebateThreadPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id: debateId } = useParams();
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectionMenuRef = useRef<HTMLDivElement>(null);
   const { currentDebate, messages, fetchDebate, fetchMessages, createMessage } =
     useDebate();
   const { user } = useAuthStore();
@@ -118,6 +150,12 @@ const DebateThreadPage = () => {
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [loadError, setLoadError] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [pendingSelection, setPendingSelection] =
+    useState<PendingSelection | null>(null);
+  const [activeCardMenuKey, setActiveCardMenuKey] = useState<string | null>(
+    null,
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -210,6 +248,125 @@ const DebateThreadPage = () => {
 
     return () => window.clearInterval(intervalId);
   }, [commentsByPostId, debateId, fetchMessages, threadMessages]);
+
+  const clearSelectionMenu = () => {
+    setPendingSelection(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  useEffect(() => {
+    setPendingSelection(null);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        pendingSelection &&
+        !selectionMenuRef.current?.contains(event.target as Node)
+      ) {
+        setPendingSelection(null);
+      }
+    };
+
+    const handleSelectionChange = () => {
+      if (!window.getSelection()?.toString().trim()) {
+        setPendingSelection(null);
+      }
+    };
+
+    const handleCardMenuPointerDown = (event: PointerEvent) => {
+      if (
+        activeCardMenuKey &&
+        event.target instanceof Element &&
+        !event.target.closest("[data-card-menu-root]")
+      ) {
+        setActiveCardMenuKey(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("pointerdown", handleCardMenuPointerDown);
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("pointerdown", handleCardMenuPointerDown);
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [activeCardMenuKey, pendingSelection]);
+
+  const handleTextSelection = () => {
+    window.setTimeout(() => {
+      const selection = window.getSelection();
+      const selectedText = selection?.toString() ?? "";
+      if (!selection || selection.rangeCount === 0 || !selectedText.trim()) {
+        setPendingSelection(null);
+        return;
+      }
+
+      const anchorSource = getSelectionSourceElement(selection.anchorNode);
+      const focusSource = getSelectionSourceElement(selection.focusNode);
+      if (!anchorSource || !focusSource) return;
+
+      if (anchorSource !== focusSource) {
+        setPendingSelection(null);
+        setActionMessage("하나의 의견 또는 댓글 안에서만 선택할 수 있습니다.");
+        selection.removeAllRanges();
+        return;
+      }
+
+      if (currentDebate?.status !== "OPEN") {
+        setPendingSelection(null);
+        setActionMessage(
+          "종료되었거나 보관된 토론에서는 선택 액션을 사용할 수 없습니다.",
+        );
+        selection.removeAllRanges();
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+      if (
+        !anchorSource.contains(range.startContainer) ||
+        !anchorSource.contains(range.endContainer)
+      ) {
+        setPendingSelection(null);
+        setActionMessage("하나의 의견 또는 댓글 안에서만 선택할 수 있습니다.");
+        selection.removeAllRanges();
+        return;
+      }
+
+      const beforeRange = range.cloneRange();
+      beforeRange.selectNodeContents(anchorSource);
+      beforeRange.setEnd(range.startContainer, range.startOffset);
+
+      const startOffset = beforeRange.toString().length;
+      const endOffset = startOffset + selectedText.length;
+      const rect = range.getBoundingClientRect();
+      const sourceRect = anchorSource.getBoundingClientRect();
+      const menuX = clampMenuCoordinate(
+        rect.width
+          ? rect.left + rect.width / 2
+          : sourceRect.left + sourceRect.width / 2,
+        88,
+        window.innerWidth - 88,
+      );
+      const menuY = clampMenuCoordinate(
+        (rect.height ? rect.top : sourceRect.top) - 10,
+        72,
+        window.innerHeight - 88,
+      );
+
+      setActionMessage("");
+      setPendingSelection({
+        sourceType: anchorSource.dataset.selectionSourceType as SelectionSource,
+        sourceId: anchorSource.dataset.selectionSourceId ?? "",
+        selectedText,
+        startOffset,
+        endOffset,
+        menuX,
+        menuY,
+      });
+    }, 0);
+  };
 
   const getMutationErrorMessage = (error: unknown) => {
     if (isAxiosError(error) && error.response?.status === 409) {
@@ -336,14 +493,110 @@ const DebateThreadPage = () => {
     }
   };
 
+  const createSelectionTargetForAction = async (
+    selection: PendingSelection,
+  ) => {
+    if (!debateId) return null;
+    const { data } = await debateService.createSelectionTarget(debateId, {
+      sourceType: selection.sourceType,
+      sourceId: selection.sourceId,
+      selectedText: selection.selectedText,
+      startOffset: selection.startOffset,
+      endOffset: selection.endOffset,
+    });
+    return data.selectionTarget;
+  };
+
+  const handleSelectionAction = async (action: SelectionAction) => {
+    if (!pendingSelection) return;
+    if (currentDebate?.status !== "OPEN") {
+      setSubmitError(
+        "종료되었거나 보관된 토론에서는 선택 액션을 사용할 수 없습니다.",
+      );
+      clearSelectionMenu();
+      return;
+    }
+
+    try {
+      await createSelectionTargetForAction(pendingSelection);
+      setActionMessage(
+        action === "consensus"
+          ? "합의안 작성은 다음 단계에서 연결됩니다."
+          : "하위 토론 생성은 다음 단계에서 연결됩니다.",
+      );
+      clearSelectionMenu();
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
+    }
+  };
+
+  const handleCopySelection = async () => {
+    if (!pendingSelection) return;
+    try {
+      await navigator.clipboard.writeText(pendingSelection.selectedText);
+      setActionMessage("선택한 내용을 복사했습니다.");
+      clearSelectionMenu();
+    } catch {
+      setSubmitError("선택한 내용을 복사하지 못했습니다.");
+    }
+  };
+
+  const openCardSelectionFallback = (
+    sourceType: SelectionSource,
+    sourceId: string,
+    content: string,
+  ) => {
+    setActiveCardMenuKey(null);
+
+    if (currentDebate?.status !== "OPEN") {
+      setActionMessage(
+        "종료되었거나 보관된 토론에서는 선택 액션을 사용할 수 없습니다.",
+      );
+      return;
+    }
+
+    const selectedText = window.prompt(
+      "액션에 사용할 텍스트를 입력하세요.",
+      content,
+    );
+    if (!selectedText?.trim()) return;
+
+    const startOffset = content.indexOf(selectedText);
+    if (startOffset < 0) {
+      setActionMessage("입력한 텍스트를 원문에서 찾을 수 없습니다.");
+      return;
+    }
+
+    setPendingSelection({
+      sourceType,
+      sourceId,
+      selectedText,
+      startOffset,
+      endOffset: startOffset + selectedText.length,
+      menuX: window.innerWidth / 2,
+      menuY: Math.max(88, window.innerHeight - 180),
+    });
+  };
+
+  const toggleCardMenu = (menuKey: string) => {
+    setActiveCardMenuKey((current) => (current === menuKey ? null : menuKey));
+  };
+
   const title = currentDebate?.title;
   const description = currentDebate?.description ?? "설명이 존재하지 않습니다.";
 
-  const renderMessageText = (content: string) => {
+  const renderMessageText = (
+    content: string,
+    sourceType?: SelectionSource,
+    sourceId?: string,
+  ) => {
     const mentionMatch = content.match(/^(@[^\s]+)(\s+)([\s\S]*)$/);
 
     return (
-      <MessageText>
+      <MessageText
+        data-selection-source-type={sourceType}
+        data-selection-source-id={sourceId}
+      >
         {mentionMatch ? (
           <>
             <MentionText>{mentionMatch[1]}</MentionText>
@@ -359,34 +612,79 @@ const DebateThreadPage = () => {
 
   const renderCommentCard = (comment: Comment, postId: string) => {
     const isDeleted = comment.status === "DELETED";
+    const menuKey = `comment:${comment.id}`;
+    const canManage = comment.author?.id === user?.id;
 
     return (
-      <MessageCard
-        key={comment.id}
-        onClick={() => startCommentReply(postId, comment)}
-      >
+      <MessageCard key={comment.id}>
         <MetaRow>
           <NumberText>#1</NumberText>
           <Avatar />
           <AuthorName>{comment.author?.nickname ?? "사용자 이름"}</AuthorName>
-          {!isDeleted && comment.author?.id === user?.id && (
-            <ActionGroup onClick={(event) => event.stopPropagation()}>
-              <InlineAction
+          {!isDeleted && (
+            <ActionGroup
+              data-card-menu-root
+              onClick={(event) => event.stopPropagation()}
+            >
+              <ReplyAction
                 type="button"
-                onClick={() => void handleUpdateComment(postId, comment)}
+                onClick={() => startCommentReply(postId, comment)}
               >
-                수정
-              </InlineAction>
-              <InlineAction
+                답글
+              </ReplyAction>
+              <MoreAction
                 type="button"
-                onClick={() => void handleDeleteComment(postId, comment.id)}
+                aria-label="댓글 선택 액션"
+                onClick={() => toggleCardMenu(menuKey)}
               >
-                삭제
-              </InlineAction>
+                ...
+              </MoreAction>
+              {activeCardMenuKey === menuKey && (
+                <CardMenu>
+                  {canManage && (
+                    <>
+                      <CardMenuButton
+                        type="button"
+                        onClick={() => {
+                          setActiveCardMenuKey(null);
+                          void handleUpdateComment(postId, comment);
+                        }}
+                      >
+                        수정
+                      </CardMenuButton>
+                      <CardMenuButton
+                        type="button"
+                        onClick={() => {
+                          setActiveCardMenuKey(null);
+                          void handleDeleteComment(postId, comment.id);
+                        }}
+                      >
+                        삭제
+                      </CardMenuButton>
+                    </>
+                  )}
+                  <CardMenuButton
+                    type="button"
+                    onClick={() =>
+                      openCardSelectionFallback(
+                        "COMMENT",
+                        comment.id,
+                        comment.content,
+                      )
+                    }
+                  >
+                    선택
+                  </CardMenuButton>
+                </CardMenu>
+              )}
             </ActionGroup>
           )}
         </MetaRow>
-        {renderMessageText(isDeleted ? "삭제된 댓글입니다." : comment.content)}
+        {renderMessageText(
+          isDeleted ? "삭제된 댓글입니다." : comment.content,
+          isDeleted ? undefined : "COMMENT",
+          isDeleted ? undefined : comment.id,
+        )}
       </MessageCard>
     );
   };
@@ -421,7 +719,10 @@ const DebateThreadPage = () => {
         <PromptArrow aria-hidden />
       </PromptCard>
 
-      <ThreadArea>
+      <ThreadArea
+        onMouseUp={handleTextSelection}
+        onTouchEnd={handleTextSelection}
+      >
         {loadError && <ErrorText>{loadError}</ErrorText>}
         {!loadError && threadMessages.length === 0 && (
           <EmptyCard>아직 의견이 없습니다. 첫 의견을 남겨보세요.</EmptyCard>
@@ -430,39 +731,81 @@ const DebateThreadPage = () => {
           const comments = commentsByPostId[item.id] ?? [];
           const commentGroups = buildCommentGroups(comments);
           const isDeleted = item.status === "DELETED";
+          const menuKey = `post:${item.id}`;
+          const canManage = item.author.id === user?.id;
 
           return (
             <MessageGroup key={item.id}>
-              <MessageCard
-                onClick={() =>
-                  !isDeleted && startPostReply(item.id, item.author.nickname)
-                }
-              >
+              <MessageCard>
                 <MetaRow>
                   <NumberText>#1</NumberText>
                   <Avatar />
                   <AuthorName>{item.author.nickname}</AuthorName>
-                  {!isDeleted && item.author.id === user?.id && (
-                    <ActionGroup onClick={(event) => event.stopPropagation()}>
-                      <InlineAction
+                  {!isDeleted && (
+                    <ActionGroup
+                      data-card-menu-root
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <ReplyAction
                         type="button"
                         onClick={() =>
-                          void handleUpdatePost(item.id, item.content)
+                          startPostReply(item.id, item.author.nickname)
                         }
                       >
-                        수정
-                      </InlineAction>
-                      <InlineAction
+                        답글
+                      </ReplyAction>
+                      <MoreAction
                         type="button"
-                        onClick={() => void handleDeletePost(item.id)}
+                        aria-label="의견 선택 액션"
+                        onClick={() => toggleCardMenu(menuKey)}
                       >
-                        삭제
-                      </InlineAction>
+                        ...
+                      </MoreAction>
+                      {activeCardMenuKey === menuKey && (
+                        <CardMenu>
+                          {canManage && (
+                            <>
+                              <CardMenuButton
+                                type="button"
+                                onClick={() => {
+                                  setActiveCardMenuKey(null);
+                                  void handleUpdatePost(item.id, item.content);
+                                }}
+                              >
+                                수정
+                              </CardMenuButton>
+                              <CardMenuButton
+                                type="button"
+                                onClick={() => {
+                                  setActiveCardMenuKey(null);
+                                  void handleDeletePost(item.id);
+                                }}
+                              >
+                                삭제
+                              </CardMenuButton>
+                            </>
+                          )}
+                          <CardMenuButton
+                            type="button"
+                            onClick={() =>
+                              openCardSelectionFallback(
+                                "POST",
+                                item.id,
+                                item.content,
+                              )
+                            }
+                          >
+                            선택
+                          </CardMenuButton>
+                        </CardMenu>
+                      )}
                     </ActionGroup>
                   )}
                 </MetaRow>
                 {renderMessageText(
                   isDeleted ? "삭제된 의견입니다." : item.content,
+                  isDeleted ? undefined : "POST",
+                  isDeleted ? undefined : item.id,
                 )}
               </MessageCard>
 
@@ -487,8 +830,35 @@ const DebateThreadPage = () => {
         })}
       </ThreadArea>
 
+      {pendingSelection && (
+        <SelectionMenu
+          ref={selectionMenuRef}
+          style={{
+            left: pendingSelection.menuX,
+            top: pendingSelection.menuY,
+          }}
+        >
+          <SelectionMenuButton
+            type="button"
+            onClick={() => void handleSelectionAction("consensus")}
+          >
+            합의안
+          </SelectionMenuButton>
+          <SelectionMenuButton
+            type="button"
+            onClick={() => void handleSelectionAction("child")}
+          >
+            하위 토론
+          </SelectionMenuButton>
+          <SelectionMenuButton type="button" onClick={handleCopySelection}>
+            복사
+          </SelectionMenuButton>
+        </SelectionMenu>
+      )}
+
       <ComposerWrap>
         {submitError && <SubmitError>{submitError}</SubmitError>}
+        {actionMessage && <ActionNotice>{actionMessage}</ActionNotice>}
         {replyTarget && (
           <ReplyBanner>
             <span>
@@ -658,9 +1028,10 @@ const MessageCard = styled.div`
   border-radius: 4px;
   background: #ffffff;
   padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.3vw, 14px);
-  overflow: hidden;
+  position: relative;
+  overflow: visible;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 `;
 
 const MetaRow = styled.div`
@@ -698,6 +1069,7 @@ const ActionGroup = styled.span`
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  position: relative;
 `;
 
 const InlineAction = styled.button`
@@ -709,6 +1081,43 @@ const InlineAction = styled.button`
   padding: 0;
 `;
 
+const MoreAction = styled(InlineAction)`
+  min-width: 20px;
+  color: #8f8f8f;
+`;
+
+const CardMenu = styled.div`
+  position: absolute;
+  top: 20px;
+  right: 0;
+  z-index: 30;
+  width: 76px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`;
+
+const CardMenuButton = styled.button`
+  width: 100%;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #7f7f7f;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+
+  &:active {
+    background: #eefaf6;
+    color: #2dcd97;
+  }
+`;
+
 const MessageText = styled.p`
   margin: 0;
   color: #8f8f8f;
@@ -717,6 +1126,16 @@ const MessageText = styled.p`
   white-space: pre-wrap;
   word-break: keep-all;
   overflow-wrap: anywhere;
+  user-select: text;
+`;
+
+const ReplyAction = styled.button`
+  border: none;
+  background: transparent;
+  color: #2dcd97;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0;
 `;
 
 const MentionText = styled.span`
@@ -807,6 +1226,45 @@ const SubmitError = styled.p`
   text-align: center;
   color: #f04444;
   font-size: 12px;
+`;
+
+const ActionNotice = styled.p`
+  margin: 0 0 8px;
+  text-align: center;
+  color: #2dcd97;
+  font-size: 12px;
+`;
+
+const SelectionMenu = styled.div`
+  position: fixed;
+  z-index: 40;
+  transform: translate(-50%, -100%);
+  min-width: 176px;
+  height: 38px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 8px;
+`;
+
+const SelectionMenuButton = styled.button`
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #2f3238;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 9px;
+
+  &:active {
+    background: #eefaf6;
+    color: #2dcd97;
+  }
 `;
 
 const ReplyBanner = styled.div`
