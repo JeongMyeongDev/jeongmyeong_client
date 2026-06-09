@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { isAxiosError } from "axios";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
@@ -52,10 +59,13 @@ const SELECTION_SOURCE_SELECTOR =
 
 const CONSENSUS_STATUS_LABEL: Record<string, string> = {
   OPEN: "진행 중",
-  APPROVED: "승인",
+  APPROVED: "기준 정의 확정",
   REJECTED: "반려",
   CLOSED: "종료",
 };
+
+const buildConsensusSourceKey = (sourceType: SelectionSource, sourceId: string) =>
+  `${sourceType}:${sourceId}`;
 
 const getMentionPrefix = (name: string) => {
   const normalizedName = name.replace(/\s+/g, "") || "사용자";
@@ -232,6 +242,29 @@ const DebateThreadPage = () => {
     [messages],
   );
 
+  const consensusesBySource = useMemo(() => {
+    const map = new Map<string, Consensus[]>();
+
+    consensuses.forEach((consensus) => {
+      const target = consensus.selectionTarget;
+      if (!target?.sourceType || !target.sourceId) return;
+
+      const key = buildConsensusSourceKey(target.sourceType, target.sourceId);
+      const sourceConsensuses = map.get(key) ?? [];
+      sourceConsensuses.push(consensus);
+      map.set(key, sourceConsensuses);
+    });
+
+    return map;
+  }, [consensuses]);
+
+  const openConsensusCount = consensuses.filter(
+    (consensus) => consensus.status === "OPEN",
+  ).length;
+  const approvedConsensusCount = consensuses.filter(
+    (consensus) => consensus.status === "APPROVED",
+  ).length;
+
   useEffect(() => {
     if (threadMessages.length === 0) {
       window.setTimeout(() => setCommentsByPostId({}), 0);
@@ -296,7 +329,8 @@ const DebateThreadPage = () => {
   };
 
   useEffect(() => {
-    setPendingSelection(null);
+    const timer = window.setTimeout(() => setPendingSelection(null), 0);
+    return () => window.clearTimeout(timer);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -699,8 +733,17 @@ const DebateThreadPage = () => {
       const { data } = await consensusService[action](consensusId);
       setSelectedConsensus(data.consensus);
       await refreshConsensuses(debateId);
+      if (action === "approve") {
+        await fetchDebate(debateId);
+      }
       setSubmitError("");
-      setActionMessage(data.message);
+      setActionMessage(
+        action === "approve"
+          ? "합의안이 승인되어 기준 정의로 저장되었습니다."
+          : action === "reject"
+            ? "합의안이 반려되었습니다."
+            : "합의안이 종료되었습니다.",
+      );
     } catch (error) {
       setSubmitError(getMutationErrorMessage(error));
     }
@@ -775,82 +818,166 @@ const DebateThreadPage = () => {
     );
   };
 
+  const renderInlineConsensusStack = (
+    sourceType: SelectionSource,
+    sourceId: string,
+  ) => {
+    const sourceConsensuses =
+      consensusesBySource.get(buildConsensusSourceKey(sourceType, sourceId)) ??
+      [];
+    if (sourceConsensuses.length === 0) return null;
+
+    return (
+      <InlineConsensusStack>
+        {sourceConsensuses.map((consensus) => {
+          const canVote =
+            currentDebate?.status === "OPEN" && consensus.status === "OPEN";
+
+          return (
+            <InlineConsensusCard key={consensus.id}>
+              <ConsensusMetaRow>
+                <ConsensusBadge>
+                  {CONSENSUS_STATUS_LABEL[consensus.status] ??
+                    consensus.status}
+                </ConsensusBadge>
+                <ConsensusTerm>{consensus.term}</ConsensusTerm>
+              </ConsensusMetaRow>
+              {consensus.selectionTarget?.selectedText && (
+                <ConsensusQuote>
+                  “{consensus.selectionTarget.selectedText}”
+                </ConsensusQuote>
+              )}
+              <ConsensusTitle>{consensus.title}</ConsensusTitle>
+              <ConsensusContent>{consensus.content}</ConsensusContent>
+              <ConsensusCountRow>
+                <span>찬성 {consensus.approveCount ?? 0}</span>
+                <span>반대 {consensus.rejectCount ?? 0}</span>
+                <span>의견 {consensus.commentCount ?? 0}</span>
+              </ConsensusCountRow>
+              <ConsensusActionRow>
+                {canVote && (
+                  <>
+                    <ConsensusAction
+                      type="button"
+                      onClick={() => {
+                        setVoteComment("");
+                        setSelectedConsensus(consensus);
+                        void handleVoteConsensus(consensus.id, "APPROVE", "");
+                      }}
+                    >
+                      찬성
+                    </ConsensusAction>
+                    <ConsensusAction
+                      type="button"
+                      onClick={() => {
+                        setVoteComment("");
+                        setSelectedConsensus(consensus);
+                        void handleVoteConsensus(consensus.id, "REJECT", "");
+                      }}
+                    >
+                      반대
+                    </ConsensusAction>
+                    <ConsensusAction
+                      type="button"
+                      onClick={() => void openConsensusDetail(consensus)}
+                    >
+                      의견
+                    </ConsensusAction>
+                  </>
+                )}
+                <ConsensusAction
+                  type="button"
+                  onClick={() => void openConsensusDetail(consensus)}
+                >
+                  상세
+                </ConsensusAction>
+              </ConsensusActionRow>
+            </InlineConsensusCard>
+          );
+        })}
+      </InlineConsensusStack>
+    );
+  };
+
   const renderCommentCard = (comment: Comment, postId: string) => {
     const isDeleted = comment.status === "DELETED";
     const menuKey = `comment:${comment.id}`;
     const canManage = comment.author?.id === user?.id;
 
     return (
-      <MessageCard key={comment.id}>
-        <MetaRow>
-          <NumberText>#1</NumberText>
-          <Avatar />
-          <AuthorName>{comment.author?.nickname ?? "사용자 이름"}</AuthorName>
-          {!isDeleted && (
-            <ActionGroup
-              data-card-menu-root
-              onClick={(event) => event.stopPropagation()}
-            >
-              <ReplyAction
-                type="button"
-                onClick={() => startCommentReply(postId, comment)}
+      <Fragment key={comment.id}>
+        <MessageCard>
+          <MetaRow>
+            <NumberText>#1</NumberText>
+            <Avatar />
+            <AuthorName>{comment.author?.nickname ?? "사용자 이름"}</AuthorName>
+            {!isDeleted && (
+              <ActionGroup
+                data-card-menu-root
+                onClick={(event) => event.stopPropagation()}
               >
-                답글
-              </ReplyAction>
-              <MoreAction
-                type="button"
-                aria-label="댓글 선택 액션"
-                onClick={() => toggleCardMenu(menuKey)}
-              >
-                ...
-              </MoreAction>
-              {activeCardMenuKey === menuKey && (
-                <CardMenu>
-                  {canManage && (
-                    <>
-                      <CardMenuButton
-                        type="button"
-                        onClick={() => {
-                          setActiveCardMenuKey(null);
-                          void handleUpdateComment(postId, comment);
-                        }}
-                      >
-                        수정
-                      </CardMenuButton>
-                      <CardMenuButton
-                        type="button"
-                        onClick={() => {
-                          setActiveCardMenuKey(null);
-                          void handleDeleteComment(postId, comment.id);
-                        }}
-                      >
-                        삭제
-                      </CardMenuButton>
-                    </>
-                  )}
-                  <CardMenuButton
-                    type="button"
-                    onClick={() =>
-                      openCardSelectionFallback(
-                        "COMMENT",
-                        comment.id,
-                        comment.content,
-                      )
-                    }
-                  >
-                    선택
-                  </CardMenuButton>
-                </CardMenu>
-              )}
-            </ActionGroup>
+                <ReplyAction
+                  type="button"
+                  onClick={() => startCommentReply(postId, comment)}
+                >
+                  답글
+                </ReplyAction>
+                <MoreAction
+                  type="button"
+                  aria-label="댓글 선택 액션"
+                  onClick={() => toggleCardMenu(menuKey)}
+                >
+                  ...
+                </MoreAction>
+                {activeCardMenuKey === menuKey && (
+                  <CardMenu>
+                    {canManage && (
+                      <>
+                        <CardMenuButton
+                          type="button"
+                          onClick={() => {
+                            setActiveCardMenuKey(null);
+                            void handleUpdateComment(postId, comment);
+                          }}
+                        >
+                          수정
+                        </CardMenuButton>
+                        <CardMenuButton
+                          type="button"
+                          onClick={() => {
+                            setActiveCardMenuKey(null);
+                            void handleDeleteComment(postId, comment.id);
+                          }}
+                        >
+                          삭제
+                        </CardMenuButton>
+                      </>
+                    )}
+                    <CardMenuButton
+                      type="button"
+                      onClick={() =>
+                        openCardSelectionFallback(
+                          "COMMENT",
+                          comment.id,
+                          comment.content,
+                        )
+                      }
+                    >
+                      선택
+                    </CardMenuButton>
+                  </CardMenu>
+                )}
+              </ActionGroup>
+            )}
+          </MetaRow>
+          {renderMessageText(
+            isDeleted ? "삭제된 댓글입니다." : comment.content,
+            isDeleted ? undefined : "COMMENT",
+            isDeleted ? undefined : comment.id,
           )}
-        </MetaRow>
-        {renderMessageText(
-          isDeleted ? "삭제된 댓글입니다." : comment.content,
-          isDeleted ? undefined : "COMMENT",
-          isDeleted ? undefined : comment.id,
-        )}
-      </MessageCard>
+        </MessageCard>
+        {!isDeleted && renderInlineConsensusStack("COMMENT", comment.id)}
+      </Fragment>
     );
   };
 
@@ -893,95 +1020,10 @@ const DebateThreadPage = () => {
           <EmptyCard>아직 의견이 없습니다. 첫 의견을 남겨보세요.</EmptyCard>
         )}
         {consensuses.length > 0 && (
-          <ConsensusList>
-            {consensuses.map((consensus) => (
-              <ConsensusCard key={consensus.id}>
-                <ConsensusMetaRow>
-                  <ConsensusBadge>
-                    {CONSENSUS_STATUS_LABEL[consensus.status] ??
-                      consensus.status}
-                  </ConsensusBadge>
-                  <ConsensusTerm>{consensus.term}</ConsensusTerm>
-                </ConsensusMetaRow>
-                {consensus.selectionTarget?.selectedText && (
-                  <ConsensusQuote>
-                    “{consensus.selectionTarget.selectedText}”
-                  </ConsensusQuote>
-                )}
-                <ConsensusTitle>{consensus.title}</ConsensusTitle>
-                <ConsensusContent>{consensus.content}</ConsensusContent>
-                <ConsensusCountRow>
-                  <span>찬성 {consensus.approveCount ?? 0}</span>
-                  <span>반대 {consensus.rejectCount ?? 0}</span>
-                  <span>의견 {consensus.commentCount ?? 0}</span>
-                </ConsensusCountRow>
-                <ConsensusActionRow>
-                  <ConsensusAction
-                    type="button"
-                    disabled={
-                      currentDebate?.status !== "OPEN" ||
-                      consensus.status !== "OPEN"
-                    }
-                    onClick={() => {
-                      setVoteComment("");
-                      setSelectedConsensus(consensus);
-                      void handleVoteConsensus(consensus.id, "APPROVE", "");
-                    }}
-                  >
-                    찬성
-                  </ConsensusAction>
-                  <ConsensusAction
-                    type="button"
-                    disabled={
-                      currentDebate?.status !== "OPEN" ||
-                      consensus.status !== "OPEN"
-                    }
-                    onClick={() => {
-                      setVoteComment("");
-                      setSelectedConsensus(consensus);
-                      void handleVoteConsensus(consensus.id, "REJECT", "");
-                    }}
-                  >
-                    반대
-                  </ConsensusAction>
-                  <ConsensusAction
-                    type="button"
-                    onClick={() => void openConsensusDetail(consensus)}
-                  >
-                    상세
-                  </ConsensusAction>
-                  {canFinalizeConsensus && consensus.status === "OPEN" && (
-                    <>
-                      <ConsensusAction
-                        type="button"
-                        onClick={() =>
-                          void handleFinalizeConsensus(consensus.id, "approve")
-                        }
-                      >
-                        승인
-                      </ConsensusAction>
-                      <ConsensusAction
-                        type="button"
-                        onClick={() =>
-                          void handleFinalizeConsensus(consensus.id, "reject")
-                        }
-                      >
-                        반려
-                      </ConsensusAction>
-                      <ConsensusAction
-                        type="button"
-                        onClick={() =>
-                          void handleFinalizeConsensus(consensus.id, "close")
-                        }
-                      >
-                        종료
-                      </ConsensusAction>
-                    </>
-                  )}
-                </ConsensusActionRow>
-              </ConsensusCard>
-            ))}
-          </ConsensusList>
+          <ConsensusSummaryPanel>
+            진행 중 합의안 {openConsensusCount}개 · 승인된 기준 정의{" "}
+            {approvedConsensusCount}개
+          </ConsensusSummaryPanel>
         )}
         {threadMessages.map((item) => {
           const comments = commentsByPostId[item.id] ?? [];
@@ -1064,6 +1106,7 @@ const DebateThreadPage = () => {
                   isDeleted ? undefined : item.id,
                 )}
               </MessageCard>
+              {!isDeleted && renderInlineConsensusStack("POST", item.id)}
 
               {commentGroups.length > 0 && (
                 <CommentList>
@@ -1191,76 +1234,89 @@ const DebateThreadPage = () => {
               <span>반대 {selectedConsensus.rejectCount ?? 0}</span>
               <span>의견 {selectedConsensus.commentCount ?? 0}</span>
             </ConsensusCountRow>
-            <SheetTextarea
-              value={voteComment}
-              onChange={(event) => setVoteComment(event.target.value)}
-              placeholder="의견을 남길 수 있습니다."
-            />
-            <ConsensusActionRow>
-              <ConsensusAction
-                type="button"
-                disabled={
-                  currentDebate?.status !== "OPEN" ||
-                  selectedConsensus.status !== "OPEN"
-                }
-                onClick={() =>
-                  void handleVoteConsensus(selectedConsensus.id, "APPROVE", "")
-                }
-              >
-                찬성
-              </ConsensusAction>
-              <ConsensusAction
-                type="button"
-                disabled={
-                  currentDebate?.status !== "OPEN" ||
-                  selectedConsensus.status !== "OPEN"
-                }
-                onClick={() =>
-                  void handleVoteConsensus(selectedConsensus.id, "REJECT", "")
-                }
-              >
-                반대
-              </ConsensusAction>
-              <ConsensusAction
-                type="button"
-                disabled={
-                  currentDebate?.status !== "OPEN" ||
-                  selectedConsensus.status !== "OPEN"
-                }
-                onClick={() =>
-                  void handleVoteConsensus(selectedConsensus.id, "COMMENT")
-                }
-              >
-                의견
-              </ConsensusAction>
-            </ConsensusActionRow>
+            {currentDebate?.status === "OPEN" &&
+              selectedConsensus.status === "OPEN" && (
+                <>
+                  <SheetTextarea
+                    value={voteComment}
+                    onChange={(event) => setVoteComment(event.target.value)}
+                    placeholder="의견을 남길 수 있습니다."
+                  />
+                  <ConsensusActionRow>
+                    <ConsensusAction
+                      type="button"
+                      onClick={() =>
+                        void handleVoteConsensus(
+                          selectedConsensus.id,
+                          "APPROVE",
+                          "",
+                        )
+                      }
+                    >
+                      찬성
+                    </ConsensusAction>
+                    <ConsensusAction
+                      type="button"
+                      onClick={() =>
+                        void handleVoteConsensus(
+                          selectedConsensus.id,
+                          "REJECT",
+                          "",
+                        )
+                      }
+                    >
+                      반대
+                    </ConsensusAction>
+                    <ConsensusAction
+                      type="button"
+                      onClick={() =>
+                        void handleVoteConsensus(selectedConsensus.id, "COMMENT")
+                      }
+                    >
+                      의견
+                    </ConsensusAction>
+                  </ConsensusActionRow>
+                </>
+              )}
             {canFinalizeConsensus && selectedConsensus.status === "OPEN" && (
-              <ConsensusActionRow>
-                <ConsensusAction
-                  type="button"
-                  onClick={() =>
-                    void handleFinalizeConsensus(selectedConsensus.id, "approve")
-                  }
-                >
-                  승인
-                </ConsensusAction>
-                <ConsensusAction
-                  type="button"
-                  onClick={() =>
-                    void handleFinalizeConsensus(selectedConsensus.id, "reject")
-                  }
-                >
-                  반려
-                </ConsensusAction>
-                <ConsensusAction
-                  type="button"
-                  onClick={() =>
-                    void handleFinalizeConsensus(selectedConsensus.id, "close")
-                  }
-                >
-                  종료
-                </ConsensusAction>
-              </ConsensusActionRow>
+              <FinalizeSection>
+                <FinalizeTitle>확정 관리</FinalizeTitle>
+                <ConsensusActionRow>
+                  <ConsensusAction
+                    type="button"
+                    disabled={currentDebate?.status !== "OPEN"}
+                    onClick={() =>
+                      void handleFinalizeConsensus(
+                        selectedConsensus.id,
+                        "approve",
+                      )
+                    }
+                  >
+                    기준 정의로 승인
+                  </ConsensusAction>
+                  <ConsensusAction
+                    type="button"
+                    disabled={currentDebate?.status !== "OPEN"}
+                    onClick={() =>
+                      void handleFinalizeConsensus(
+                        selectedConsensus.id,
+                        "reject",
+                      )
+                    }
+                  >
+                    반려
+                  </ConsensusAction>
+                  <ConsensusAction
+                    type="button"
+                    disabled={currentDebate?.status !== "OPEN"}
+                    onClick={() =>
+                      void handleFinalizeConsensus(selectedConsensus.id, "close")
+                    }
+                  >
+                    종료
+                  </ConsensusAction>
+                </ConsensusActionRow>
+              </FinalizeSection>
             )}
             {selectedConsensus.votes && selectedConsensus.votes.length > 0 && (
               <VoteList>
@@ -1568,17 +1624,30 @@ const ReplyAction = styled.button`
   padding: 0;
 `;
 
-const ConsensusList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+const ConsensusSummaryPanel = styled.div`
+  width: 100%;
+  border-radius: 8px;
+  background: #eefaf6;
+  color: #2d8f73;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 12px;
 `;
 
-const ConsensusCard = styled.section`
+const InlineConsensusStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: -2px;
+  padding-left: clamp(10px, 3vw, 14px);
+`;
+
+const InlineConsensusCard = styled.section`
   width: 100%;
   border-radius: 4px;
-  background: #ffffff;
-  padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.3vw, 14px);
+  border-left: 3px solid #d8f5ec;
+  background: #fbfffd;
+  padding: 9px 10px 10px;
 `;
 
 const ConsensusMetaRow = styled.div`
@@ -1822,6 +1891,20 @@ const VoteComment = styled.p`
   white-space: pre-wrap;
   word-break: keep-all;
   overflow-wrap: anywhere;
+`;
+
+const FinalizeSection = styled.section`
+  margin-top: 14px;
+  border-radius: 8px;
+  background: #f7f7f7;
+  padding: 10px;
+`;
+
+const FinalizeTitle = styled.h3`
+  margin: 0;
+  color: #555555;
+  font-size: 12px;
+  font-weight: 700;
 `;
 
 const MentionText = styled.span`
