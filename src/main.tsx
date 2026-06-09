@@ -28,6 +28,28 @@ const GlobalStyle = createGlobalStyle`
     cursor: pointer;
   }
 
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  [role='button']:focus-visible {
+    outline: 3px solid rgba(45, 205, 151, 0.45);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
   :root {
     --app-max-width: 430px;
     --page-x: clamp(12px, 4.1vw, 18px);

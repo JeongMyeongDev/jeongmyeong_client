@@ -190,6 +190,18 @@ const BackButton = styled.button`
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const HeaderTitle = styled.h1`
@@ -309,9 +321,23 @@ const TagAddButton = styled.button`
   font-weight: 700;
   align-self: center;
   flex-shrink: 0;
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      transform: translateY(-1px);
+      background: #27b985;
+      box-shadow: 0 8px 16px rgba(45, 205, 151, 0.18);
+    }
+  }
+
+  &:not(:disabled):active {
+    transform: scale(0.98);
+  }
 
   &:disabled {
     opacity: 0.4;
+    cursor: not-allowed;
   }
 `;
 
@@ -340,6 +366,19 @@ const TagChip = styled.button`
   padding: 0 clamp(10px, 2.8vw, 12px);
   font-size: var(--body-sm);
   font-weight: 600;
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-1px);
+      background: #d0f6e8;
+      box-shadow: 0 6px 14px rgba(45, 205, 151, 0.12);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 const CloseMark = styled.span`
@@ -362,6 +401,19 @@ const SaveButton = styled.button`
   color: #1b1b1b;
   font-size: clamp(16px, 4.2vw, 18px);
   font-weight: 700;
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-1px);
+      background: #f5f5f5;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 const CreateButton = styled.button`
@@ -373,8 +425,23 @@ const CreateButton = styled.button`
   color: #ffffff;
   font-size: clamp(16px, 4.2vw, 18px);
   font-weight: 700;
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      transform: translateY(-1px);
+      background: #27b985;
+      box-shadow: 0 10px 20px rgba(45, 205, 151, 0.22);
+    }
+  }
+
+  &:not(:disabled):active {
+    transform: scale(0.98);
+  }
+
   &:disabled {
     opacity: 0.7;
+    cursor: not-allowed;
   }
 `;
 

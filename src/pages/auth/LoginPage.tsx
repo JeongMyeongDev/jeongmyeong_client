@@ -280,9 +280,18 @@ const IconButton = styled.button`
   color: #999;
   padding: 0;
   cursor: pointer;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
 
-  &:hover {
-    color: #555;
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+      color: #555;
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
   }
 `;
 
@@ -303,6 +312,23 @@ const LoginButton = styled.button<{ disabled?: boolean }>`
   font-weight: 600;
   margin-top: 8px;
   cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      transform: translateY(-1px);
+      background: #37bf88;
+      box-shadow: 0 10px 20px rgba(77, 200, 145, 0.22);
+    }
+  }
+
+  &:not(:disabled):active {
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 `;
 
 const GoogleButtonContainer = styled.div`
@@ -323,6 +349,19 @@ const SignUpLink = styled.button`
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+  border-radius: 8px;
+  transition: color 0.18s ease, text-decoration-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      color: #2dcd97;
+      text-decoration-color: #2dcd97;
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 export default LoginPage;

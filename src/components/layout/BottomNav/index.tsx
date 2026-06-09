@@ -96,6 +96,18 @@ const Tab = styled(NavLink)`
   gap: 3px;
   text-decoration: none;
   height: 100%;
+  border-radius: 12px;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const TabLabel = styled.span<{ $active: boolean }>`
@@ -121,6 +133,19 @@ const Fab = styled.button`
   align-items: center;
   justify-content: center;
   margin-bottom: 10px;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, transform 0.18s ease, filter 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+      filter: drop-shadow(0 8px 14px rgba(45, 205, 151, 0.2));
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const FabIcon = styled.img`

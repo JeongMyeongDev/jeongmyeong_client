@@ -405,6 +405,18 @@ const IconBtn = styled.button`
   align-items: center;
   flex-shrink: 0;
   padding: 0;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, transform 0.18s ease, color 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const SearchBar = styled.div`
@@ -496,6 +508,19 @@ const FCard = styled.div`
   overflow: hidden;
   touch-action: pan-x pan-y;
   user-select: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-2px);
+      background: #ffffff;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+    }
+  }
+
+  &:active {
+    transform: scale(0.99);
+  }
 `;
 
 const FTitle = styled.h3`
@@ -645,6 +670,18 @@ const FilterBtn = styled.button`
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  border-radius: 12px;
+  transition: background-color 0.18s ease, transform 0.18s ease, color 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const CategoryScroll = styled.div`
@@ -668,6 +705,19 @@ const CategoryPill = styled.button<{ $active: boolean }>`
   background: ${({ $active }) => ($active ? '#4dc891' : '#f3f3f3')};
   color: ${({ $active }) => ($active ? '#fff' : '#666')};
   cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-1px);
+      background: ${({ $active }) => ($active ? '#37bf88' : '#ffffff')};
+      box-shadow: 0 6px 14px rgba(45, 205, 151, 0.14);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 const DebateList = styled.div`
@@ -696,6 +746,19 @@ const DCard = styled.div`
   box-sizing: border-box;
   cursor: pointer;
   overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-2px);
+      background: #ffffff;
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  &:active {
+    transform: scale(0.99);
+  }
 `;
 
 const DebateIconImg = styled.img`
@@ -791,6 +854,18 @@ const ModalIconButton = styled.button`
   align-items: center;
   justify-content: center;
   padding: 0;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const ModalTitle = styled.h2`
@@ -871,6 +946,18 @@ const ModalActionIconButton = styled.button`
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const ModalActionIcon = styled.img`
@@ -892,6 +979,19 @@ const JoinButton = styled.button`
   color: #ffffff;
   font-size: var(--title-sm);
   font-weight: 700;
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-1px);
+      background: #27b985;
+      box-shadow: 0 10px 20px rgba(45, 205, 151, 0.22);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 export default MainPage;

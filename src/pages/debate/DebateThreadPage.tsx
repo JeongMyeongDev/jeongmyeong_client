@@ -373,6 +373,18 @@ const IconButton = styled.button`
   align-items: center;
   justify-content: center;
   padding: 0;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const InfoIcon = styled.img`
@@ -476,6 +488,19 @@ const MessageCard = styled.button`
   padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.3vw, 14px);
   overflow: hidden;
   text-align: left;
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-1px);
+      background: #ffffff;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.99);
+  }
 `;
 
 const MetaRow = styled.div`
@@ -565,6 +590,18 @@ const HashButton = styled.button`
   color: #a6a6a6;
   font-size: clamp(20px, 5.1vw, 22px);
   font-weight: 500;
+  transition: background-color 0.18s ease, transform 0.18s ease, color 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.1);
+      color: #2dcd97;
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const MessageInput = styled.input`
@@ -593,9 +630,22 @@ const SendButton = styled.button`
   align-items: center;
   justify-content: center;
   padding: 0;
+  transition: background-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      background: rgba(45, 205, 151, 0.12);
+      transform: translateY(-1px);
+    }
+  }
+
+  &:not(:disabled):active {
+    transform: scale(0.96);
+  }
 
   &:disabled {
     opacity: 0.45;
+    cursor: not-allowed;
   }
 `;
 
@@ -626,6 +676,19 @@ const ReplyCancelButton = styled.button`
   font-size: 13px;
   font-weight: 700;
   padding: 0;
+  border-radius: 8px;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+      color: #27b985;
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 export default DebateThreadPage;

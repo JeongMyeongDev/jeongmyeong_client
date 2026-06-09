@@ -260,9 +260,18 @@ const IconButton = styled.button`
   color: #999;
   padding: 0;
   cursor: pointer;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
 
-  &:hover {
-    color: #555;
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+      color: #555;
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
   }
 `;
 
@@ -328,6 +337,23 @@ const SubmitButton = styled.button<{ disabled: boolean }>`
   font-size: var(--body-md);
   font-weight: 600;
   cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      transform: translateY(-1px);
+      background: #37bf88;
+      box-shadow: 0 10px 20px rgba(77, 200, 145, 0.22);
+    }
+  }
+
+  &:not(:disabled):active {
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 `;
 
 export default SignUpPage;

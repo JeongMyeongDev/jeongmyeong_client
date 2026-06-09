@@ -243,6 +243,18 @@ const SideButton = styled.button`
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const TopIcon = styled.img`
@@ -267,6 +279,18 @@ const FilterButton = styled.button`
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 12px;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const FilterChip = styled.button<{ $active: boolean }>`
@@ -279,6 +303,19 @@ const FilterChip = styled.button<{ $active: boolean }>`
   font-size: var(--body-sm);
   font-weight: 600;
   white-space: nowrap;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-1px);
+      background: ${({ $active }) => ($active ? '#27b985' : '#ffffff')};
+      box-shadow: 0 6px 14px rgba(45, 205, 151, 0.14);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 const ListWrap = styled.div`
@@ -299,6 +336,19 @@ const Card = styled.article`
   padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.3vw, 14px) clamp(12px, 3.3vw, 14px);
   overflow: hidden;
   cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-2px);
+      background: #ffffff;
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  &:active {
+    transform: scale(0.99);
+  }
 `;
 
 const CardTop = styled.div`
@@ -395,6 +445,18 @@ const ModalIconButton = styled.button`
   align-items: center;
   justify-content: center;
   padding: 0;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const ModalTitle = styled.h2`
@@ -475,6 +537,18 @@ const ModalActionIconButton = styled.button`
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const ModalActionIcon = styled.img`
@@ -496,6 +570,19 @@ const JoinButton = styled.button`
   color: #ffffff;
   font-size: var(--title-sm);
   font-weight: 700;
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      transform: translateY(-1px);
+      background: #27b985;
+      box-shadow: 0 10px 20px rgba(45, 205, 151, 0.22);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 export default DebatePage;

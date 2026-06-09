@@ -94,6 +94,19 @@ const CloseButton = styled.button`
   align-items: center;
   justify-content: center;
   color: #555;
+  border-radius: 50%;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(45, 205, 151, 0.08);
+      color: #2dcd97;
+    }
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const CloseIcon = styled.svg`
@@ -118,9 +131,16 @@ const NavItem = styled.button<{ $active: boolean }>`
   font-weight: ${({ $active }) => ($active ? '700' : '500')};
   padding: 14px 16px;
   cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
 
-  &:hover {
-    background: #f5f5f5;
+  @media (hover: hover) {
+    &:hover {
+      background: ${({ $active }) => ($active ? '#edfaf4' : '#f5f5f5')};
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
   }
 `;
 
