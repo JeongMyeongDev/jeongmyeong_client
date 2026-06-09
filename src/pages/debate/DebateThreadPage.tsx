@@ -9,7 +9,37 @@ import type { Comment } from '../../types/debate';
 
 type ReplyTarget = {
   postId: string;
+  commentId?: string | null;
   authorName: string;
+};
+
+type CommentNode = Comment & {
+  replies: CommentNode[];
+};
+
+const REPLY_INDENT_PX = 34;
+
+const buildCommentTree = (comments: Comment[]) => {
+  const nodeMap = new Map<string, CommentNode>();
+  const roots: CommentNode[] = [];
+
+  comments.forEach((comment) => {
+    nodeMap.set(comment.id, { ...comment, replies: [] });
+  });
+
+  comments.forEach((comment) => {
+    const node = nodeMap.get(comment.id);
+    if (!node) return;
+
+    const parent = comment.parentCommentId ? nodeMap.get(comment.parentCommentId) : null;
+    if (parent) {
+      parent.replies.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  return roots;
 };
 
 const BackIcon = () => (
@@ -103,7 +133,10 @@ const DebateThreadPage = () => {
     setIsSubmitting(true);
     try {
       if (replyTarget) {
-        await postService.createComment(replyTarget.postId, { content: message.trim() });
+        await postService.createComment(replyTarget.postId, {
+          content: message.trim(),
+          parentCommentId: replyTarget.commentId ?? undefined,
+        });
         const { data } = await postService.getComments(replyTarget.postId);
         setCommentsByPostId((prev) => ({ ...prev, [replyTarget.postId]: data.comments }));
         setReplyTarget(null);
@@ -119,8 +152,36 @@ const DebateThreadPage = () => {
     }
   };
 
-  const title = currentDebate?.title ?? '기술 토론';
-  const description = currentDebate?.description ?? 'AI가 사람의 직업을 대체 할 수 있을까?';
+  const title = currentDebate?.title;
+  const description = currentDebate?.description ?? '설명이 존재하지 않습니다.';
+
+  const renderCommentNode = (comment: CommentNode, postId: string) => (
+    <CommentNodeItem key={comment.id}>
+        <MessageCard
+          type="button"
+          onClick={() => {
+            setReplyTarget({
+              postId,
+              commentId: comment.id,
+              authorName: comment.author?.nickname ?? '사용자 이름',
+            });
+            inputRef.current?.focus();
+          }}
+        >
+          <MetaRow>
+            <NumberText>#1</NumberText>
+            <Avatar />
+            <AuthorName>{comment.author?.nickname ?? '사용자 이름'}</AuthorName>
+          </MetaRow>
+          <MessageText>{comment.content}</MessageText>
+        </MessageCard>
+      
+
+      {comment.replies.length > 0 && (
+        <CommentChildren>{comment.replies.map((reply) => renderCommentNode(reply, postId))}</CommentChildren>
+      )}
+    </CommentNodeItem>
+  );
 
   return (
     <Wrapper>
@@ -151,45 +212,28 @@ const DebateThreadPage = () => {
         )}
         {visibleMessages.map((item) => {
           const comments = commentsByPostId[item.id] ?? [];
+          const commentTree = buildCommentTree(comments);
 
           return (
             <MessageGroup key={item.id}>
-              <MessageNode $depth={0}>
-                <MessageCard
-                  type="button"
-                  onClick={() => {
-                    setReplyTarget({ postId: item.id, authorName: item.author.nickname });
-                    inputRef.current?.focus();
-                  }}
-                >
-                  <MetaRow>
-                    <NumberText>#1</NumberText>
-                    <Avatar />
-                    <AuthorName>{item.author.nickname}</AuthorName>
-                  </MetaRow>
-                  <MessageText>{item.content}</MessageText>
-                </MessageCard>
-              </MessageNode>
+              <MessageCard
+                type="button"
+                onClick={() => {
+                  setReplyTarget({ postId: item.id, commentId: null, authorName: item.author.nickname });
+                  inputRef.current?.focus();
+                }}
+              >
+                <MetaRow>
+                  <NumberText>#1</NumberText>
+                  <Avatar />
+                  <AuthorName>{item.author.nickname}</AuthorName>
+                </MetaRow>
+                <MessageText>{item.content}</MessageText>
+              </MessageCard>
 
-              {comments.map((comment) => (
-                <MessageNode key={comment.id} $depth={1}>
-                  <Connector aria-hidden />
-                  <MessageCard
-                    type="button"
-                    onClick={() => {
-                      setReplyTarget({ postId: item.id, authorName: comment.author?.nickname ?? '사용자 이름' });
-                      inputRef.current?.focus();
-                    }}
-                  >
-                    <MetaRow>
-                      <NumberText>#1</NumberText>
-                      <Avatar />
-                      <AuthorName>{comment.author?.nickname ?? '사용자 이름'}</AuthorName>
-                    </MetaRow>
-                    <MessageText>{comment.content}</MessageText>
-                  </MessageCard>
-                </MessageNode>
-              ))}
+              {commentTree.length > 0 && (
+                <CommentChildren>{commentTree.map((comment) => renderCommentNode(comment, item.id))}</CommentChildren>
+              )}
             </MessageGroup>
           );
         })}
@@ -331,20 +375,57 @@ const MessageGroup = styled.div`
   gap: 8px;
 `;
 
-const MessageNode = styled.div<{ $depth: number }>`
+const CommentNodeItem = styled.div`
   position: relative;
-  margin-left: ${({ $depth }) => `min(${Math.min($depth * 18, 108)}px, ${Math.min($depth * 4.2, 25.1)}vw)`};
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: -${REPLY_INDENT_PX}px;
+    top: 24px;
+    width: ${REPLY_INDENT_PX}px;
+    height: 18px;
+    border-left: 1px solid #d8d8d8;
+    border-bottom: 1px solid #d8d8d8;
+    border-radius: 0 0 0 10px;
+    pointer-events: none;
+  }
+
+  &:last-child::after {
+    content: '';
+    position: absolute;
+    left: -${REPLY_INDENT_PX}px;
+    top: 42px;
+    bottom: 0;
+    z-index: 2;
+    width: 4px;
+    background: #f5f5f5;
+    pointer-events: none;
+  }
 `;
 
-const Connector = styled.span`
-  position: absolute;
-  left: -14px;
-  top: -18px;
-  width: 18px;
-  height: 34px;
-  border-left: 1px solid #cfcfcf;
-  border-bottom: 1px solid #cfcfcf;
-  border-radius: 0 0 0 16px;
+const CommentChildren = styled.div`
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: ${REPLY_INDENT_PX}px;
+  padding-left: ${REPLY_INDENT_PX}px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: -8px;
+    bottom: 0;
+    z-index: 0;
+    border-left: 1px solid #d8d8d8;
+    pointer-events: none;
+  }
 `;
 
 const MessageCard = styled.button`
@@ -415,6 +496,7 @@ const ComposerWrap = styled.div`
   left: 50%;
   right: auto;
   bottom: 0;
+  z-index: 20;
   width: 100%;
   max-width: var(--app-max-width);
   transform: translateX(-50%);
