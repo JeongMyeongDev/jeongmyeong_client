@@ -39,6 +39,9 @@ const DebateInfoPage = () => {
   const [participantNames, setParticipantNames] = useState<string[]>([]);
   const [postCount, setPostCount] = useState(0);
   const [loadError, setLoadError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -88,15 +91,60 @@ const DebateInfoPage = () => {
         <BackIcon />
       </HeaderIconButton>
       <HeaderActions>
-        <HeaderIconButton type="button" aria-label="저장">
+        <HeaderIconButton type="button" aria-label="저장" onClick={() => void handleBookmarkToggle()}>
           <TopIcon src={iconStar} alt="" />
         </HeaderIconButton>
-        <HeaderIconButton type="button" aria-label="알림">
+        <HeaderIconButton type="button" aria-label="알림" onClick={() => void handleSubscriptionToggle()}>
           <TopIcon src={iconAlarm} alt="" />
         </HeaderIconButton>
       </HeaderActions>
     </HeaderRow>
   );
+
+  const handleJoin = async () => {
+    if (!debateId) return;
+    try {
+      await debateService.join(debateId);
+      setActionMessage('토론에 참여했습니다.');
+      navigate(`/debate/${debateId}`);
+    } catch {
+      setActionMessage('토론 참여에 실패했습니다.');
+    }
+  };
+
+  const handleBookmarkToggle = async () => {
+    if (!debateId) return;
+    try {
+      if (isBookmarked) {
+        await debateService.unbookmark(debateId);
+        setIsBookmarked(false);
+        setActionMessage('저장을 해제했습니다.');
+      } else {
+        await debateService.bookmark(debateId);
+        setIsBookmarked(true);
+        setActionMessage('토론을 저장했습니다.');
+      }
+    } catch {
+      setActionMessage('저장 상태를 변경하지 못했습니다.');
+    }
+  };
+
+  const handleSubscriptionToggle = async () => {
+    if (!debateId) return;
+    try {
+      if (isSubscribed) {
+        await debateService.unsubscribe(debateId);
+        setIsSubscribed(false);
+        setActionMessage('알림 구독을 해제했습니다.');
+      } else {
+        await debateService.subscribe(debateId);
+        setIsSubscribed(true);
+        setActionMessage('토론 알림을 구독했습니다.');
+      }
+    } catch {
+      setActionMessage('알림 설정을 변경하지 못했습니다.');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -127,6 +175,10 @@ const DebateInfoPage = () => {
 
       <Title>{debate.title}</Title>
       <Description>{debate.description}</Description>
+      <JoinButton type="button" onClick={() => void handleJoin()}>
+        참여하기
+      </JoinButton>
+      {actionMessage && <ActionMessage>{actionMessage}</ActionMessage>}
 
       <InfoCard>
         {tagName && <Tag>#{tagName}</Tag>}
@@ -210,6 +262,25 @@ const HeaderIconButton = styled.button`
 const TopIcon = styled.img`
   width: var(--icon-size);
   height: var(--icon-size);
+`;
+
+const JoinButton = styled.button`
+  width: 100%;
+  height: 48px;
+  margin: 0 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: #2dcd97;
+  color: #ffffff;
+  font-size: var(--body-md);
+  font-weight: 700;
+`;
+
+const ActionMessage = styled.p`
+  margin: -4px 0 12px;
+  text-align: center;
+  color: #2dcd97;
+  font-size: 13px;
 `;
 
 const Title = styled.h1`

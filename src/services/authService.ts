@@ -28,6 +28,20 @@ interface VerifyEmailRequest {
   token: string;
 }
 
+interface PasswordResetRequest {
+  email: string;
+}
+
+interface PasswordResetVerifyRequest {
+  token: string;
+}
+
+interface PasswordResetConfirmRequest {
+  token: string;
+  password: string;
+  passwordConfirm: string;
+}
+
 interface LoginResponse {
   success: boolean;
   accessToken: string;
@@ -51,6 +65,14 @@ export const authService = {
   googleLogin: (data: GoogleLoginRequest) => api.post<LoginResponse>('/auth/google', data),
   googleSignup: (data: GoogleSignupRequest) => api.post<LoginResponse>('/auth/google/signup', data),
   verifyEmail: (data: VerifyEmailRequest) => api.post<MessageResponse>('/auth/verify-email', data),
+  resendVerification: (data: { email: string }) =>
+    api.post<MessageResponse>('/auth/verification/resend', data),
+  requestPasswordReset: (data: PasswordResetRequest) =>
+    api.post<MessageResponse>('/auth/password-reset/request', data),
+  verifyPasswordReset: (data: PasswordResetVerifyRequest) =>
+    api.post<{ success: boolean; valid: boolean }>('/auth/password-reset/verify', data),
+  confirmPasswordReset: (data: PasswordResetConfirmRequest) =>
+    api.post<MessageResponse>('/auth/password-reset/confirm', data),
   logout: () => api.post('/auth/logout'),
   getMe: () => api.get<UserResponse>('/auth/me'),
 };

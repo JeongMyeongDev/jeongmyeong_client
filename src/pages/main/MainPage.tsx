@@ -229,10 +229,11 @@ const MainPage = () => {
   }, [debates, searchKeyword, activeCategory]);
 
   useEffect(() => {
-    setActiveDot(0);
+    const timer = window.setTimeout(() => setActiveDot(0), 0);
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ left: 0, behavior: 'auto' });
     }
+    return () => window.clearTimeout(timer);
   }, [searchKeyword]);
 
   const debateItems: DebateListItem[] = filteredDebates.map((debate) => ({

@@ -2,7 +2,7 @@ export type DebateType = 'FREE' | 'CONSENSUS' | 'PROS_CONS';
 export type DebateStatus = 'OPEN' | 'CLOSED' | 'ARCHIVED';
 export type PostStatus = 'VISIBLE' | 'HIDDEN' | 'DELETED';
 export type SelectionSource = 'POST' | 'COMMENT';
-export type ConsensusStatus = 'OPEN' | 'CLOSED' | 'ARCHIVED';
+export type ConsensusStatus = 'OPEN' | 'APPROVED' | 'REJECTED' | 'CLOSED';
 export type ConsensusVoteType = 'APPROVE' | 'REJECT' | 'COMMENT';
 
 export interface DebateTag {
@@ -24,6 +24,7 @@ export interface Debate {
     nickname: string;
   };
   definitions?: DebateDefinition[];
+  participantCount?: number;
 }
 
 export interface DebateDefinition {

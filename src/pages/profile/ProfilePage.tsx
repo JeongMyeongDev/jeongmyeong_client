@@ -31,7 +31,8 @@ const ProfilePage = () => {
     : '로그인을 먼저 진행해주세요.';
 
   useEffect(() => {
-    setNickname(user?.nickname ?? '');
+    const timer = window.setTimeout(() => setNickname(user?.nickname ?? ''), 0);
+    return () => window.clearTimeout(timer);
   }, [user?.nickname]);
 
   const handleUpdateProfile = async () => {

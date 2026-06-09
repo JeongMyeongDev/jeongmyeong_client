@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { isAxiosError } from 'axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
 import iconShowInfo from '../../assets/icon_show_info.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import { postService } from '../../services/postService';
+import { useAuthStore } from '../../stores/authStore';
 import type { Comment } from '../../types/debate';
 
 type ReplyTarget = {
@@ -90,7 +92,11 @@ const DebateThreadPage = () => {
   const { id: debateId } = useParams();
   const inputRef = useRef<HTMLInputElement>(null);
   const { currentDebate, messages, fetchDebate, fetchMessages, createMessage } = useDebate();
-  const [message, setMessage] = useState('');
+  const { user } = useAuthStore();
+  const draftKey = debateId ? `debate-thread:${debateId}:composer` : '';
+  const [message, setMessage] = useState(() =>
+    draftKey ? (localStorage.getItem(draftKey) ?? '') : '',
+  );
   const [commentsByPostId, setCommentsByPostId] = useState<Record<string, Comment[]>>({});
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [loadError, setLoadError] = useState('');
@@ -117,6 +123,11 @@ const DebateThreadPage = () => {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!draftKey) return;
+    localStorage.setItem(draftKey, message);
+  }, [draftKey, message]);
+
   const visibleMessages = useMemo(
     () => messages.filter((item) => item.status === 'VISIBLE').slice().reverse(),
     [messages],
@@ -124,7 +135,7 @@ const DebateThreadPage = () => {
 
   useEffect(() => {
     if (visibleMessages.length === 0) {
-      setCommentsByPostId({});
+      window.setTimeout(() => setCommentsByPostId({}), 0);
       return;
     }
 
@@ -153,6 +164,35 @@ const DebateThreadPage = () => {
       isCurrent = false;
     };
   }, [visibleMessages]);
+
+  useEffect(() => {
+    if (!debateId) return;
+    const intervalId = window.setInterval(() => {
+      void fetchMessages(debateId);
+      const postIds = visibleMessages.map((item) => item.id);
+      void Promise.all(
+        postIds.map(async (postId) => {
+          try {
+            const { data } = await postService.getComments(postId);
+            return [postId, data.comments] as const;
+          } catch {
+            return [postId, commentsByPostId[postId] ?? []] as const;
+          }
+        }),
+      ).then((entries) => {
+        setCommentsByPostId((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      });
+    }, 30_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [commentsByPostId, debateId, fetchMessages, visibleMessages]);
+
+  const getMutationErrorMessage = (error: unknown) => {
+    if (isAxiosError(error) && error.response?.status === 409) {
+      return '선택/합의에 연결된 글은 수정하거나 삭제할 수 없습니다.';
+    }
+    return '요청을 처리하지 못했습니다.';
+  };
 
   const startPostReply = (postId: string, authorName: string) => {
     setReplyTarget({ postId, parentCommentId: null, authorName });
@@ -205,11 +245,59 @@ const DebateThreadPage = () => {
         await createMessage(debateId, message.trim());
       }
       setMessage('');
+      if (draftKey) localStorage.removeItem(draftKey);
       inputRef.current?.focus();
     } catch {
       setSubmitError('메시지를 전송하지 못했습니다.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const refreshComments = async (postId: string) => {
+    const { data } = await postService.getComments(postId);
+    setCommentsByPostId((prev) => ({ ...prev, [postId]: data.comments }));
+  };
+
+  const handleUpdatePost = async (postId: string, content: string) => {
+    const nextContent = window.prompt('수정할 내용을 입력하세요.', content);
+    if (!nextContent?.trim() || !debateId) return;
+    try {
+      await postService.update(postId, { content: nextContent.trim() });
+      await fetchMessages(debateId);
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!window.confirm('이 의견을 삭제할까요?') || !debateId) return;
+    try {
+      await postService.delete(postId);
+      await fetchMessages(debateId);
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
+    }
+  };
+
+  const handleUpdateComment = async (postId: string, comment: Comment) => {
+    const nextContent = window.prompt('수정할 댓글 내용을 입력하세요.', comment.content);
+    if (!nextContent?.trim()) return;
+    try {
+      await postService.updateComment(comment.id, { content: nextContent.trim() });
+      await refreshComments(postId);
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    if (!window.confirm('이 댓글을 삭제할까요?')) return;
+    try {
+      await postService.deleteComment(commentId);
+      await refreshComments(postId);
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
     }
   };
 
@@ -235,11 +323,21 @@ const DebateThreadPage = () => {
   };
 
   const renderCommentCard = (comment: Comment, postId: string) => (
-    <MessageCard key={comment.id} type="button" onClick={() => startCommentReply(postId, comment)}>
+    <MessageCard key={comment.id} onClick={() => startCommentReply(postId, comment)}>
       <MetaRow>
         <NumberText>#1</NumberText>
         <Avatar />
         <AuthorName>{comment.author?.nickname ?? '사용자 이름'}</AuthorName>
+        {comment.author?.id === user?.id && (
+          <ActionGroup onClick={(event) => event.stopPropagation()}>
+            <InlineAction type="button" onClick={() => void handleUpdateComment(postId, comment)}>
+              수정
+            </InlineAction>
+            <InlineAction type="button" onClick={() => void handleDeleteComment(postId, comment.id)}>
+              삭제
+            </InlineAction>
+          </ActionGroup>
+        )}
       </MetaRow>
       {renderMessageText(comment.content)}
     </MessageCard>
@@ -278,14 +376,21 @@ const DebateThreadPage = () => {
 
           return (
             <MessageGroup key={item.id}>
-              <MessageCard
-                type="button"
-                onClick={() => startPostReply(item.id, item.author.nickname)}
-              >
+              <MessageCard onClick={() => startPostReply(item.id, item.author.nickname)}>
                 <MetaRow>
                   <NumberText>#1</NumberText>
                   <Avatar />
                   <AuthorName>{item.author.nickname}</AuthorName>
+                  {item.author.id === user?.id && (
+                    <ActionGroup onClick={(event) => event.stopPropagation()}>
+                      <InlineAction type="button" onClick={() => void handleUpdatePost(item.id, item.content)}>
+                        수정
+                      </InlineAction>
+                      <InlineAction type="button" onClick={() => void handleDeletePost(item.id)}>
+                        삭제
+                      </InlineAction>
+                    </ActionGroup>
+                  )}
                 </MetaRow>
                 {renderMessageText(item.content)}
               </MessageCard>
@@ -467,7 +572,7 @@ const ReplyList = styled.div`
   margin-left: clamp(16px, 5.6vw, 24px);
 `;
 
-const MessageCard = styled.button`
+const MessageCard = styled.div`
   width: 100%;
   min-height: clamp(64px, 16.7vw, 72px);
   border: none;
@@ -476,6 +581,7 @@ const MessageCard = styled.button`
   padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.3vw, 14px);
   overflow: hidden;
   text-align: left;
+  cursor: pointer;
 `;
 
 const MetaRow = styled.div`
@@ -505,6 +611,23 @@ const AuthorName = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+`;
+
+const ActionGroup = styled.span`
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+`;
+
+const InlineAction = styled.button`
+  border: none;
+  background: transparent;
+  color: #2dcd97;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
 `;
 
 const MessageText = styled.p`

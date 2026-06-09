@@ -21,6 +21,16 @@ interface DeletePostResponse {
   post: DeletedPost;
 }
 
+interface UpdateCommentResponse {
+  success: boolean;
+  comment: { id: string; content: string; updatedAt: string };
+}
+
+interface DeleteCommentResponse {
+  success: boolean;
+  comment: { id: string; status: string; deletedAt: string };
+}
+
 interface CommentListResponse {
   success: boolean;
   comments: Comment[];
@@ -42,6 +52,9 @@ export const postService = {
   update: (postId: string, data: UpdatePostRequest) =>
     api.patch<UpdatePostResponse>(`/posts/${postId}`, data),
   delete: (postId: string) => api.delete<DeletePostResponse>(`/posts/${postId}`),
+  updateComment: (commentId: string, data: UpdatePostRequest) =>
+    api.patch<UpdateCommentResponse>(`/comments/${commentId}`, data),
+  deleteComment: (commentId: string) => api.delete<DeleteCommentResponse>(`/comments/${commentId}`),
   getComments: (postId: string) => api.get<CommentListResponse>(`/posts/${postId}/comments`),
   createComment: (postId: string, data: CreateCommentRequest) =>
     api.post<CreateCommentResponse>(`/posts/${postId}/comments`, data),

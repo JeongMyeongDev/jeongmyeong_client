@@ -1,5 +1,5 @@
 import { isAxiosError } from 'axios';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useDebate } from '../../hooks/useDebate';
@@ -9,7 +9,28 @@ const TITLE_MAX_LENGTH = 40;
 const DESCRIPTION_MAX_LENGTH = 120;
 const TAG_MAX_LENGTH = 12;
 const TAG_MAX_COUNT = 5;
-const DEFAULT_DEBATE_TYPE: 'FREE' = 'FREE';
+const DEFAULT_DEBATE_TYPE = 'FREE' as const;
+const DRAFT_KEY = 'debate-create:draft';
+
+const getInitialDraft = () => {
+  const rawDraft = localStorage.getItem(DRAFT_KEY);
+  if (!rawDraft) return { title: '', description: '', tags: [] as string[] };
+  try {
+    const draft = JSON.parse(rawDraft) as {
+      title?: string;
+      description?: string;
+      tags?: string[];
+    };
+    return {
+      title: draft.title ?? '',
+      description: draft.description ?? '',
+      tags: Array.isArray(draft.tags) ? draft.tags : [],
+    };
+  } catch {
+    localStorage.removeItem(DRAFT_KEY);
+    return { title: '', description: '', tags: [] as string[] };
+  }
+};
 
 const BackIcon = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b3b3b" strokeWidth="2.2">
@@ -22,15 +43,22 @@ const DebateCreatePage = () => {
   const navigate = useNavigate();
   const { createDebate } = useDebate();
   const { isAuthenticated } = useAuthStore();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+  const [draft] = useState(getInitialDraft);
+  const [title, setTitle] = useState(draft.title);
+  const [description, setDescription] = useState(draft.description);
+  const [tags, setTags] = useState<string[]>(draft.tags);
   const [tagInput, setTagInput] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, tags }));
+  }, [title, description, tags]);
+
+  const normalizeTag = (value: string) => value.trim().toLowerCase();
+
   const addTag = () => {
-    const trimmed = tagInput.trim();
+    const trimmed = normalizeTag(tagInput);
     if (!trimmed || tags.includes(trimmed) || tags.length >= TAG_MAX_COUNT) return;
     setTags((prev) => [...prev, trimmed]);
     setTagInput('');
@@ -81,9 +109,10 @@ const DebateCreatePage = () => {
         title: title.trim(),
         description: description.trim(),
         debateType: DEFAULT_DEBATE_TYPE,
-        tags,
+        tags: Array.from(new Set(tags.map(normalizeTag).filter(Boolean))),
         closeConditionType: 'MANUAL',
       });
+      localStorage.removeItem(DRAFT_KEY);
       navigate('/debate-room');
     } catch (error) {
       setError(getErrorMessage(error));

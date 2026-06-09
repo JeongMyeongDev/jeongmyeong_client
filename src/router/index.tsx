@@ -6,6 +6,7 @@ import LoginPage from '../pages/auth/LoginPage';
 import GoogleSignUpPage from '../pages/auth/GoogleSignUpPage';
 import SignUpPage from '../pages/auth/SignUpPage';
 import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
+import PasswordResetPage from '../pages/auth/PasswordResetPage';
 import MainPage from '../pages/main/MainPage';
 import DebatePage from '../pages/debate/DebatePage';
 import DebateCreatePage from '../pages/debate/DebateCreatePage';
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
       { path: '/google-signup', element: <GoogleSignUpPage /> },
       { path: '/signup', element: <SignUpPage /> },
       { path: '/verify-email', element: <VerifyEmailPage /> },
+      { path: '/password-reset', element: <PasswordResetPage /> },
     ],
   },
   {

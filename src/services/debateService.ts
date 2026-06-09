@@ -41,6 +41,19 @@ interface DebateDetailResponse {
   debate: Debate;
 }
 
+interface JoinDebateResponse {
+  success: boolean;
+  participant: {
+    id: string;
+    debateId: string;
+    userId: string;
+    joinedAt: string;
+    lastReadAt?: string | null;
+    roleInDebate: 'CREATOR' | 'PARTICIPANT' | 'MODERATOR';
+  };
+  participantCount: number;
+}
+
 interface ArchiveDebateResponse {
   success: boolean;
   debate: Pick<Debate, 'id' | 'status' | 'archivedAt'>;
@@ -91,7 +104,12 @@ export const debateService = {
   getList: (params?: ListDebatesParams) => api.get<DebateListResponse>('/debates', { params }),
   getById: (id: string) => api.get<DebateDetailResponse>(`/debates/${id}`),
   create: (data: CreateDebateRequest) => api.post<DebateDetailResponse>('/debates', data),
+  join: (id: string) => api.post<JoinDebateResponse>(`/debates/${id}/participants`),
   archive: (id: string) => api.post<ArchiveDebateResponse>(`/debates/${id}/archive`),
+  bookmark: (id: string) => api.post(`/debates/${id}/bookmark`),
+  unbookmark: (id: string) => api.delete(`/debates/${id}/bookmark`),
+  subscribe: (id: string) => api.post(`/debates/${id}/subscription`),
+  unsubscribe: (id: string) => api.delete(`/debates/${id}/subscription`),
   getMessages: (id: string, params?: Pick<ListDebatesParams, 'page' | 'limit'>) =>
     api.get<DebatePostsResponse>(`/debates/${id}/posts`, { params }),
   createPost: (id: string, data: CreatePostRequest) =>
@@ -104,4 +122,6 @@ export const debateService = {
     api.get<DebateListResponse>('/debates/archive', { params }),
   getMyDebates: (params?: ListDebatesParams) =>
     api.get<DebateListResponse>('/debates/my', { params }),
+  getBookmarks: (params?: ListDebatesParams) =>
+    api.get<DebateListResponse>('/debates/bookmarks', { params }),
 };
