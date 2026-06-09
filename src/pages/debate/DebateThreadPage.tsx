@@ -9,37 +9,66 @@ import type { Comment } from '../../types/debate';
 
 type ReplyTarget = {
   postId: string;
-  commentId?: string | null;
+  parentCommentId?: string | null;
   authorName: string;
+  mention?: string;
 };
 
-type CommentNode = Comment & {
-  replies: CommentNode[];
+type CommentGroup = Comment & {
+  replies: Comment[];
 };
 
-const REPLY_INDENT_PX = 34;
+const getMentionPrefix = (name: string) => {
+  const normalizedName = name.replace(/\s+/g, '') || '사용자';
+  return `@${normalizedName} `;
+};
 
-const buildCommentTree = (comments: Comment[]) => {
-  const nodeMap = new Map<string, CommentNode>();
-  const roots: CommentNode[] = [];
+const buildCommentGroups = (comments: Comment[]) => {
+  const commentMap = new Map(comments.map((comment) => [comment.id, comment]));
+  const rootIdMap = new Map<string, string>();
+
+  const getRootId = (comment: Comment) => {
+    const cachedRootId = rootIdMap.get(comment.id);
+    if (cachedRootId) return cachedRootId;
+
+    const visitedIds = new Set<string>();
+    let current = comment;
+
+    while (current.parentCommentId) {
+      if (visitedIds.has(current.id)) break;
+      visitedIds.add(current.id);
+
+      const parent = commentMap.get(current.parentCommentId);
+      if (!parent) break;
+
+      current = parent;
+    }
+
+    rootIdMap.set(comment.id, current.id);
+    return current.id;
+  };
+
+  const groups = new Map<string, CommentGroup>();
 
   comments.forEach((comment) => {
-    nodeMap.set(comment.id, { ...comment, replies: [] });
-  });
-
-  comments.forEach((comment) => {
-    const node = nodeMap.get(comment.id);
-    if (!node) return;
-
-    const parent = comment.parentCommentId ? nodeMap.get(comment.parentCommentId) : null;
-    if (parent) {
-      parent.replies.push(node);
-    } else {
-      roots.push(node);
+    if (getRootId(comment) === comment.id) {
+      groups.set(comment.id, { ...comment, replies: [] });
     }
   });
 
-  return roots;
+  comments.forEach((comment) => {
+    const rootId = getRootId(comment);
+    if (rootId === comment.id) return;
+
+    const rootGroup = groups.get(rootId);
+    if (rootGroup) {
+      rootGroup.replies.push(comment);
+    } else {
+      groups.set(comment.id, { ...comment, replies: [] });
+    }
+  });
+
+  return Array.from(groups.values());
 };
 
 const BackIcon = () => (
@@ -125,17 +154,49 @@ const DebateThreadPage = () => {
     };
   }, [visibleMessages]);
 
+  const startPostReply = (postId: string, authorName: string) => {
+    setReplyTarget({ postId, parentCommentId: null, authorName });
+    inputRef.current?.focus();
+  };
+
+  const startCommentReply = (postId: string, comment: Comment) => {
+    const authorName = comment.author?.nickname ?? '사용자 이름';
+    const mention = getMentionPrefix(authorName);
+
+    setReplyTarget({
+      postId,
+      parentCommentId: comment.parentCommentId ?? comment.id,
+      authorName,
+      mention,
+    });
+    setMessage((prev) => (prev.trim() ? prev : mention));
+    inputRef.current?.focus();
+  };
+
+  const cancelReply = () => {
+    if (replyTarget?.mention && message.trim() === replyTarget.mention.trim()) {
+      setMessage('');
+    }
+    setReplyTarget(null);
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!debateId || !message.trim() || isSubmitting) return;
+    const trimmedMessage = message.trim();
+    if (!debateId || !trimmedMessage || isSubmitting) return;
 
     setSubmitError('');
     setIsSubmitting(true);
     try {
       if (replyTarget) {
+        const content =
+          replyTarget.mention && !trimmedMessage.startsWith(replyTarget.mention.trim())
+            ? `${replyTarget.mention}${trimmedMessage}`.trim()
+            : trimmedMessage;
+
         await postService.createComment(replyTarget.postId, {
-          content: message.trim(),
-          parentCommentId: replyTarget.commentId ?? undefined,
+          content,
+          parentCommentId: replyTarget.parentCommentId ?? undefined,
         });
         const { data } = await postService.getComments(replyTarget.postId);
         setCommentsByPostId((prev) => ({ ...prev, [replyTarget.postId]: data.comments }));
@@ -155,32 +216,33 @@ const DebateThreadPage = () => {
   const title = currentDebate?.title;
   const description = currentDebate?.description ?? '설명이 존재하지 않습니다.';
 
-  const renderCommentNode = (comment: CommentNode, postId: string) => (
-    <CommentNodeItem key={comment.id}>
-        <MessageCard
-          type="button"
-          onClick={() => {
-            setReplyTarget({
-              postId,
-              commentId: comment.id,
-              authorName: comment.author?.nickname ?? '사용자 이름',
-            });
-            inputRef.current?.focus();
-          }}
-        >
-          <MetaRow>
-            <NumberText>#1</NumberText>
-            <Avatar />
-            <AuthorName>{comment.author?.nickname ?? '사용자 이름'}</AuthorName>
-          </MetaRow>
-          <MessageText>{comment.content}</MessageText>
-        </MessageCard>
-      
+  const renderMessageText = (content: string) => {
+    const mentionMatch = content.match(/^(@[^\s]+)(\s+)([\s\S]*)$/);
 
-      {comment.replies.length > 0 && (
-        <CommentChildren>{comment.replies.map((reply) => renderCommentNode(reply, postId))}</CommentChildren>
-      )}
-    </CommentNodeItem>
+    return (
+      <MessageText>
+        {mentionMatch ? (
+          <>
+            <MentionText>{mentionMatch[1]}</MentionText>
+            {mentionMatch[2]}
+            {mentionMatch[3]}
+          </>
+        ) : (
+          content
+        )}
+      </MessageText>
+    );
+  };
+
+  const renderCommentCard = (comment: Comment, postId: string) => (
+    <MessageCard key={comment.id} type="button" onClick={() => startCommentReply(postId, comment)}>
+      <MetaRow>
+        <NumberText>#1</NumberText>
+        <Avatar />
+        <AuthorName>{comment.author?.nickname ?? '사용자 이름'}</AuthorName>
+      </MetaRow>
+      {renderMessageText(comment.content)}
+    </MessageCard>
   );
 
   return (
@@ -212,27 +274,33 @@ const DebateThreadPage = () => {
         )}
         {visibleMessages.map((item) => {
           const comments = commentsByPostId[item.id] ?? [];
-          const commentTree = buildCommentTree(comments);
+          const commentGroups = buildCommentGroups(comments);
 
           return (
             <MessageGroup key={item.id}>
               <MessageCard
                 type="button"
-                onClick={() => {
-                  setReplyTarget({ postId: item.id, commentId: null, authorName: item.author.nickname });
-                  inputRef.current?.focus();
-                }}
+                onClick={() => startPostReply(item.id, item.author.nickname)}
               >
                 <MetaRow>
                   <NumberText>#1</NumberText>
                   <Avatar />
                   <AuthorName>{item.author.nickname}</AuthorName>
                 </MetaRow>
-                <MessageText>{item.content}</MessageText>
+                {renderMessageText(item.content)}
               </MessageCard>
 
-              {commentTree.length > 0 && (
-                <CommentChildren>{commentTree.map((comment) => renderCommentNode(comment, item.id))}</CommentChildren>
+              {commentGroups.length > 0 && (
+                <CommentList>
+                  {commentGroups.map((comment) => (
+                    <CommentGroupItem key={comment.id}>
+                      {renderCommentCard(comment, item.id)}
+                      {comment.replies.length > 0 && (
+                        <ReplyList>{comment.replies.map((reply) => renderCommentCard(reply, item.id))}</ReplyList>
+                      )}
+                    </CommentGroupItem>
+                  ))}
+                </CommentList>
               )}
             </MessageGroup>
           );
@@ -243,8 +311,12 @@ const DebateThreadPage = () => {
         {submitError && <SubmitError>{submitError}</SubmitError>}
         {replyTarget && (
           <ReplyBanner>
-            <span>{replyTarget.authorName}에게 답글 작성 중</span>
-            <ReplyCancelButton type="button" onClick={() => setReplyTarget(null)}>
+            <span>
+              {replyTarget.mention
+                ? `${replyTarget.mention.trim()} 답글 작성 중`
+                : `${replyTarget.authorName} 의견에 댓글 작성 중`}
+            </span>
+            <ReplyCancelButton type="button" onClick={cancelReply}>
               취소
             </ReplyCancelButton>
           </ReplyBanner>
@@ -375,57 +447,24 @@ const MessageGroup = styled.div`
   gap: 8px;
 `;
 
-const CommentNodeItem = styled.div`
-  position: relative;
+const CommentList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 1;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: -${REPLY_INDENT_PX}px;
-    top: 24px;
-    width: ${REPLY_INDENT_PX}px;
-    height: 18px;
-    border-left: 1px solid #d8d8d8;
-    border-bottom: 1px solid #d8d8d8;
-    border-radius: 0 0 0 10px;
-    pointer-events: none;
-  }
-
-  &:last-child::after {
-    content: '';
-    position: absolute;
-    left: -${REPLY_INDENT_PX}px;
-    top: 42px;
-    bottom: 0;
-    z-index: 2;
-    width: 4px;
-    background: #f5f5f5;
-    pointer-events: none;
-  }
+  margin-left: clamp(24px, 7.9vw, 34px);
 `;
 
-const CommentChildren = styled.div`
-  position: relative;
+const CommentGroupItem = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-left: ${REPLY_INDENT_PX}px;
-  padding-left: ${REPLY_INDENT_PX}px;
+`;
 
-  &::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: -8px;
-    bottom: 0;
-    z-index: 0;
-    border-left: 1px solid #d8d8d8;
-    pointer-events: none;
-  }
+const ReplyList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: clamp(16px, 5.6vw, 24px);
 `;
 
 const MessageCard = styled.button`
@@ -476,6 +515,11 @@ const MessageText = styled.p`
   white-space: pre-wrap;
   word-break: keep-all;
   overflow-wrap: anywhere;
+`;
+
+const MentionText = styled.span`
+  color: #2dcd97;
+  font-weight: 700;
 `;
 
 const EmptyCard = styled.div`

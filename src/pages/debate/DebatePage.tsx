@@ -141,7 +141,7 @@ const DebatePage = () => {
           <Card key={card.id} onClick={() => setSelectedCard(card)}>
             <CardTop>
               <StatusBadge $running={card.statusLabel === '진행중'}>
-                {card.statusLabel}
+                {card.statusLabel.replace(/\s+/g, '')}
               </StatusBadge>
               <ChatCircleIconImg src={iconChat} alt="" />
             </CardTop>
@@ -315,9 +315,9 @@ const ChatCircleIconImg = styled.img`
 `;
 
 const StatusBadge = styled.span<{ $running: boolean }>`
-  width: clamp(40px, 10vw, 43px);
+  min-width: clamp(52px, 14vw, 60px);
   height: clamp(24px, 6vw, 26px);
-  padding: 0;
+  padding: 0 10px;
   border-radius: 999px;
   border: 1.2px solid #2dcd97;
   background: ${({ $running }) => ($running ? '#2dcd97' : 'transparent')};
@@ -328,6 +328,11 @@ const StatusBadge = styled.span<{ $running: boolean }>`
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
+  flex-shrink: 0;
+  line-height: 1;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
 `;
 
 const CardTitle = styled.h3`

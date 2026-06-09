@@ -104,7 +104,7 @@ const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
 });
 
 const StatusBadge = ({ status }: { status: string }) => {
-  const label = STATUS_LABEL[status] ?? status;
+  const label = (STATUS_LABEL[status] ?? status).replace(/\s+/g, '');
   return <Badge $active={status === 'OPEN' || status === 'IN_PROGRESS'}>{label}</Badge>;
 };
 
@@ -139,7 +139,7 @@ const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => vo
   <DCard onClick={onClick}>
     <DLeft>
       <DStatusBadge>
-        {item.status === 'OPEN' ? '진행중' : '준비중'}
+        {(item.status === 'OPEN' ? '진행중' : '준비중').replace(/\s+/g, '')}
       </DStatusBadge>
       <DTitle>{item.title}</DTitle>
       <DDesc>{item.description}</DDesc>
@@ -579,7 +579,7 @@ const Badge = styled.span<{ $active: boolean }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: clamp(70px, 20vw, 86px);
+  min-width: clamp(78px, 21vw, 92px);
   padding: 0 clamp(14px, 4.2vw, 18px);
   border-radius: 999px;
   border: 2px solid #2dcd97;
@@ -590,6 +590,8 @@ const Badge = styled.span<{ $active: boolean }>`
   flex-shrink: 0;
   line-height: 1;
   white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
 `;
 
 const TagPill = styled.span`
@@ -721,7 +723,12 @@ const DStatusBadge = styled.span`
   line-height: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   align-self: flex-start;
+  min-width: 67px;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
 `;
 
 const DTitle = styled.h4`
