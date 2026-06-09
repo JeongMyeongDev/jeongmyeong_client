@@ -95,7 +95,7 @@ const DebatePage = () => {
   }, [activeFilter, fetchDebates]);
 
   const cards = useMemo(
-    () => debates.slice(0, 8).map(mapToRoomCard),
+    () => (Array.isArray(debates) ? debates : []).slice(0, 8).map(mapToRoomCard),
     [debates],
   );
 
@@ -209,7 +209,7 @@ const DebatePage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: transparent;
   padding: var(--page-top) var(--page-x) var(--page-bottom);
 `;
 
@@ -274,8 +274,11 @@ const FilterChip = styled.button<{ $active: boolean }>`
   padding: 0 clamp(12px, 3.7vw, 16px);
   border-radius: 999px;
   border: 1.5px solid ${({ $active }) => ($active ? '#2dcd97' : '#9f9f9f')};
-  background: ${({ $active }) => ($active ? '#2dcd97' : '#f3f3f3')};
+  background: ${({ $active }) => ($active ? '#2dcd97' : 'rgba(255, 255, 255, 0.58)')};
   color: ${({ $active }) => ($active ? '#ffffff' : '#8f8f8f')};
+  box-shadow: ${({ $active }) => ($active ? '0 8px 18px rgba(45, 205, 151, 0.16)' : 'none')};
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   font-size: var(--body-sm);
   font-weight: 600;
   white-space: nowrap;
@@ -294,11 +297,15 @@ const ErrorText = styled.p`
 `;
 
 const Card = styled.article`
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
   border-radius: clamp(18px, 4.7vw, 20px);
   padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.3vw, 14px) clamp(12px, 3.3vw, 14px);
   overflow: hidden;
   cursor: pointer;
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const CardTop = styled.div`
@@ -357,7 +364,9 @@ const CardDesc = styled.p`
 const ModalOverlay = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(34, 46, 42, 0.22);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -367,11 +376,15 @@ const ModalOverlay = styled.div`
 
 const ModalCard = styled.div`
   width: min(100%, 354px);
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
   border-radius: clamp(34px, 9.8vw, 42px);
   padding: clamp(18px, 5.1vw, 22px) clamp(18px, 4.7vw, 20px) clamp(20px, 5.1vw, 22px);
   max-height: calc(100dvh - 36px);
   overflow-y: auto;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const ModalTop = styled.div`
@@ -487,7 +500,8 @@ const JoinButton = styled.button`
   height: clamp(50px, 13vw, 56px);
   border-radius: 999px;
   border: none;
-  background: #2dcd97;
+  background: linear-gradient(135deg, #2dcd97, #43bfaa);
+  box-shadow: 0 12px 24px rgba(45, 205, 151, 0.22);
   color: #ffffff;
   font-size: var(--title-sm);
   font-weight: 700;

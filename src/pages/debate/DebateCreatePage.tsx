@@ -9,7 +9,7 @@ const TITLE_MAX_LENGTH = 40;
 const DESCRIPTION_MAX_LENGTH = 120;
 const TAG_MAX_LENGTH = 12;
 const TAG_MAX_COUNT = 5;
-const DEFAULT_DEBATE_TYPE: 'FREE' = 'FREE';
+const DEFAULT_DEBATE_TYPE = 'FREE' as const;
 
 const BackIcon = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b3b3b" strokeWidth="2.2">
@@ -171,7 +171,7 @@ const DebateCreatePage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: transparent;
 `;
 
 const Header = styled.header`
@@ -179,7 +179,9 @@ const Header = styled.header`
   display: flex;
   align-items: center;
   padding: clamp(8px, 2.8vw, 12px) var(--page-x) 0;
-  background: #f5f5f5;
+  background: rgba(255, 255, 255, 0.46);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const BackButton = styled.button`
@@ -209,7 +211,7 @@ const HeaderSpacer = styled.div`
 
 const HeaderDivider = styled.div`
   height: 2px;
-  background: #ececec;
+  background: rgba(255, 255, 255, 0.54);
 `;
 
 const Body = styled.div`
@@ -220,7 +222,11 @@ const Body = styled.div`
 `;
 
 const SectionCard = styled.section`
-  background: #efefef;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--card-radius);
   padding: clamp(16px, 4.7vw, 20px) clamp(14px, 4.2vw, 18px);
 `;
@@ -237,7 +243,7 @@ const TitleInput = styled.input`
   width: 100%;
   height: clamp(38px, 9.8vw, 42px);
   border: none;
-  border-bottom: 2px solid #b7b7b7;
+  border-bottom: 2px solid rgba(129, 146, 140, 0.5);
   background: transparent;
   font-size: var(--body-md);
   color: #2f3238;
@@ -252,7 +258,8 @@ const DescriptionInput = styled.textarea`
   width: 100%;
   height: clamp(124px, 34.4vw, 148px);
   border-radius: clamp(18px, 5.1vw, 22px);
-  border: 2px solid #b7b7b7;
+  border: 2px solid rgba(129, 146, 140, 0.5);
+  background: rgba(255, 255, 255, 0.28);
   background: transparent;
   resize: none;
   padding: clamp(12px, 3.3vw, 14px);
@@ -282,7 +289,7 @@ const TagTextInput = styled.input`
   flex: 1;
   height: clamp(38px, 9.8vw, 42px);
   border: none;
-  border-bottom: 2px solid #b7b7b7;
+  border-bottom: 2px solid rgba(129, 146, 140, 0.5);
   background: transparent;
   font-size: clamp(14px, 3.5vw, 15px);
   color: #2f3238;
@@ -303,7 +310,8 @@ const TagAddButton = styled.button`
   padding: 0 clamp(12px, 3.7vw, 16px);
   border-radius: 999px;
   border: 2px solid #2dcd97;
-  background: #2dcd97;
+  background: linear-gradient(135deg, #2dcd97, #43bfaa);
+  box-shadow: 0 10px 22px rgba(45, 205, 151, 0.18);
   color: #fff;
   font-size: var(--body-sm);
   font-weight: 700;
@@ -332,7 +340,9 @@ const TagChip = styled.button`
   height: clamp(32px, 7.9vw, 34px);
   border-radius: 999px;
   border: 2px solid #2dcd97;
-  background: #b9f0db;
+  background: rgba(185, 240, 219, 0.72);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: #2dcd97;
   display: inline-flex;
   align-items: center;
@@ -358,7 +368,9 @@ const SaveButton = styled.button`
   height: clamp(50px, 13vw, 56px);
   border-radius: 999px;
   border: 2px solid #1b1b1b;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(27, 27, 27, 0.68);
+  box-shadow: var(--glass-shadow-soft);
   color: #1b1b1b;
   font-size: clamp(16px, 4.2vw, 18px);
   font-weight: 700;
@@ -369,7 +381,8 @@ const CreateButton = styled.button`
   height: clamp(50px, 13vw, 56px);
   border-radius: 999px;
   border: none;
-  background: #2dcd97;
+  background: linear-gradient(135deg, #2dcd97, #43bfaa);
+  box-shadow: 0 12px 24px rgba(45, 205, 151, 0.22);
   color: #ffffff;
   font-size: clamp(16px, 4.2vw, 18px);
   font-weight: 700;

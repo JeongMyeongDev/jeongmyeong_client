@@ -7,12 +7,12 @@ export const useMessage = () => {
 
   const fetchChatRooms = useCallback(async () => {
     const { data } = await messageService.getChatRooms();
-    setChatRooms(data.debates);
+    setChatRooms(Array.isArray(data.debates) ? data.debates : []);
   }, [setChatRooms]);
 
   const fetchMessages = useCallback(async (roomId: string) => {
     const { data } = await messageService.getMessages(roomId);
-    setCurrentMessages(data.posts);
+    setCurrentMessages(Array.isArray(data.posts) ? data.posts : []);
   }, [setCurrentMessages]);
 
   const sendMessage = useCallback(async (roomId: string, content: string) => {

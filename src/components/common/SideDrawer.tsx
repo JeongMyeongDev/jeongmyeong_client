@@ -54,7 +54,9 @@ const SideDrawer = ({ isOpen, onClose }: Props) => {
 const Overlay = styled.div<{ $visible: boolean }>`
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(34, 46, 42, 0.28);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 400;
   opacity: ${({ $visible }) => ($visible ? 1 : 0)};
   pointer-events: ${({ $visible }) => ($visible ? 'auto' : 'none')};
@@ -67,14 +69,17 @@ const Drawer = styled.div<{ $open: boolean }>`
   left: 0;
   height: 100dvh;
   width: 260px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.78);
+  border-right: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   z-index: 500;
   transform: translateX(${({ $open }) => ($open ? '0' : '-100%')});
   transition: transform 0.25s ease;
   display: flex;
   flex-direction: column;
   padding: 0 0 32px;
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
+  box-shadow: 12px 0 32px rgba(64, 88, 79, 0.14);
 `;
 
 const DrawerHeader = styled.div`
@@ -112,7 +117,7 @@ const NavItem = styled.button<{ $active: boolean }>`
   text-align: left;
   border: none;
   border-radius: 12px;
-  background: ${({ $active }) => ($active ? '#edfaf4' : 'transparent')};
+  background: ${({ $active }) => ($active ? 'rgba(45, 205, 151, 0.14)' : 'transparent')};
   color: ${({ $active }) => ($active ? '#2dcd97' : '#2f3238')};
   font-size: 16px;
   font-weight: ${({ $active }) => ($active ? '700' : '500')};
@@ -120,7 +125,7 @@ const NavItem = styled.button<{ $active: boolean }>`
   cursor: pointer;
 
   &:hover {
-    background: #f5f5f5;
+    background: rgba(255, 255, 255, 0.5);
   }
 `;
 

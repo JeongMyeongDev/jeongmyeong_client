@@ -82,8 +82,11 @@ const Wrapper = styled.nav`
   padding-bottom: env(safe-area-inset-bottom);
   display: flex;
   align-items: center;
-  background: #ffffff;
-  border-top: 1px solid #f0f0f0;
+  background: rgba(255, 255, 255, 0.72);
+  border-top: 1px solid var(--glass-border);
+  box-shadow: 0 -12px 30px rgba(64, 88, 79, 0.1);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   z-index: 100;
 `;
 
@@ -121,6 +124,7 @@ const Fab = styled.button`
   align-items: center;
   justify-content: center;
   margin-bottom: 10px;
+  filter: drop-shadow(0 10px 18px rgba(45, 205, 151, 0.22));
 `;
 
 const FabIcon = styled.img`

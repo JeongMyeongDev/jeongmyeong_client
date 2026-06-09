@@ -20,7 +20,7 @@ const MyDebatesPage = () => {
     const load = async () => {
       try {
         const { data } = await debateService.getMyDebates({ sort: 'createdAt', direction: 'desc', limit: 50 });
-        setDebates(data.debates);
+        setDebates(Array.isArray(data.debates) ? data.debates : []);
       } catch {
         setError('내 토론을 불러오지 못했습니다.');
       } finally {

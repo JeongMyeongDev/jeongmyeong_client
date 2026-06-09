@@ -14,12 +14,12 @@ export const useDebate = () => {
 
   const fetchDebates = useCallback(async (params?: ListDebatesParams) => {
     const { data } = await debateService.getList(params);
-    setDebates(data.debates);
+    setDebates(Array.isArray(data.debates) ? data.debates : []);
   }, [setDebates]);
 
   const fetchArchivedDebates = useCallback(async (params?: Omit<ListDebatesParams, 'status'>) => {
     const { data } = await debateService.getArchived(params);
-    setDebates(data.debates);
+    setDebates(Array.isArray(data.debates) ? data.debates : []);
   }, [setDebates]);
 
   const fetchDebate = useCallback(async (id: string) => {
@@ -46,7 +46,8 @@ export const useDebate = () => {
   const archiveDebate = useCallback(async (id: string) => {
     const { data } = await debateService.archive(id);
     setCurrentDebate(currentDebate?.id === id ? { ...currentDebate, ...data.debate } : currentDebate);
-    setDebates(debates.map((debate) => (debate.id === id ? { ...debate, ...data.debate } : debate)));
+    const safeDebates = Array.isArray(debates) ? debates : [];
+    setDebates(safeDebates.map((debate) => (debate.id === id ? { ...debate, ...data.debate } : debate)));
     return data.debate;
   }, [currentDebate, debates, setCurrentDebate, setDebates]);
 

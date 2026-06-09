@@ -31,7 +31,11 @@ const ProfilePage = () => {
     : '로그인을 먼저 진행해주세요.';
 
   useEffect(() => {
-    setNickname(user?.nickname ?? '');
+    const frameId = window.requestAnimationFrame(() => {
+      setNickname(user?.nickname ?? '');
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [user?.nickname]);
 
   const handleUpdateProfile = async () => {
@@ -149,7 +153,7 @@ const ProfilePage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: transparent;
   padding: 0 var(--page-x) var(--page-bottom);
 `;
 
@@ -202,7 +206,8 @@ const SignUpButton = styled.button`
   height: clamp(48px, 12.6vw, 54px);
   border-radius: 999px;
   border: 1.5px solid #1b1b1b;
-  background: #f5f5f5;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: var(--glass-shadow-soft);
   color: #2f3238;
   font-size: clamp(16px, 4.2vw, 18px);
   font-weight: 700;
@@ -213,27 +218,32 @@ const LoginButton = styled.button`
   height: clamp(48px, 12.6vw, 54px);
   border-radius: 999px;
   border: none;
-  background: #2dcd97;
+  background: linear-gradient(135deg, #2dcd97, #43bfaa);
+  box-shadow: 0 12px 24px rgba(45, 205, 151, 0.22);
   color: #ffffff;
   font-size: clamp(16px, 4.2vw, 18px);
   font-weight: 700;
 `;
 
 const ProfileEditCard = styled.section`
-  background: #efefef;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
   padding: clamp(14px, 3.7vw, 16px);
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 18px;
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const ProfileInput = styled.input`
   height: 44px;
-  border: 1.5px solid #c8c8c8;
+  border: 1.5px solid var(--glass-border);
   border-radius: 999px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.66);
   padding: 0 14px;
   font-size: var(--body-sm);
   outline: none;
@@ -243,7 +253,8 @@ const SaveButton = styled.button`
   height: 44px;
   border: none;
   border-radius: 999px;
-  background: #2dcd97;
+  background: linear-gradient(135deg, #2dcd97, #43bfaa);
+  box-shadow: 0 10px 20px rgba(45, 205, 151, 0.18);
   color: #ffffff;
   font-size: 15px;
   font-weight: 700;
@@ -260,12 +271,16 @@ const ErrorText = styled.p`
 `;
 
 const MenuCard = styled.section`
-  background: #efefef;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
   padding: clamp(16px, 4.7vw, 20px) clamp(16px, 4.2vw, 18px);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const MenuItem = styled.button`

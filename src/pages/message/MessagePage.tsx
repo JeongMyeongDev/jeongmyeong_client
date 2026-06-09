@@ -124,7 +124,7 @@ const MessagePage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: transparent;
   padding: var(--page-top) var(--page-x) var(--page-bottom);
 `;
 
@@ -149,22 +149,28 @@ const RoomTabs = styled.div`
 
 const RoomTab = styled.button<{ $active: boolean }>`
   border: 1.5px solid ${({ $active }) => ($active ? '#2dcd97' : '#b7b7b7')};
-  background: ${({ $active }) => ($active ? '#2dcd97' : '#f3f3f3')};
+  background: ${({ $active }) => ($active ? '#2dcd97' : 'rgba(255, 255, 255, 0.58)')};
   color: ${({ $active }) => ($active ? '#ffffff' : '#8f8f8f')};
   border-radius: 999px;
   height: clamp(30px, 7.9vw, 34px);
   padding: 0 clamp(12px, 3.3vw, 14px);
   font-size: var(--body-sm);
   white-space: nowrap;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const ChatPanel = styled.section`
-  background: #efefef;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
   padding: clamp(12px, 3.3vw, 14px);
   min-height: min(520px, calc(100dvh - 190px));
   display: flex;
   flex-direction: column;
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const PanelHeader = styled.div`
@@ -209,8 +215,10 @@ const MessageBubble = styled.div<{ $mine: boolean }>`
   max-width: 80%;
   border-radius: 16px;
   padding: 10px 12px;
-  background: ${({ $mine }) => ($mine ? '#d8f6e8' : '#ffffff')};
-  border: 1px solid ${({ $mine }) => ($mine ? '#b9eccc' : '#e2e2e2')};
+  background: ${({ $mine }) => ($mine ? 'rgba(216, 246, 232, 0.78)' : 'rgba(255, 255, 255, 0.78)')};
+  border: 1px solid ${({ $mine }) => ($mine ? '#b9eccc' : 'var(--glass-border)')};
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const MessageAuthor = styled.p<{ $mine: boolean }>`
@@ -238,8 +246,8 @@ const ComposerInput = styled.input`
   flex: 1;
   height: 42px;
   border-radius: 999px;
-  border: 1.5px solid #c8c8c8;
-  background: #ffffff;
+  border: 1.5px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.66);
   padding: 0 14px;
   font-size: var(--body-sm);
   outline: none;
@@ -250,7 +258,8 @@ const SendButton = styled.button`
   height: clamp(38px, 9.8vw, 42px);
   border-radius: 999px;
   border: none;
-  background: #2dcd97;
+  background: linear-gradient(135deg, #2dcd97, #43bfaa);
+  box-shadow: 0 10px 20px rgba(45, 205, 151, 0.18);
   color: #ffffff;
   font-size: var(--body-sm);
   font-weight: 700;

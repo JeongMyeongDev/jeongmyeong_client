@@ -56,7 +56,10 @@ const DebateArchivePage = () => {
     void loadDebates();
   }, [activeFilter, fetchArchivedDebates]);
 
-  const archiveCards = useMemo(() => debates.slice(0, 8).map(mapToArchiveCard), [debates]);
+  const archiveCards = useMemo(
+    () => (Array.isArray(debates) ? debates : []).slice(0, 8).map(mapToArchiveCard),
+    [debates],
+  );
 
   return (
     <Wrapper>
@@ -113,7 +116,7 @@ const DebateArchivePage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: transparent;
   padding: var(--page-top) var(--page-x) var(--page-bottom);
 `;
 
@@ -178,8 +181,10 @@ const FilterChip = styled.button<{ $active: boolean }>`
   padding: 0 clamp(12px, 3.3vw, 14px);
   border-radius: 999px;
   border: 1.5px solid ${({ $active }) => ($active ? '#2dcd97' : '#ababab')};
-  background: ${({ $active }) => ($active ? '#2dcd97' : '#f3f3f3')};
+  background: ${({ $active }) => ($active ? '#2dcd97' : 'rgba(255, 255, 255, 0.58)')};
   color: ${({ $active }) => ($active ? '#ffffff' : '#8f8f8f')};
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   font-size: var(--body-sm);
   font-weight: ${({ $active }) => ($active ? '600' : '500')};
   white-space: nowrap;
@@ -198,10 +203,14 @@ const ErrorText = styled.p`
 `;
 
 const Card = styled.article`
-  background: #f8f8f8;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
   padding: clamp(14px, 3.7vw, 16px) clamp(14px, 3.7vw, 16px) clamp(12px, 3.3vw, 14px);
   overflow: hidden;
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const CardTop = styled.div`

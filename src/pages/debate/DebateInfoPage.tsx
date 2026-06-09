@@ -179,7 +179,7 @@ const DebateInfoPage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: transparent;
   padding: clamp(20px, 5.6vw, 24px) var(--page-x) clamp(26px, 7vw, 30px);
 `;
 
@@ -200,7 +200,11 @@ const HeaderIconButton = styled.button`
   width: clamp(30px, 7.9vw, 34px);
   height: clamp(30px, 7.9vw, 34px);
   border: none;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -242,7 +246,11 @@ const ErrorText = styled.p`
 `;
 
 const LoadingCard = styled.section`
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--card-radius);
   padding: clamp(18px, 5.1vw, 22px);
   color: #9a9a9a;
@@ -251,7 +259,11 @@ const LoadingCard = styled.section`
 `;
 
 const InfoCard = styled.section`
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--card-radius);
   padding: clamp(12px, 3.3vw, 14px) clamp(12px, 3.3vw, 14px) clamp(14px, 3.7vw, 16px);
 `;
@@ -302,7 +314,11 @@ const InfoText = styled.p`
 
 const ParticipantsCard = styled.section`
   margin-top: 14px;
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--card-radius);
   padding: clamp(14px, 3.7vw, 16px) clamp(12px, 3.3vw, 14px) clamp(10px, 2.8vw, 12px);
 `;
@@ -347,7 +363,11 @@ const EmptyText = styled.p`
 
 const SummaryCard = styled.section`
   margin-top: 14px;
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--card-radius);
   padding: clamp(12px, 3.3vw, 14px);
   display: flex;

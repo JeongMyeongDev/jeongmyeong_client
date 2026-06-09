@@ -208,8 +208,10 @@ const MainPage = () => {
     setSelectedCard(item);
   };
 
+  const safeDebates = useMemo(() => (Array.isArray(debates) ? debates : []), [debates]);
+
   const filteredDebates = useMemo(() => {
-    let result = debates;
+    let result = safeDebates;
     if (activeCategory !== '전체') {
       result = result.filter((debate) =>
         debate.tagMaps?.some((tagMap) => tagMap.tag.name === activeCategory),
@@ -226,13 +228,15 @@ const MainPage = () => {
       ].join(' ').toLowerCase();
       return searchableText.includes(normalizedKeyword);
     });
-  }, [debates, searchKeyword, activeCategory]);
+  }, [safeDebates, searchKeyword, activeCategory]);
 
   useEffect(() => {
-    setActiveDot(0);
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ left: 0, behavior: 'auto' });
-    }
+    const frameId = window.requestAnimationFrame(() => {
+      setActiveDot(0);
+      scrollRef.current?.scrollTo({ left: 0, behavior: 'auto' });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [searchKeyword]);
 
   const debateItems: DebateListItem[] = filteredDebates.map((debate) => ({
@@ -386,7 +390,7 @@ const MainPage = () => {
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
 const Wrapper = styled.div`
-  background: #f5f5f5;
+  background: transparent;
   min-height: 100dvh;
 `;
 
@@ -413,8 +417,12 @@ const SearchBar = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid var(--glass-border);
   border-radius: 999px;
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 0 clamp(14px, 4.2vw, 18px);
   box-sizing: border-box;
 
@@ -488,7 +496,8 @@ const FCard = styled.div`
   position: relative;
   scroll-snap-align: start;
   scroll-snap-stop: normal;
-  background: #fff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
   padding: clamp(18px, 5.1vw, 22px) clamp(16px, 4.7vw, 20px) clamp(16px, 4.2vw, 18px);
   cursor: pointer;
@@ -496,6 +505,9 @@ const FCard = styled.div`
   overflow: hidden;
   touch-action: pan-x pan-y;
   user-select: none;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const FTitle = styled.h3`
@@ -585,7 +597,7 @@ const Badge = styled.span<{ $active: boolean }>`
   border: 2px solid #2dcd97;
   font-size: var(--body-md);
   font-weight: 600;
-  background: ${({ $active }) => ($active ? '#2dcd97' : 'transparent')};
+  background: ${({ $active }) => ($active ? '#2dcd97' : 'rgba(255, 255, 255, 0.3)')};
   color: ${({ $active }) => ($active ? '#fff' : '#2dcd97')};
   flex-shrink: 0;
   line-height: 1;
@@ -603,7 +615,7 @@ const TagPill = styled.span`
   border-radius: 999px;
   border: 2px solid #a8a8a8;
   font-size: var(--body-md);
-  background: transparent;
+  background: rgba(255, 255, 255, 0.3);
   color: #9f9f9f;
   flex: 1 1 auto;
   line-height: 1;
@@ -663,7 +675,10 @@ const CategoryPill = styled.button<{ $active: boolean }>`
   border: none;
   font-size: 13px;
   font-weight: ${({ $active }) => ($active ? '600' : '400')};
-  background: ${({ $active }) => ($active ? '#4dc891' : '#f3f3f3')};
+  background: ${({ $active }) => ($active ? '#4dc891' : 'rgba(255, 255, 255, 0.58)')};
+  border: 1px solid ${({ $active }) => ($active ? 'transparent' : 'var(--glass-border)')};
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: ${({ $active }) => ($active ? '#fff' : '#666')};
   cursor: pointer;
 `;
@@ -687,13 +702,17 @@ const DCard = styled.div`
   justify-content: space-between;
   width: min(330px, calc(100vw - var(--page-x) - var(--page-x)));
   min-height: clamp(126px, 33.5vw, 144px);
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
   border-radius: var(--card-radius);
   padding: clamp(16px, 4.2vw, 18px) clamp(14px, 3.7vw, 16px);
   margin: 0 auto;
   box-sizing: border-box;
   cursor: pointer;
   overflow: hidden;
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const DebateIconImg = styled.img`
@@ -751,7 +770,9 @@ const DDesc = styled.p`
 const ModalOverlay = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(34, 46, 42, 0.22);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -761,11 +782,15 @@ const ModalOverlay = styled.div`
 
 const ModalCard = styled.div`
   width: min(100%, 354px);
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
   border-radius: clamp(34px, 9.8vw, 42px);
   padding: clamp(18px, 5.1vw, 22px) clamp(18px, 4.7vw, 20px) clamp(20px, 5.1vw, 22px);
   max-height: calc(100dvh - 36px);
   overflow-y: auto;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const ModalTop = styled.div`
@@ -881,7 +906,8 @@ const JoinButton = styled.button`
   height: clamp(50px, 13vw, 56px);
   border-radius: 999px;
   border: none;
-  background: #2dcd97;
+  background: linear-gradient(135deg, #2dcd97, #43bfaa);
+  box-shadow: 0 12px 24px rgba(45, 205, 151, 0.22);
   color: #ffffff;
   font-size: var(--title-sm);
   font-weight: 700;

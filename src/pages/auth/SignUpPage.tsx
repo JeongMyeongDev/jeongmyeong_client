@@ -191,7 +191,7 @@ const SignUpPage = () => {
 const Wrapper = styled.div`
   min-height: 100dvh;
   padding: clamp(42px, 14vw, 60px) clamp(24px, 7.4vw, 32px) clamp(32px, 9.3vw, 40px);
-  background: #f5f5f5;
+  background: transparent;
 `;
 
 const Title = styled.h1`
@@ -206,6 +206,13 @@ const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: clamp(22px, 6.5vw, 28px);
+  padding: clamp(22px, 6.5vw, 28px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const FieldGroup = styled.div`
@@ -223,14 +230,14 @@ const Label = styled.label`
 const InputRow = styled.div`
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #d0d0d0;
+  border-bottom: 1px solid rgba(129, 146, 140, 0.48);
 `;
 
 const UnderlineInput = styled.input`
   flex: 1;
   height: 36px;
   border: none;
-  border-bottom: 1px solid #d0d0d0;
+  border-bottom: 1px solid rgba(129, 146, 140, 0.48);
   font-size: var(--body-sm);
   color: #1a1a1a;
   outline: none;
@@ -299,7 +306,8 @@ const CheckboxLabel = styled.label`
 
 const TermsBox = styled.div`
   padding: clamp(12px, 3.3vw, 14px);
-  border: 1px solid #d0d0d0;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.34);
   border-radius: 6px;
   font-size: 12px;
   color: #666;
@@ -321,13 +329,14 @@ const SuccessText = styled.p`
 const SubmitButton = styled.button<{ disabled: boolean }>`
   width: 100%;
   height: clamp(48px, 12.1vw, 52px);
-  background: ${({ disabled }) => (disabled ? '#a8e6c8' : '#4dc891')};
+  background: ${({ disabled }) => (disabled ? '#a8e6c8' : 'linear-gradient(135deg, #2dcd97, #43bfaa)')};
   color: #ffffff;
   border: none;
   border-radius: 999px;
   font-size: var(--body-md);
   font-weight: 600;
   cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  box-shadow: ${({ disabled }) => (disabled ? 'none' : '0 12px 24px rgba(45, 205, 151, 0.22)')};
 `;
 
 export default SignUpPage;

@@ -103,7 +103,7 @@ const GoogleSignUpPage = () => {
 const Wrapper = styled.div`
   min-height: 100dvh;
   padding: 60px 32px 40px;
-  background: #f5f5f5;
+  background: transparent;
 `;
 
 const Title = styled.h1`
@@ -118,6 +118,13 @@ const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 28px;
+  padding: 24px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--card-radius);
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 `;
 
 const FieldGroup = styled.div`
@@ -136,7 +143,7 @@ const ReadonlyValue = styled.div`
   min-height: 36px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #d0d0d0;
+  border-bottom: 1px solid rgba(129, 146, 140, 0.48);
   font-size: 14px;
   color: #555;
 `;
@@ -144,7 +151,7 @@ const ReadonlyValue = styled.div`
 const UnderlineInput = styled.input`
   height: 36px;
   border: none;
-  border-bottom: 1px solid #d0d0d0;
+  border-bottom: 1px solid rgba(129, 146, 140, 0.48);
   font-size: 14px;
   color: #1a1a1a;
   outline: none;
@@ -163,13 +170,14 @@ const ErrorText = styled.p`
 const SubmitButton = styled.button<{ disabled: boolean }>`
   width: 100%;
   height: 52px;
-  background: ${({ disabled }) => (disabled ? '#a8e6c8' : '#4dc891')};
+  background: ${({ disabled }) => (disabled ? '#a8e6c8' : 'linear-gradient(135deg, #2dcd97, #43bfaa)')};
   color: #ffffff;
   border: none;
   border-radius: 999px;
   font-size: 16px;
   font-weight: 600;
   cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  box-shadow: ${({ disabled }) => (disabled ? 'none' : '0 12px 24px rgba(45, 205, 151, 0.22)')};
 `;
 
 export default GoogleSignUpPage;

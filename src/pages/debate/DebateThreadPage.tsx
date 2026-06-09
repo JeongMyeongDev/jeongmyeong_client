@@ -95,7 +95,6 @@ const DebateThreadPage = () => {
 
   useEffect(() => {
     if (visibleMessages.length === 0) {
-      setCommentsByPostId({});
       return;
     }
 
@@ -271,7 +270,7 @@ const DebateThreadPage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: transparent;
   padding: 0 0 calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
 `;
 
@@ -285,7 +284,11 @@ const Logo = styled.img`
 const Header = styled.header`
   height: clamp(68px, 18.6vw, 80px);
   padding: 0 clamp(18px, 5.6vw, 24px);
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.7);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   display: grid;
   grid-template-columns: clamp(36px, 9.3vw, 40px) 1fr clamp(36px, 9.3vw, 40px);
   align-items: center;
@@ -339,8 +342,11 @@ const PromptCard = styled.section`
   min-height: clamp(88px, 24.2vw, 104px);
   margin: clamp(14px, 4.2vw, 18px) auto clamp(56px, 20.5vw, 88px);
   border-radius: var(--card-radius);
-  background: #ffffff;
-  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.14);
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -389,8 +395,8 @@ const CommentNodeItem = styled.div`
     top: 24px;
     width: ${REPLY_INDENT_PX}px;
     height: 18px;
-    border-left: 1px solid #d8d8d8;
-    border-bottom: 1px solid #d8d8d8;
+    border-left: 1px solid var(--glass-line);
+    border-bottom: 1px solid var(--glass-line);
     border-radius: 0 0 0 10px;
     pointer-events: none;
   }
@@ -403,7 +409,7 @@ const CommentNodeItem = styled.div`
     bottom: 0;
     z-index: 2;
     width: 4px;
-    background: #f5f5f5;
+    background: #f5f7f6;
     pointer-events: none;
   }
 `;
@@ -423,7 +429,7 @@ const CommentChildren = styled.div`
     top: -8px;
     bottom: 0;
     z-index: 0;
-    border-left: 1px solid #d8d8d8;
+    border-left: 1px solid var(--glass-line);
     pointer-events: none;
   }
 `;
@@ -433,7 +439,11 @@ const MessageCard = styled.button`
   min-height: clamp(64px, 16.7vw, 72px);
   border: none;
   border-radius: 4px;
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 22px rgba(64, 88, 79, 0.08);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.3vw, 14px);
   overflow: hidden;
   text-align: left;
@@ -480,7 +490,11 @@ const MessageText = styled.p`
 
 const EmptyCard = styled.div`
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--glass-surface-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: clamp(14px, 4.2vw, 18px);
   color: #a0a0a0;
   font-size: var(--body-sm);
@@ -500,9 +514,12 @@ const ComposerWrap = styled.div`
   width: 100%;
   max-width: var(--app-max-width);
   transform: translateX(-50%);
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.76);
+  border-top: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: clamp(8px, 2.3vw, 10px) var(--page-x) max(clamp(8px, 2.3vw, 10px), env(safe-area-inset-bottom));
-  box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 -10px 30px rgba(64, 88, 79, 0.1);
 `;
 
 const Composer = styled.form`
@@ -517,7 +534,8 @@ const HashButton = styled.button`
   height: clamp(36px, 9.3vw, 40px);
   border: none;
   border-radius: 50%;
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--glass-border);
   color: #a6a6a6;
   font-size: clamp(20px, 5.1vw, 22px);
   font-weight: 500;
@@ -528,7 +546,8 @@ const MessageInput = styled.input`
   height: clamp(36px, 9.3vw, 40px);
   border: none;
   border-radius: 999px;
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--glass-border);
   color: #555555;
   font-size: 15px;
   padding: 0 clamp(14px, 4.2vw, 18px);
@@ -544,7 +563,8 @@ const SendButton = styled.button`
   height: clamp(36px, 9.3vw, 40px);
   border: none;
   border-radius: 50%;
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--glass-border);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -566,7 +586,8 @@ const ReplyBanner = styled.div`
   height: 34px;
   margin-bottom: 8px;
   border-radius: 999px;
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--glass-border);
   color: #8f8f8f;
   font-size: 13px;
   display: flex;

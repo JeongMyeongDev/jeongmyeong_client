@@ -17,7 +17,10 @@ const GlobalStyle = createGlobalStyle`
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #f5f5f5;
+    background:
+      radial-gradient(circle at 16% 0%, rgba(77, 200, 145, 0.18), transparent 36%),
+      radial-gradient(circle at 90% 20%, rgba(102, 196, 255, 0.14), transparent 34%),
+      linear-gradient(180deg, #f8fbfa 0%, #eef5f2 48%, #f7f7f7 100%);
     color: #1a1a1a;
     -webkit-font-smoothing: antialiased;
     -webkit-text-size-adjust: 100%;
@@ -45,6 +48,16 @@ const GlobalStyle = createGlobalStyle`
     --title-sm: clamp(16px, 4.7vw, 20px);
     --body-md: clamp(13px, 3.7vw, 16px);
     --body-sm: clamp(12px, 3.3vw, 14px);
+    --glass-surface: rgba(255, 255, 255, 0.68);
+    --glass-surface-strong: rgba(255, 255, 255, 0.84);
+    --glass-surface-soft: rgba(255, 255, 255, 0.42);
+    --glass-border: rgba(255, 255, 255, 0.72);
+    --glass-line: rgba(216, 216, 216, 0.86);
+    --glass-shadow: 0 18px 40px rgba(64, 88, 79, 0.14);
+    --glass-shadow-soft: 0 10px 28px rgba(64, 88, 79, 0.1);
+    --glass-blur: blur(18px) saturate(1.18);
+    --brand-primary: #2dcd97;
+    --brand-primary-soft: rgba(45, 205, 151, 0.16);
   }
 `;
 
@@ -55,17 +68,22 @@ const ViewportFrame = styled.div`
   justify-content: center;
   align-items: flex-start;
   overflow-x: hidden;
-  background: #f5f5f5;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(45, 205, 151, 0.16), transparent 34%),
+    radial-gradient(circle at 82% 8%, rgba(122, 189, 255, 0.14), transparent 32%),
+    linear-gradient(160deg, #f9fbfa 0%, #eef6f3 45%, #f7f7f7 100%);
 `;
 
 const MobileShell = styled.div`
   width: 100%;
   max-width: var(--app-max-width);
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: rgba(245, 247, 246, 0.6);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   position: relative;
   overflow-x: hidden;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 0 44px rgba(52, 74, 66, 0.16);
 
   @media (max-width: 430px) {
     box-shadow: none;
