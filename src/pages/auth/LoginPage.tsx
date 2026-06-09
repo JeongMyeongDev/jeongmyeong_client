@@ -209,7 +209,7 @@ const Wrapper = styled.div`
   justify-content: center;
   min-height: 100dvh;
   padding: 0 clamp(24px, 7.4vw, 32px);
-  background: #f5f5f5;
+  background: var(--color-bg);
 `;
 
 const Logo = styled.img`
@@ -237,22 +237,22 @@ const FieldGroup = styled.div`
 const Label = styled.label`
   font-size: 15px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--color-text-main);
 `;
 
 const InputRow = styled.div`
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #d0d0d0;
+  border-bottom: 1px solid var(--color-border);
 `;
 
 const UnderlineInput = styled.input`
   flex: 1;
   height: 36px;
   border: none;
-  border-bottom: 1px solid #d0d0d0;
+  border-bottom: 1px solid var(--color-border);
   font-size: var(--body-sm);
-  color: #1a1a1a;
+  color: var(--color-text-main);
   outline: none;
   background: transparent;
 
@@ -261,7 +261,7 @@ const UnderlineInput = styled.input`
   }
 
   &::placeholder {
-    color: #b0b0b0;
+    color: var(--color-text-sub);
   }
 `;
 
@@ -277,25 +277,26 @@ const IconButton = styled.button`
   align-items: center;
   background: none;
   border: none;
-  color: #999;
+  color: var(--color-text-sub);
   padding: 0;
   cursor: pointer;
+  transition: color 0.2s;
 
   &:hover {
-    color: #555;
+    color: var(--color-text-main);
   }
 `;
 
 const ErrorText = styled.p`
   font-size: 13px;
-  color: #f04444;
+  color: #e03131;
   margin: -12px 0 0;
 `;
 
 const LoginButton = styled.button<{ disabled?: boolean }>`
   width: 100%;
   height: clamp(48px, 12.1vw, 52px);
-  background: ${({ disabled }) => (disabled ? '#a8e6c8' : '#4dc891')};
+  background: var(--color-primary);
   color: #ffffff;
   border: none;
   border-radius: 999px;
@@ -303,6 +304,14 @@ const LoginButton = styled.button<{ disabled?: boolean }>`
   font-weight: 600;
   margin-top: 8px;
   cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  transition: transform 0.2s, opacity 0.2s, background-color 0.2s;
+  
+  opacity: ${({ disabled }) => (disabled ? 0.6 : 1)};
+
+  &:active {
+    transform: ${({ disabled }) => (disabled ? 'none' : 'scale(0.98)')};
+    background: ${({ disabled }) => (disabled ? 'var(--color-primary)' : 'var(--color-primary-hover)')};
+  }
 `;
 
 const GoogleButtonContainer = styled.div`
@@ -319,10 +328,15 @@ const SignUpLink = styled.button`
   background: none;
   border: none;
   font-size: var(--body-sm);
-  color: #888;
+  color: var(--color-text-sub);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+  transition: color 0.2s;
+
+  &:active {
+    color: var(--color-text-main);
+  }
 `;
 
 export default LoginPage;

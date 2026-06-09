@@ -271,7 +271,7 @@ const DebateThreadPage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: var(--color-bg);
   padding: 0 0 calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
 `;
 
@@ -285,11 +285,14 @@ const Logo = styled.img`
 const Header = styled.header`
   height: clamp(68px, 18.6vw, 80px);
   padding: 0 clamp(18px, 5.6vw, 24px);
-  background: #ffffff;
+  background: var(--color-surface);
   display: grid;
   grid-template-columns: clamp(36px, 9.3vw, 40px) 1fr clamp(36px, 9.3vw, 40px);
   align-items: center;
   gap: clamp(8px, 2.8vw, 12px);
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
+  position: relative;
 `;
 
 const IconButton = styled.button`
@@ -315,7 +318,7 @@ const HeaderText = styled.div`
 
 const Title = styled.h1`
   margin: 0;
-  color: #2f3238;
+  color: var(--color-text-main);
   font-size: var(--title-sm);
   font-weight: 700;
   line-height: 1.2;
@@ -326,7 +329,7 @@ const Title = styled.h1`
 
 const Description = styled.p`
   margin: 4px 0 0;
-  color: #a0a0a0;
+  color: var(--color-text-sub);
   font-size: var(--body-sm);
   line-height: 1.2;
   overflow: hidden;
@@ -339,8 +342,8 @@ const PromptCard = styled.section`
   min-height: clamp(88px, 24.2vw, 104px);
   margin: clamp(14px, 4.2vw, 18px) auto clamp(56px, 20.5vw, 88px);
   border-radius: var(--card-radius);
-  background: #ffffff;
-  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.14);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -350,15 +353,15 @@ const PromptCard = styled.section`
 
 const PromptText = styled.p`
   margin: 0;
-  color: #b0b0b0;
+  color: var(--color-text-sub);
   font-size: var(--body-sm);
 `;
 
 const PromptArrow = styled.span`
   width: 22px;
   height: 22px;
-  border-right: 2px solid #a6a6a6;
-  border-bottom: 2px solid #a6a6a6;
+  border-right: 2px solid var(--color-text-sub);
+  border-bottom: 2px solid var(--color-text-sub);
   transform: rotate(45deg);
 `;
 
@@ -389,8 +392,8 @@ const CommentNodeItem = styled.div`
     top: 24px;
     width: ${REPLY_INDENT_PX}px;
     height: 18px;
-    border-left: 1px solid #d8d8d8;
-    border-bottom: 1px solid #d8d8d8;
+    border-left: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
     border-radius: 0 0 0 10px;
     pointer-events: none;
   }
@@ -403,7 +406,7 @@ const CommentNodeItem = styled.div`
     bottom: 0;
     z-index: 2;
     width: 4px;
-    background: #f5f5f5;
+    background: var(--color-bg);
     pointer-events: none;
   }
 `;
@@ -423,7 +426,7 @@ const CommentChildren = styled.div`
     top: -8px;
     bottom: 0;
     z-index: 0;
-    border-left: 1px solid #d8d8d8;
+    border-left: 1px solid var(--color-border);
     pointer-events: none;
   }
 `;
@@ -433,10 +436,17 @@ const MessageCard = styled.button`
   min-height: clamp(64px, 16.7vw, 72px);
   border: none;
   border-radius: 4px;
-  background: #ffffff;
+  background: var(--color-surface);
   padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.3vw, 14px);
   overflow: hidden;
   text-align: left;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: none;
+  }
 `;
 
 const MetaRow = styled.div`
@@ -447,7 +457,7 @@ const MetaRow = styled.div`
 `;
 
 const NumberText = styled.span`
-  color: #b5b5b5;
+  color: var(--color-text-sub);
   font-size: 12px;
 `;
 
@@ -455,13 +465,13 @@ const Avatar = styled.span`
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #b8b8b8;
+  background: var(--color-border);
   flex-shrink: 0;
 `;
 
 const AuthorName = styled.span`
   min-width: 0;
-  color: #b0b0b0;
+  color: var(--color-text-sub);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -470,7 +480,7 @@ const AuthorName = styled.span`
 
 const MessageText = styled.p`
   margin: 0;
-  color: #8f8f8f;
+  color: var(--color-text-main);
   font-size: var(--body-sm);
   line-height: 1.45;
   white-space: pre-wrap;
@@ -480,15 +490,15 @@ const MessageText = styled.p`
 
 const EmptyCard = styled.div`
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--color-surface);
   padding: clamp(14px, 4.2vw, 18px);
-  color: #a0a0a0;
+  color: var(--color-text-sub);
   font-size: var(--body-sm);
   text-align: center;
 `;
 
 const ErrorText = styled(EmptyCard)`
-  color: #f04444;
+  color: #e03131;
 `;
 
 const ComposerWrap = styled.div`
@@ -500,7 +510,7 @@ const ComposerWrap = styled.div`
   width: 100%;
   max-width: var(--app-max-width);
   transform: translateX(-50%);
-  background: #ffffff;
+  background: var(--color-surface);
   padding: clamp(8px, 2.3vw, 10px) var(--page-x) max(clamp(8px, 2.3vw, 10px), env(safe-area-inset-bottom));
   box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.04);
 `;
@@ -517,10 +527,14 @@ const HashButton = styled.button`
   height: clamp(36px, 9.3vw, 40px);
   border: none;
   border-radius: 50%;
-  background: #f0f0f0;
-  color: #a6a6a6;
+  background: var(--color-bg);
+  color: var(--color-text-sub);
   font-size: clamp(20px, 5.1vw, 22px);
   font-weight: 500;
+  transition: opacity 0.2s;
+  &:active {
+    opacity: 0.6;
+  }
 `;
 
 const MessageInput = styled.input`
@@ -528,14 +542,14 @@ const MessageInput = styled.input`
   height: clamp(36px, 9.3vw, 40px);
   border: none;
   border-radius: 999px;
-  background: #f0f0f0;
-  color: #555555;
+  background: var(--color-bg);
+  color: var(--color-text-main);
   font-size: 15px;
   padding: 0 clamp(14px, 4.2vw, 18px);
   outline: none;
 
   &::placeholder {
-    color: #9f9f9f;
+    color: var(--color-text-sub);
   }
 `;
 
@@ -544,11 +558,16 @@ const SendButton = styled.button`
   height: clamp(36px, 9.3vw, 40px);
   border: none;
   border-radius: 50%;
-  background: #f0f0f0;
+  background: var(--color-bg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  transition: opacity 0.2s, background-color 0.2s;
+
+  &:active {
+    opacity: 0.6;
+  }
 
   &:disabled {
     opacity: 0.45;
@@ -558,7 +577,7 @@ const SendButton = styled.button`
 const SubmitError = styled.p`
   margin: 0 0 8px;
   text-align: center;
-  color: #f04444;
+  color: #e03131;
   font-size: 12px;
 `;
 
@@ -566,8 +585,8 @@ const ReplyBanner = styled.div`
   height: 34px;
   margin-bottom: 8px;
   border-radius: 999px;
-  background: #f0f0f0;
-  color: #8f8f8f;
+  background: var(--color-bg);
+  color: var(--color-text-sub);
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -578,7 +597,7 @@ const ReplyBanner = styled.div`
 const ReplyCancelButton = styled.button`
   border: none;
   background: transparent;
-  color: #2dcd97;
+  color: var(--color-primary);
   font-size: 13px;
   font-weight: 700;
   padding: 0;

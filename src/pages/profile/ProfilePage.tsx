@@ -149,7 +149,7 @@ const ProfilePage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: var(--color-bg);
   padding: 0 var(--page-x) var(--page-bottom);
 `;
 
@@ -168,7 +168,7 @@ const Avatar = styled.div`
   width: clamp(112px, 34.4vw, 148px);
   height: clamp(112px, 34.4vw, 148px);
   border-radius: 50%;
-  background: #d4d4d6;
+  background: var(--color-border);
   flex-shrink: 0;
 `;
 
@@ -182,13 +182,13 @@ const Name = styled.h1`
   margin: 0;
   font-size: var(--title-sm);
   font-weight: 700;
-  color: #2f3238;
+  color: var(--color-text-main);
 `;
 
 const SubText = styled.p`
   margin: 0;
   font-size: var(--body-sm);
-  color: #8f8f8f;
+  color: var(--color-text-sub);
 `;
 
 const AuthActionRow = styled.div`
@@ -201,11 +201,16 @@ const SignUpButton = styled.button`
   flex: 1;
   height: clamp(48px, 12.6vw, 54px);
   border-radius: 999px;
-  border: 1.5px solid #1b1b1b;
-  background: #f5f5f5;
-  color: #2f3238;
+  border: 1.5px solid var(--color-text-main);
+  background: transparent;
+  color: var(--color-text-main);
   font-size: clamp(16px, 4.2vw, 18px);
   font-weight: 700;
+  transition: transform 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 const LoginButton = styled.button`
@@ -213,43 +218,58 @@ const LoginButton = styled.button`
   height: clamp(48px, 12.6vw, 54px);
   border-radius: 999px;
   border: none;
-  background: #2dcd97;
+  background: var(--color-primary);
   color: #ffffff;
   font-size: clamp(16px, 4.2vw, 18px);
   font-weight: 700;
+  transition: transform 0.2s, background-color 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+    background: var(--color-primary-hover);
+  }
 `;
 
 const ProfileEditCard = styled.section`
-  background: #efefef;
+  background: var(--color-surface);
   border-radius: var(--card-radius);
   padding: clamp(14px, 3.7vw, 16px);
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 18px;
+  box-shadow: var(--shadow-sm);
 `;
 
 const ProfileInput = styled.input`
   height: 44px;
-  border: 1.5px solid #c8c8c8;
+  border: 1.5px solid var(--color-border);
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--color-bg);
   padding: 0 14px;
   font-size: var(--body-sm);
   outline: none;
+  color: var(--color-text-main);
 `;
 
 const SaveButton = styled.button`
   height: 44px;
   border: none;
   border-radius: 999px;
-  background: #2dcd97;
+  background: var(--color-primary);
   color: #ffffff;
   font-size: 15px;
   font-weight: 700;
+  transition: transform 0.2s, background-color 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+    background: var(--color-primary-hover);
+  }
 
   &:disabled {
     opacity: 0.65;
+    transform: none;
   }
 `;
 
@@ -260,24 +280,30 @@ const ErrorText = styled.p`
 `;
 
 const MenuCard = styled.section`
-  background: #efefef;
+  background: var(--color-surface);
   border-radius: var(--card-radius);
   padding: clamp(16px, 4.7vw, 20px) clamp(16px, 4.2vw, 18px);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  box-shadow: var(--shadow-sm);
 `;
 
 const MenuItem = styled.button`
   text-align: left;
   border: none;
   background: transparent;
-  color: #8f8f8f;
+  color: var(--color-text-main);
   font-size: var(--body-sm);
   font-weight: 500;
   line-height: 1.45;
-  padding: 0;
+  padding: 8px 4px;
   cursor: pointer;
+  transition: opacity 0.2s;
+
+  &:active {
+    opacity: 0.6;
+  }
 `;
 
 const Toast = styled.div`

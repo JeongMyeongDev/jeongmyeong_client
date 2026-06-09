@@ -191,14 +191,14 @@ const SignUpPage = () => {
 const Wrapper = styled.div`
   min-height: 100dvh;
   padding: clamp(42px, 14vw, 60px) clamp(24px, 7.4vw, 32px) clamp(32px, 9.3vw, 40px);
-  background: #f5f5f5;
+  background: var(--color-bg);
 `;
 
 const Title = styled.h1`
   font-size: var(--title-sm);
   font-weight: 700;
   text-align: center;
-  color: #1a1a1a;
+  color: var(--color-text-main);
   margin-bottom: clamp(28px, 9.3vw, 40px);
 `;
 
@@ -217,22 +217,22 @@ const FieldGroup = styled.div`
 const Label = styled.label`
   font-size: 15px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--color-text-main);
 `;
 
 const InputRow = styled.div`
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #d0d0d0;
+  border-bottom: 1px solid var(--color-border);
 `;
 
 const UnderlineInput = styled.input`
   flex: 1;
   height: 36px;
   border: none;
-  border-bottom: 1px solid #d0d0d0;
+  border-bottom: 1px solid var(--color-border);
   font-size: var(--body-sm);
-  color: #1a1a1a;
+  color: var(--color-text-main);
   outline: none;
   background: transparent;
 
@@ -241,7 +241,7 @@ const UnderlineInput = styled.input`
   }
 
   &::placeholder {
-    color: #b0b0b0;
+    color: var(--color-text-sub);
   }
 `;
 
@@ -257,12 +257,13 @@ const IconButton = styled.button`
   align-items: center;
   background: none;
   border: none;
-  color: #999;
+  color: var(--color-text-sub);
   padding: 0;
   cursor: pointer;
+  transition: color 0.2s;
 
   &:hover {
-    color: #555;
+    color: var(--color-text-main);
   }
 `;
 
@@ -275,7 +276,7 @@ const ConsentSection = styled.div`
 const ConsentTitle = styled.p`
   font-size: 15px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--color-text-main);
 `;
 
 const CheckboxRow = styled.div`
@@ -287,22 +288,22 @@ const CheckboxRow = styled.div`
 const Checkbox = styled.input`
   width: clamp(16px, 4.2vw, 18px);
   height: clamp(16px, 4.2vw, 18px);
-  accent-color: #4dc891;
+  accent-color: var(--color-primary);
   cursor: pointer;
 `;
 
 const CheckboxLabel = styled.label`
   font-size: var(--body-sm);
-  color: #1a1a1a;
+  color: var(--color-text-main);
   cursor: pointer;
 `;
 
 const TermsBox = styled.div`
   padding: clamp(12px, 3.3vw, 14px);
-  border: 1px solid #d0d0d0;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-sub);
   line-height: 1.6;
   max-height: 100px;
   overflow-y: auto;
@@ -310,24 +311,32 @@ const TermsBox = styled.div`
 
 const ErrorText = styled.p`
   font-size: 13px;
-  color: #f04444;
+  color: #e03131;
 `;
 
 const SuccessText = styled.p`
   font-size: 13px;
-  color: #1f9f6b;
+  color: var(--color-primary);
 `;
 
 const SubmitButton = styled.button<{ disabled: boolean }>`
   width: 100%;
   height: clamp(48px, 12.1vw, 52px);
-  background: ${({ disabled }) => (disabled ? '#a8e6c8' : '#4dc891')};
+  background: var(--color-primary);
   color: #ffffff;
   border: none;
   border-radius: 999px;
   font-size: var(--body-md);
   font-weight: 600;
   cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  transition: transform 0.2s, opacity 0.2s, background-color 0.2s;
+  
+  opacity: ${({ disabled }) => (disabled ? 0.6 : 1)};
+
+  &:active {
+    transform: ${({ disabled }) => (disabled ? 'none' : 'scale(0.98)')};
+    background: ${({ disabled }) => (disabled ? 'var(--color-primary)' : 'var(--color-primary-hover)')};
+  }
 `;
 
 export default SignUpPage;

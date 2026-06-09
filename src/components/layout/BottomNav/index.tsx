@@ -3,26 +3,26 @@ import styled from 'styled-components';
 import iconBtnGenerate from '../../../assets/icon_btn_generate.svg';
 
 const HomeIcon = ({ active }: { active: boolean }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? '#4dc891' : 'none'} stroke={active ? '#4dc891' : '#bbb'} strokeWidth="2">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? 'var(--color-primary)' : 'none'} stroke={active ? 'var(--color-primary)' : 'var(--color-text-sub)'} strokeWidth="2">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
     <polyline points="9 22 9 12 15 12 15 22" />
   </svg>
 );
 
 const DebateIcon = ({ active }: { active: boolean }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#4dc891' : '#bbb'} strokeWidth="2">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? 'var(--color-primary)' : 'var(--color-text-sub)'} strokeWidth="2">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
   </svg>
 );
 
 const ArchiveIcon = ({ active }: { active: boolean }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#4dc891' : '#bbb'} strokeWidth="2">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? 'var(--color-primary)' : 'var(--color-text-sub)'} strokeWidth="2">
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
   </svg>
 );
 
 const ProfileIcon = ({ active }: { active: boolean }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#4dc891' : '#bbb'} strokeWidth="2">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? 'var(--color-primary)' : 'var(--color-text-sub)'} strokeWidth="2">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
   </svg>
@@ -82,8 +82,9 @@ const Wrapper = styled.nav`
   padding-bottom: env(safe-area-inset-bottom);
   display: flex;
   align-items: center;
-  background: #ffffff;
-  border-top: 1px solid #f0f0f0;
+  background: var(--color-surface);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  border-top: none;
   z-index: 100;
 `;
 
@@ -100,7 +101,7 @@ const Tab = styled(NavLink)`
 
 const TabLabel = styled.span<{ $active: boolean }>`
   font-size: 10px;
-  color: ${({ $active }) => ($active ? '#4dc891' : '#bbb')};
+  color: ${({ $active }) => ($active ? 'var(--color-primary)' : 'var(--color-text-sub)')};
   font-weight: ${({ $active }) => ($active ? '600' : '400')};
 `;
 
@@ -121,6 +122,11 @@ const Fab = styled.button`
   align-items: center;
   justify-content: center;
   margin-bottom: 10px;
+  transition: transform 0.2s;
+
+  &:active {
+    transform: scale(0.92);
+  }
 `;
 
 const FabIcon = styled.img`

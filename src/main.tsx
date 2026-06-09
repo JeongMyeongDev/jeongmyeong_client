@@ -17,8 +17,8 @@ const GlobalStyle = createGlobalStyle`
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #f5f5f5;
-    color: #1a1a1a;
+    background: var(--color-bg);
+    color: var(--color-text-main);
     -webkit-font-smoothing: antialiased;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
@@ -29,6 +29,18 @@ const GlobalStyle = createGlobalStyle`
   }
 
   :root {
+    /* Design System Colors & Shadows */
+    --color-primary: #2dcd97;
+    --color-primary-hover: #25b383;
+    --color-bg: #f8f9fa;
+    --color-surface: #ffffff;
+    --color-text-main: #1a1b1e;
+    --color-text-sub: #717579;
+    --color-border: #e9ecef;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+    /* Layout Variables */
     --app-max-width: 430px;
     --page-x: clamp(12px, 4.1vw, 18px);
     --page-top: clamp(44px, 14.4vw, 62px);
@@ -55,14 +67,14 @@ const ViewportFrame = styled.div`
   justify-content: center;
   align-items: flex-start;
   overflow-x: hidden;
-  background: #f5f5f5;
+  background: var(--color-bg);
 `;
 
 const MobileShell = styled.div`
   width: 100%;
   max-width: var(--app-max-width);
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: var(--color-bg);
   position: relative;
   overflow-x: hidden;
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.12);

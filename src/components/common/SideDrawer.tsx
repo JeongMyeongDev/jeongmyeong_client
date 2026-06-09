@@ -67,7 +67,7 @@ const Drawer = styled.div<{ $open: boolean }>`
   left: 0;
   height: 100dvh;
   width: 260px;
-  background: #ffffff;
+  background: var(--color-surface);
   z-index: 500;
   transform: translateX(${({ $open }) => ($open ? '0' : '-100%')});
   transition: transform 0.25s ease;
@@ -93,7 +93,11 @@ const CloseButton = styled.button`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #555;
+  color: var(--color-text-sub);
+  transition: opacity 0.2s;
+  &:active {
+    opacity: 0.7;
+  }
 `;
 
 const CloseIcon = styled.svg`
@@ -112,15 +116,16 @@ const NavItem = styled.button<{ $active: boolean }>`
   text-align: left;
   border: none;
   border-radius: 12px;
-  background: ${({ $active }) => ($active ? '#edfaf4' : 'transparent')};
-  color: ${({ $active }) => ($active ? '#2dcd97' : '#2f3238')};
+  background: ${({ $active }) => ($active ? 'rgba(45, 205, 151, 0.1)' : 'transparent')};
+  color: ${({ $active }) => ($active ? 'var(--color-primary)' : 'var(--color-text-main)')};
   font-size: 16px;
   font-weight: ${({ $active }) => ($active ? '700' : '500')};
   padding: 14px 16px;
   cursor: pointer;
+  transition: background 0.2s;
 
-  &:hover {
-    background: #f5f5f5;
+  &:hover, &:active {
+    background: ${({ $active }) => ($active ? 'rgba(45, 205, 151, 0.15)' : 'var(--color-bg)')};
   }
 `;
 

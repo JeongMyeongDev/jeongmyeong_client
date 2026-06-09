@@ -386,7 +386,7 @@ const MainPage = () => {
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
 const Wrapper = styled.div`
-  background: #f5f5f5;
+  background: var(--color-bg);
   min-height: 100dvh;
 `;
 
@@ -400,11 +400,15 @@ const Header = styled.div`
 const IconBtn = styled.button`
   background: none;
   border: none;
-  color: #1a1a1a;
+  color: var(--color-text-main);
   display: flex;
   align-items: center;
   flex-shrink: 0;
   padding: 0;
+  transition: opacity 0.2s;
+  &:active {
+    opacity: 0.7;
+  }
 `;
 
 const SearchBar = styled.div`
@@ -413,11 +417,11 @@ const SearchBar = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #ffffff;
+  background: var(--color-surface);
   border-radius: 999px;
   padding: 0 clamp(14px, 4.2vw, 18px);
   box-sizing: border-box;
-
+  box-shadow: var(--shadow-sm);
   min-width: 0;
 `;
 
@@ -428,10 +432,10 @@ const SearchInput = styled.input`
   outline: none;
   background: transparent;
   font-size: var(--body-sm);
-  color: #666666;
+  color: var(--color-text-main);
 
   &::placeholder {
-    color: #b4b4b4;
+    color: var(--color-text-sub);
   }
 `;
 
@@ -449,14 +453,14 @@ const Section = styled.div`
 const SectionTitle = styled.h2`
   font-size: var(--body-md);
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--color-text-main);
   margin-bottom: 2px;
   padding: 0 var(--page-x);
 `;
 
 const SectionSub = styled.p`
   font-size: clamp(12px, 3vw, 13px);
-  color: #999;
+  color: var(--color-text-sub);
   margin-bottom: 14px;
   padding: 0 var(--page-x);
 `;
@@ -488,7 +492,7 @@ const FCard = styled.div`
   position: relative;
   scroll-snap-align: start;
   scroll-snap-stop: normal;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: var(--card-radius);
   padding: clamp(18px, 5.1vw, 22px) clamp(16px, 4.7vw, 20px) clamp(16px, 4.2vw, 18px);
   cursor: pointer;
@@ -496,6 +500,13 @@ const FCard = styled.div`
   overflow: hidden;
   touch-action: pan-x pan-y;
   user-select: none;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: none;
+  }
 `;
 
 const FTitle = styled.h3`
@@ -504,7 +515,7 @@ const FTitle = styled.h3`
   font-size: var(--title-sm);
   line-height: 1.2;
   font-weight: 700;
-  color: #2f3238;
+  color: var(--color-text-main);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -515,7 +526,7 @@ const FDesc = styled.p`
   text-align: left;
   font-size: var(--body-sm);
   line-height: 1.3;
-  color: #939393;
+  color: var(--color-text-sub);
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -536,7 +547,7 @@ const FAuthor = styled.div`
   align-items: center;
   gap: 10px;
   font-size: var(--body-sm);
-  color: #adadad;
+  color: var(--color-text-sub);
   min-width: 0;
 
   span {
@@ -550,7 +561,7 @@ const Avatar = styled.div`
   width: clamp(34px, 9.3vw, 40px);
   height: clamp(34px, 9.3vw, 40px);
   border-radius: 50%;
-  background: #b3b3b3;
+  background: var(--color-border);
 `;
 
 const FParticipants = styled.div`
@@ -558,7 +569,7 @@ const FParticipants = styled.div`
   align-items: center;
   gap: 6px;
   font-size: var(--body-sm);
-  color: #adadad;
+  color: var(--color-text-sub);
   flex-shrink: 0;
 `;
 
@@ -582,11 +593,11 @@ const Badge = styled.span<{ $active: boolean }>`
   min-width: clamp(70px, 20vw, 86px);
   padding: 0 clamp(14px, 4.2vw, 18px);
   border-radius: 999px;
-  border: 2px solid #2dcd97;
+  border: 2px solid var(--color-primary);
   font-size: var(--body-md);
   font-weight: 600;
-  background: ${({ $active }) => ($active ? '#2dcd97' : 'transparent')};
-  color: ${({ $active }) => ($active ? '#fff' : '#2dcd97')};
+  background: ${({ $active }) => ($active ? 'var(--color-primary)' : 'transparent')};
+  color: ${({ $active }) => ($active ? '#fff' : 'var(--color-primary)')};
   flex-shrink: 0;
   line-height: 1;
   white-space: nowrap;
@@ -601,10 +612,10 @@ const TagPill = styled.span`
   min-width: 0;
   padding: 0 clamp(14px, 4.2vw, 18px);
   border-radius: 999px;
-  border: 2px solid #a8a8a8;
+  border: 2px solid var(--color-border);
   font-size: var(--body-md);
   background: transparent;
-  color: #9f9f9f;
+  color: var(--color-text-sub);
   flex: 1 1 auto;
   line-height: 1;
   overflow: hidden;
@@ -624,7 +635,7 @@ const Dot = styled.div<{ $active: boolean }>`
   width: clamp(10px, 2.8vw, 12px);
   height: clamp(10px, 2.8vw, 12px);
   border-radius: 50%;
-  background: ${({ $active }) => ($active ? '#4dc891' : '#ddd')};
+  background: ${({ $active }) => ($active ? 'var(--color-primary)' : 'var(--color-border)')};
   transition: background 0.25s;
 `;
 
@@ -639,7 +650,7 @@ const CategoryRow = styled.div`
 const FilterBtn = styled.button`
   background: none;
   border: none;
-  color: #555;
+  color: var(--color-text-main);
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -663,9 +674,11 @@ const CategoryPill = styled.button<{ $active: boolean }>`
   border: none;
   font-size: 13px;
   font-weight: ${({ $active }) => ($active ? '600' : '400')};
-  background: ${({ $active }) => ($active ? '#4dc891' : '#f3f3f3')};
-  color: ${({ $active }) => ($active ? '#fff' : '#666')};
+  background: ${({ $active }) => ($active ? 'var(--color-primary)' : 'var(--color-bg)')};
+  color: ${({ $active }) => ($active ? '#fff' : 'var(--color-text-main)')};
   cursor: pointer;
+  box-shadow: ${({ $active }) => ($active ? 'var(--shadow-sm)' : 'none')};
+  border: 1px solid ${({ $active }) => ($active ? 'transparent' : 'var(--color-border)')};
 `;
 
 const DebateList = styled.div`
@@ -687,13 +700,20 @@ const DCard = styled.div`
   justify-content: space-between;
   width: min(330px, calc(100vw - var(--page-x) - var(--page-x)));
   min-height: clamp(126px, 33.5vw, 144px);
-  background: #ffffff;
+  background: var(--color-surface);
   border-radius: var(--card-radius);
   padding: clamp(16px, 4.2vw, 18px) clamp(14px, 3.7vw, 16px);
   margin: 0 auto;
   box-sizing: border-box;
   cursor: pointer;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: none;
+  }
 `;
 
 const DebateIconImg = styled.img`
@@ -714,8 +734,8 @@ const DStatusBadge = styled.span`
   height: 22px;
   padding: 0 16px;
   border-radius: 999px;
-  border: 1.3px solid #2dcd97;
-  color: #2dcd97;
+  border: 1.3px solid var(--color-primary);
+  color: var(--color-primary);
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
@@ -729,7 +749,7 @@ const DTitle = styled.h4`
   font-size: var(--title-sm);
   line-height: 1.2;
   font-weight: 700;
-  color: #2f3238;
+  color: var(--color-text-main);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -739,7 +759,7 @@ const DDesc = styled.p`
   margin: 0;
   font-size: var(--body-md);
   line-height: 1.3;
-  color: #8f8f8f;
+  color: var(--color-text-sub);
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -761,11 +781,12 @@ const ModalOverlay = styled.div`
 
 const ModalCard = styled.div`
   width: min(100%, 354px);
-  background: #ffffff;
+  background: var(--color-surface);
   border-radius: clamp(34px, 9.8vw, 42px);
   padding: clamp(18px, 5.1vw, 22px) clamp(18px, 4.7vw, 20px) clamp(20px, 5.1vw, 22px);
   max-height: calc(100dvh - 36px);
   overflow-y: auto;
+  box-shadow: var(--shadow-md);
 `;
 
 const ModalTop = styled.div`
@@ -791,7 +812,7 @@ const ModalTitle = styled.h2`
   text-align: center;
   font-size: var(--title-lg);
   font-weight: 700;
-  color: #2f3238;
+  color: var(--color-text-main);
   line-height: 1.2;
   white-space: normal;
   word-break: keep-all;
@@ -802,7 +823,7 @@ const ModalDesc = styled.p`
   margin: 10px 0 16px;
   text-align: center;
   font-size: clamp(15px, 4vw, 17px);
-  color: #8f8f8f;
+  color: var(--color-text-sub);
   line-height: 1.35;
   white-space: pre-wrap;
   word-break: keep-all;
@@ -814,9 +835,9 @@ const ModalTag = styled.span`
   height: clamp(38px, 9.8vw, 42px);
   align-items: center;
   max-width: 100%;
-  border: 1.5px solid #a7a7a7;
+  border: 1.5px solid var(--color-border);
   border-radius: 999px;
-  color: #9f9f9f;
+  color: var(--color-text-sub);
   font-size: var(--title-sm);
   font-weight: 600;
   padding: 0 clamp(16px, 4.7vw, 20px);
@@ -831,7 +852,7 @@ const ModalAuthorRow = styled.div`
   align-items: center;
   gap: 10px;
   font-size: var(--body-md);
-  color: #a4a4a4;
+  color: var(--color-text-sub);
   margin-bottom: 20px;
 `;
 
@@ -839,13 +860,13 @@ const ModalAvatar = styled.div`
   width: clamp(36px, 9.8vw, 42px);
   height: clamp(36px, 9.8vw, 42px);
   border-radius: 50%;
-  background: #b8b8b8;
+  background: var(--color-border);
 `;
 
 const ModalMeta = styled.p`
   margin: 0 0 10px;
   font-size: 15px;
-  color: #9a9a9a;
+  color: var(--color-text-sub);
 `;
 
 const ModalActionRow = styled.div`
@@ -881,10 +902,16 @@ const JoinButton = styled.button`
   height: clamp(50px, 13vw, 56px);
   border-radius: 999px;
   border: none;
-  background: #2dcd97;
+  background: var(--color-primary);
   color: #ffffff;
   font-size: var(--title-sm);
   font-weight: 700;
+  transition: background-color 0.2s, transform 0.2s;
+
+  &:active {
+    background: var(--color-primary-hover);
+    transform: scale(0.98);
+  }
 `;
 
 export default MainPage;

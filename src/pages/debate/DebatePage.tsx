@@ -209,7 +209,7 @@ const DebatePage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: var(--color-bg);
   padding: var(--page-top) var(--page-x) var(--page-bottom);
 `;
 
@@ -243,6 +243,10 @@ const SideButton = styled.button`
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.2s;
+  &:active {
+    opacity: 0.7;
+  }
 `;
 
 const TopIcon = styled.img`
@@ -267,18 +271,27 @@ const FilterButton = styled.button`
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: opacity 0.2s;
+  &:active {
+    opacity: 0.7;
+  }
 `;
 
 const FilterChip = styled.button<{ $active: boolean }>`
   height: clamp(32px, 8.8vw, 38px);
   padding: 0 clamp(12px, 3.7vw, 16px);
   border-radius: 999px;
-  border: 1.5px solid ${({ $active }) => ($active ? '#2dcd97' : '#9f9f9f')};
-  background: ${({ $active }) => ($active ? '#2dcd97' : '#f3f3f3')};
-  color: ${({ $active }) => ($active ? '#ffffff' : '#8f8f8f')};
+  border: 1.5px solid ${({ $active }) => ($active ? 'transparent' : 'var(--color-border)')};
+  background: ${({ $active }) => ($active ? 'var(--color-primary)' : 'var(--color-surface)')};
+  color: ${({ $active }) => ($active ? '#ffffff' : 'var(--color-text-main)')};
   font-size: var(--body-sm);
   font-weight: 600;
   white-space: nowrap;
+  box-shadow: ${({ $active }) => ($active ? 'var(--shadow-sm)' : 'none')};
+  transition: transform 0.2s, background-color 0.2s;
+  &:active {
+    transform: scale(0.96);
+  }
 `;
 
 const ListWrap = styled.div`
@@ -290,15 +303,22 @@ const ListWrap = styled.div`
 const ErrorText = styled.p`
   margin: 0;
   font-size: 12px;
-  color: #f04444;
+  color: #e03131;
 `;
 
 const Card = styled.article`
-  background: #ffffff;
+  background: var(--color-surface);
   border-radius: clamp(18px, 4.7vw, 20px);
   padding: clamp(10px, 2.8vw, 12px) clamp(12px, 3.3vw, 14px) clamp(12px, 3.3vw, 14px);
   overflow: hidden;
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: none;
+  }
 `;
 
 const CardTop = styled.div`
@@ -319,9 +339,9 @@ const StatusBadge = styled.span<{ $running: boolean }>`
   height: clamp(24px, 6vw, 26px);
   padding: 0;
   border-radius: 999px;
-  border: 1.2px solid #2dcd97;
-  background: ${({ $running }) => ($running ? '#2dcd97' : 'transparent')};
-  color: ${({ $running }) => ($running ? '#ffffff' : '#2dcd97')};
+  border: 1.2px solid var(--color-primary);
+  background: ${({ $running }) => ($running ? 'var(--color-primary)' : 'transparent')};
+  color: ${({ $running }) => ($running ? '#ffffff' : 'var(--color-primary)')};
   font-size: 10px;
   font-weight: 700;
   display: inline-flex;
@@ -334,7 +354,7 @@ const CardTitle = styled.h3`
   margin: 0 0 6px;
   font-size: var(--title-sm);
   line-height: 1.15;
-  color: #333333;
+  color: var(--color-text-main);
   font-weight: 700;
   letter-spacing: -0.02em;
   overflow: hidden;
@@ -345,7 +365,7 @@ const CardTitle = styled.h3`
 const CardDesc = styled.p`
   margin: 0;
   font-size: var(--body-sm);
-  color: #8f8f8f;
+  color: var(--color-text-sub);
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -367,11 +387,12 @@ const ModalOverlay = styled.div`
 
 const ModalCard = styled.div`
   width: min(100%, 354px);
-  background: #ffffff;
+  background: var(--color-surface);
   border-radius: clamp(34px, 9.8vw, 42px);
   padding: clamp(18px, 5.1vw, 22px) clamp(18px, 4.7vw, 20px) clamp(20px, 5.1vw, 22px);
   max-height: calc(100dvh - 36px);
   overflow-y: auto;
+  box-shadow: var(--shadow-md);
 `;
 
 const ModalTop = styled.div`
@@ -397,7 +418,7 @@ const ModalTitle = styled.h2`
   text-align: center;
   font-size: var(--title-lg);
   font-weight: 700;
-  color: #2f3238;
+  color: var(--color-text-main);
   line-height: 1.2;
   white-space: normal;
   word-break: keep-all;
@@ -408,7 +429,7 @@ const ModalDesc = styled.p`
   margin: 10px 0 16px;
   text-align: center;
   font-size: clamp(15px, 4vw, 17px);
-  color: #8f8f8f;
+  color: var(--color-text-sub);
   line-height: 1.35;
   white-space: pre-wrap;
   word-break: keep-all;
@@ -420,9 +441,9 @@ const ModalTag = styled.span`
   height: clamp(38px, 9.8vw, 42px);
   align-items: center;
   max-width: 100%;
-  border: 1.5px solid #a7a7a7;
+  border: 1.5px solid var(--color-border);
   border-radius: 999px;
-  color: #9f9f9f;
+  color: var(--color-text-sub);
   font-size: var(--title-sm);
   font-weight: 600;
   padding: 0 clamp(16px, 4.7vw, 20px);
@@ -437,7 +458,7 @@ const ModalAuthorRow = styled.div`
   align-items: center;
   gap: 10px;
   font-size: var(--body-md);
-  color: #a4a4a4;
+  color: var(--color-text-sub);
   margin-bottom: 20px;
 `;
 
@@ -445,13 +466,13 @@ const ModalAvatar = styled.div`
   width: clamp(36px, 9.8vw, 42px);
   height: clamp(36px, 9.8vw, 42px);
   border-radius: 50%;
-  background: #b8b8b8;
+  background: var(--color-border);
 `;
 
 const ModalMeta = styled.p`
   margin: 0 0 10px;
   font-size: 15px;
-  color: #9a9a9a;
+  color: var(--color-text-sub);
 `;
 
 const ModalActionRow = styled.div`
@@ -487,10 +508,16 @@ const JoinButton = styled.button`
   height: clamp(50px, 13vw, 56px);
   border-radius: 999px;
   border: none;
-  background: #2dcd97;
+  background: var(--color-primary);
   color: #ffffff;
   font-size: var(--title-sm);
   font-weight: 700;
+  transition: background-color 0.2s, transform 0.2s;
+
+  &:active {
+    background: var(--color-primary-hover);
+    transform: scale(0.98);
+  }
 `;
 
 export default DebatePage;

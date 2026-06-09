@@ -70,7 +70,7 @@ const MyDebatesPage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  background: #f5f5f5;
+  background: var(--color-bg);
   padding-bottom: 32px;
 `;
 
@@ -79,7 +79,8 @@ const TopBar = styled.div`
   align-items: center;
   padding: 16px 16px 12px;
   gap: 8px;
-  background: #fff;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -94,8 +95,13 @@ const BackButton = styled.button`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #353535;
+  color: var(--color-text-main);
   flex-shrink: 0;
+  transition: opacity 0.2s;
+
+  &:active {
+    opacity: 0.6;
+  }
 `;
 
 const BackIcon = styled.svg`
@@ -107,12 +113,12 @@ const TopTitle = styled.h1`
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--color-text-main);
 `;
 
 const CenterText = styled.p<{ $error?: boolean }>`
   text-align: center;
-  color: ${({ $error }) => ($error ? '#f04444' : '#999')};
+  color: ${({ $error }) => ($error ? '#e03131' : 'var(--color-text-sub)')};
   font-size: 14px;
   margin-top: 60px;
 `;
@@ -125,10 +131,17 @@ const List = styled.div`
 `;
 
 const Card = styled.div`
-  background: #fff;
+  background: var(--color-surface);
   border-radius: 20px;
   padding: 16px;
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: none;
+  }
 `;
 
 const CardTop = styled.div`
@@ -141,8 +154,8 @@ const StatusBadge = styled.span<{ $status: string }>`
   height: 24px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1.2px solid ${({ $status }) => ($status === 'OPEN' ? '#2dcd97' : '#aaa')};
-  color: ${({ $status }) => ($status === 'OPEN' ? '#2dcd97' : '#999')};
+  border: 1.2px solid ${({ $status }) => ($status === 'OPEN' ? 'var(--color-primary)' : 'var(--color-border)')};
+  color: ${({ $status }) => ($status === 'OPEN' ? 'var(--color-primary)' : 'var(--color-text-sub)')};
   font-size: 11px;
   font-weight: 700;
 `;
@@ -151,7 +164,7 @@ const CardTitle = styled.h3`
   margin: 0 0 6px;
   font-size: 18px;
   font-weight: 700;
-  color: #2f3238;
+  color: var(--color-text-main);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -160,7 +173,7 @@ const CardTitle = styled.h3`
 const CardDesc = styled.p`
   margin: 0 0 8px;
   font-size: 13px;
-  color: #8f8f8f;
+  color: var(--color-text-sub);
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -169,7 +182,7 @@ const CardDesc = styled.p`
 
 const CardTag = styled.span`
   font-size: 12px;
-  color: #b0b0b0;
+  color: var(--color-text-sub);
 `;
 
 export default MyDebatesPage;
