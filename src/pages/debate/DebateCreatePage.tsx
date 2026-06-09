@@ -9,7 +9,7 @@ const TITLE_MAX_LENGTH = 40;
 const DESCRIPTION_MAX_LENGTH = 120;
 const TAG_MAX_LENGTH = 12;
 const TAG_MAX_COUNT = 5;
-const DEFAULT_DEBATE_TYPE: 'PROS_CONS' = 'PROS_CONS';
+const DEFAULT_DEBATE_TYPE: 'FREE' = 'FREE';
 
 const BackIcon = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b3b3b" strokeWidth="2.2">

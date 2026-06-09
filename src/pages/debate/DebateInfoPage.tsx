@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
@@ -9,7 +9,7 @@ import type { Debate } from '../../types/debate';
 const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
   PROS_CONS: '찬반토론',
   CONSENSUS: '합의토론',
-  FREE: '댓글토론',
+  FREE: '일반 토론',
 };
 
 const STATUS_LABEL_MAP: Record<Debate['status'], string> = {
@@ -19,9 +19,9 @@ const STATUS_LABEL_MAP: Record<Debate['status'], string> = {
 };
 
 const formatCreatedDate = (createdAt?: string) => {
-  if (!createdAt) return '20XX. YY. ZZ';
+  if (!createdAt) return '';
   const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return '20XX. YY. ZZ';
+  if (Number.isNaN(date.getTime())) return '';
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
 };
 
@@ -72,7 +72,6 @@ const DebateInfoPage = () => {
         setDebate(loadedDebate);
         setParticipantNames(Array.from(uniqueNames.values()).slice(0, 6));
         setPostCount(postsResponse.data.totalCount ?? posts.length);
-        setLoadError('');
       } catch {
         setLoadError('토론 정보를 불러오지 못했습니다.');
       } finally {
@@ -83,27 +82,26 @@ const DebateInfoPage = () => {
     void loadInfo();
   }, [debateId]);
 
-  const participants = useMemo(() => {
-    if (participantNames.length > 0) return participantNames;
-    return Array.from({ length: 6 }, () => '사용자이름');
-  }, [participantNames]);
+  const renderHeader = () => (
+    <HeaderRow>
+      <HeaderIconButton type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)}>
+        <BackIcon />
+      </HeaderIconButton>
+      <HeaderActions>
+        <HeaderIconButton type="button" aria-label="저장">
+          <TopIcon src={iconStar} alt="" />
+        </HeaderIconButton>
+        <HeaderIconButton type="button" aria-label="알림">
+          <TopIcon src={iconAlarm} alt="" />
+        </HeaderIconButton>
+      </HeaderActions>
+    </HeaderRow>
+  );
 
   if (isLoading) {
     return (
       <Wrapper>
-        <HeaderRow>
-          <HeaderIconButton type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)}>
-            <BackIcon />
-          </HeaderIconButton>
-          <HeaderActions>
-            <HeaderIconButton type="button" aria-label="저장">
-              <TopIcon src={iconStar} alt="" />
-            </HeaderIconButton>
-            <HeaderIconButton type="button" aria-label="알림">
-              <TopIcon src={iconAlarm} alt="" />
-            </HeaderIconButton>
-          </HeaderActions>
-        </HeaderRow>
+        {renderHeader()}
         <LoadingCard>토론 정보를 불러오는 중입니다.</LoadingCard>
       </Wrapper>
     );
@@ -112,80 +110,68 @@ const DebateInfoPage = () => {
   if (loadError || !debate) {
     return (
       <Wrapper>
-        <HeaderRow>
-          <HeaderIconButton type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)}>
-            <BackIcon />
-          </HeaderIconButton>
-          <HeaderActions>
-            <HeaderIconButton type="button" aria-label="저장">
-              <TopIcon src={iconStar} alt="" />
-            </HeaderIconButton>
-            <HeaderIconButton type="button" aria-label="알림">
-              <TopIcon src={iconAlarm} alt="" />
-            </HeaderIconButton>
-          </HeaderActions>
-        </HeaderRow>
+        {renderHeader()}
         <ErrorText>{loadError || '토론 정보를 찾을 수 없습니다.'}</ErrorText>
       </Wrapper>
     );
   }
 
-  const title = debate?.title ?? '기술 토론';
-  const description = debate?.description ?? 'AI가 사람의 직업을 대체 할 수 있을까?';
-  const tagLabel = `#${debate?.tagMaps?.[0]?.tag.name ?? '기술'}`;
-  const creatorName = debate?.creator?.nickname ?? '디그슨';
-  const debateTypeLabel = debate ? DEBATE_TYPE_LABEL_MAP[debate.debateType] : '찬반토론';
-  const statusLabel = debate ? STATUS_LABEL_MAP[debate.status] : '진행중';
-  const createdDateLabel = formatCreatedDate(debate?.createdAt);
+  const tagName = debate.tagMaps?.[0]?.tag.name;
+  const creatorName = debate.creator?.nickname ?? '';
+  const createdDateLabel = formatCreatedDate(debate.createdAt);
+  const definitions = debate.definitions ?? [];
 
   return (
     <Wrapper>
-      <HeaderRow>
-        <HeaderIconButton type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)}>
-          <BackIcon />
-        </HeaderIconButton>
-        <HeaderActions>
-          <HeaderIconButton type="button" aria-label="저장">
-            <TopIcon src={iconStar} alt="" />
-          </HeaderIconButton>
-          <HeaderIconButton type="button" aria-label="알림">
-            <TopIcon src={iconAlarm} alt="" />
-          </HeaderIconButton>
-        </HeaderActions>
-      </HeaderRow>
+      {renderHeader()}
 
-      <Title>{title}</Title>
-      <Description>{description}</Description>
-
-      {loadError && <ErrorText>{loadError}</ErrorText>}
+      <Title>{debate.title}</Title>
+      <Description>{debate.description}</Description>
 
       <InfoCard>
-        <Tag>{tagLabel}</Tag>
-        <AuthorRow>
-          <Avatar />
-          <AuthorName>{creatorName}</AuthorName>
-        </AuthorRow>
-        <InfoText>토론 방식 : {debateTypeLabel}</InfoText>
-        <InfoText>토론 상태 : 현재 {statusLabel}</InfoText>
-        <InfoText>{createdDateLabel}</InfoText>
-        <InfoText>조회수 : 5,234회</InfoText>
+        {tagName && <Tag>#{tagName}</Tag>}
+        {creatorName && (
+          <AuthorRow>
+            <Avatar />
+            <AuthorName>{creatorName}</AuthorName>
+          </AuthorRow>
+        )}
+        <InfoText>토론 방식 : {DEBATE_TYPE_LABEL_MAP[debate.debateType]}</InfoText>
+        <InfoText>토론 상태 : 현재 {STATUS_LABEL_MAP[debate.status]}</InfoText>
+        {createdDateLabel && <InfoText>{createdDateLabel}</InfoText>}
       </InfoCard>
 
       <ParticipantsCard>
         <ParticipantsTitle>현재 참여자</ParticipantsTitle>
         <ParticipantsList>
-          {participants.map((name, index) => (
-            <ParticipantRow key={`${name}-${index}`}>
-              <ParticipantAvatar />
-              <ParticipantName>{name}</ParticipantName>
-            </ParticipantRow>
-          ))}
+          {participantNames.length > 0 ? (
+            participantNames.map((name, index) => (
+              <ParticipantRow key={`${name}-${index}`}>
+                <ParticipantAvatar />
+                <ParticipantName>{name}</ParticipantName>
+              </ParticipantRow>
+            ))
+          ) : (
+            <EmptyText>아직 참여자가 없습니다.</EmptyText>
+          )}
         </ParticipantsList>
       </ParticipantsCard>
 
       <SummaryCard>
-        <SummaryText>진행된 내용 : {postCount}개</SummaryText>
-        <SummaryText>정의한 용어 : 무슨 뜻에 대한 무슨 용어</SummaryText>
+        <SummaryText>진행된 의견 : {postCount}개</SummaryText>
+        <DefinitionTitle>정의된 사항</DefinitionTitle>
+        {definitions.length > 0 ? (
+          <DefinitionList>
+            {definitions.map((definition) => (
+              <DefinitionItem key={definition.id}>
+                <DefinitionTerm>{definition.term}</DefinitionTerm>
+                <DefinitionContent>{definition.content}</DefinitionContent>
+              </DefinitionItem>
+            ))}
+          </DefinitionList>
+        ) : (
+          <EmptyText>아직 정의된 사항이 없습니다.</EmptyText>
+        )}
       </SummaryCard>
     </Wrapper>
   );
@@ -353,6 +339,12 @@ const ParticipantName = styled.span`
   font-size: 15px;
 `;
 
+const EmptyText = styled.p`
+  margin: 0;
+  color: #9a9a9a;
+  font-size: var(--body-sm);
+`;
+
 const SummaryCard = styled.section`
   margin-top: 14px;
   background: #ffffff;
@@ -367,6 +359,41 @@ const SummaryText = styled.p`
   margin: 0;
   font-size: var(--body-sm);
   color: #9a9a9a;
+`;
+
+const DefinitionTitle = styled.h2`
+  margin: 4px 0 0;
+  font-size: var(--body-sm);
+  color: #8f8f8f;
+  font-weight: 600;
+`;
+
+const DefinitionList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const DefinitionItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const DefinitionTerm = styled.span`
+  font-size: var(--body-sm);
+  color: #8f8f8f;
+  font-weight: 600;
+`;
+
+const DefinitionContent = styled.p`
+  margin: 0;
+  font-size: var(--body-sm);
+  color: #9a9a9a;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
 export default DebateInfoPage;

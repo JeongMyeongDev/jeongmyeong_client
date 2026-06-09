@@ -10,7 +10,7 @@ interface DebateMetadataModalProps {
 const DEBATE_TYPE_LABEL: Record<DebateType, string> = {
   PROS_CONS: '찬반토론',
   CONSENSUS: '합의토론',
-  FREE: '댓글토론',
+  FREE: '일반 토론',
 };
 
 const formatDate = (date?: string) => {

@@ -23,6 +23,14 @@ export interface Debate {
     id: string;
     nickname: string;
   };
+  definitions?: DebateDefinition[];
+}
+
+export interface DebateDefinition {
+  id: string;
+  term: string;
+  content: string;
+  createdAt?: string;
 }
 
 export interface DebateMessage {
