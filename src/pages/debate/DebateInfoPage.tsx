@@ -39,11 +39,18 @@ const DebateInfoPage = () => {
   const [participantNames, setParticipantNames] = useState<string[]>([]);
   const [postCount, setPostCount] = useState(0);
   const [loadError, setLoadError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!debateId) return;
 
     const loadInfo = async () => {
+      setIsLoading(true);
+      setDebate(null);
+      setParticipantNames([]);
+      setPostCount(0);
+      setLoadError('');
+
       try {
         const [detailResponse, postsResponse] = await Promise.all([
           debateService.getById(debateId),
@@ -68,6 +75,8 @@ const DebateInfoPage = () => {
         setLoadError('');
       } catch {
         setLoadError('토론 정보를 불러오지 못했습니다.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -78,6 +87,48 @@ const DebateInfoPage = () => {
     if (participantNames.length > 0) return participantNames;
     return Array.from({ length: 6 }, () => '사용자이름');
   }, [participantNames]);
+
+  if (isLoading) {
+    return (
+      <Wrapper>
+        <HeaderRow>
+          <HeaderIconButton type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)}>
+            <BackIcon />
+          </HeaderIconButton>
+          <HeaderActions>
+            <HeaderIconButton type="button" aria-label="저장">
+              <TopIcon src={iconStar} alt="" />
+            </HeaderIconButton>
+            <HeaderIconButton type="button" aria-label="알림">
+              <TopIcon src={iconAlarm} alt="" />
+            </HeaderIconButton>
+          </HeaderActions>
+        </HeaderRow>
+        <LoadingCard>토론 정보를 불러오는 중입니다.</LoadingCard>
+      </Wrapper>
+    );
+  }
+
+  if (loadError || !debate) {
+    return (
+      <Wrapper>
+        <HeaderRow>
+          <HeaderIconButton type="button" aria-label="뒤로 가기" onClick={() => navigate(-1)}>
+            <BackIcon />
+          </HeaderIconButton>
+          <HeaderActions>
+            <HeaderIconButton type="button" aria-label="저장">
+              <TopIcon src={iconStar} alt="" />
+            </HeaderIconButton>
+            <HeaderIconButton type="button" aria-label="알림">
+              <TopIcon src={iconAlarm} alt="" />
+            </HeaderIconButton>
+          </HeaderActions>
+        </HeaderRow>
+        <ErrorText>{loadError || '토론 정보를 찾을 수 없습니다.'}</ErrorText>
+      </Wrapper>
+    );
+  }
 
   const title = debate?.title ?? '기술 토론';
   const description = debate?.description ?? 'AI가 사람의 직업을 대체 할 수 있을까?';
@@ -202,6 +253,15 @@ const ErrorText = styled.p`
   margin: 0 0 12px;
   color: #f04444;
   font-size: 12px;
+`;
+
+const LoadingCard = styled.section`
+  background: #ffffff;
+  border-radius: var(--card-radius);
+  padding: clamp(18px, 5.1vw, 22px);
+  color: #9a9a9a;
+  font-size: var(--body-sm);
+  text-align: center;
 `;
 
 const InfoCard = styled.section`
