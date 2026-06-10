@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
+import { LoadingContent } from '../../components/common/LoadingContent';
+import { DefinitionListSkeleton } from '../../components/common/PageSkeletons';
 import { definitionService } from '../../services/definitionService';
+import { usePageLoading } from '../../hooks/usePageLoading';
 import type { Definition } from '../../types/debate';
 
 const DefinitionSearchPage = () => {
@@ -11,28 +14,27 @@ const DefinitionSearchPage = () => {
   const initialKeyword = searchParams.get('keyword') ?? '';
   const [keyword, setKeyword] = useState(initialKeyword);
   const [definitions, setDefinitions] = useState<Definition[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     const loadDefinitions = async () => {
-      setIsLoading(true);
       setMessage('');
-      try {
+      const result = await executeAsync(async () => {
         const { data } = await definitionService.search(initialKeyword);
-        setDefinitions(data.definitions);
-        if (data.definitions.length === 0) {
+        return data;
+      });
+      
+      if (result) {
+        setDefinitions(result.definitions);
+        if (result.definitions.length === 0) {
           setMessage('검색된 기준 정의가 없습니다.');
         }
-      } catch {
-        setMessage('기준 정의를 불러오지 못했습니다.');
-      } finally {
-        setIsLoading(false);
       }
     };
 
     void loadDefinitions();
-  }, [initialKeyword]);
+  }, [initialKeyword, executeAsync]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -58,11 +60,16 @@ const DefinitionSearchPage = () => {
         <SearchButton type="submit">검색</SearchButton>
       </SearchForm>
 
-      {isLoading && <StateText>기준 정의를 불러오는 중입니다.</StateText>}
+      {error && <StateText>{error}</StateText>}
       {!isLoading && message && <StateText>{message}</StateText>}
 
       <ResultList>
-        {definitions.map((definition) => (
+        <LoadingContent
+          isLoading={isLoading}
+          showLoadingUI={showLoadingUI}
+          skeleton={<DefinitionListSkeleton count={3} />}
+        >
+          {definitions.map((definition) => (
           <DefinitionCard key={definition.id}>
             <DefinitionTerm>{definition.term}</DefinitionTerm>
             <DefinitionContent>{definition.content}</DefinitionContent>
@@ -78,7 +85,8 @@ const DefinitionSearchPage = () => {
               <SourceMeta>출처 합의안 · {definition.sourceConsensus.title}</SourceMeta>
             )}
           </DefinitionCard>
-        ))}
+          ))}
+        </LoadingContent>
       </ResultList>
     </Wrapper>
   );

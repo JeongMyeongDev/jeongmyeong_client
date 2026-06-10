@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import { LoadingContent } from '../../components/common/LoadingContent';
+import { NotificationListSkeleton } from '../../components/common/PageSkeletons';
 import { notificationService, type Notification } from '../../services/notificationService';
+import { usePageLoading } from '../../hooks/usePageLoading';
 
 const TYPE_LABEL: Record<string, string> = {
   COMMENT_ON_POST: '회원님의 의견에 댓글이 달렸어요.',
@@ -24,30 +27,28 @@ const formatDate = (iso: string) => {
 
 const NotificationPage = () => {
   const navigate = useNavigate();
+  const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     const load = async () => {
-      try {
+      const result = await executeAsync(async () => {
         const { data } = await notificationService.getAll({ page: 1, limit: 20 });
-        setNotifications(data.notifications);
-        setUnreadCount(data.unreadCount);
-        setPage(data.page);
-        setHasMore(data.hasMore);
-      } catch {
-        setError('알림을 불러오지 못했습니다.');
-      } finally {
-        setLoading(false);
+        return data;
+      });
+      if (result) {
+        setNotifications(result.notifications);
+        setUnreadCount(result.unreadCount);
+        setPage(result.page);
+        setHasMore(result.hasMore);
       }
     };
     void load();
-  }, []);
+  }, [executeAsync]);
 
   const handleMarkAllAsRead = async () => {
     await notificationService.markAllAsRead();
@@ -65,7 +66,7 @@ const NotificationPage = () => {
       setPage(data.page);
       setHasMore(data.hasMore);
     } catch {
-      setError('알림을 더 불러오지 못했습니다.');
+      // Error handling - keep loadMore silent or add user feedback if needed
     } finally {
       setLoadingMore(false);
     }
@@ -99,12 +100,16 @@ const NotificationPage = () => {
         )}
       </TopBar>
 
-      {loading && <CenterText>불러오는 중...</CenterText>}
       {error && <CenterText $error>{error}</CenterText>}
-      {!loading && !error && notifications.length === 0 && (
+      {!isLoading && !error && notifications.length === 0 && (
         <CenterText>알림이 없습니다.</CenterText>
       )}
 
+      <LoadingContent
+        isLoading={isLoading}
+        showLoadingUI={showLoadingUI}
+        skeleton={<NotificationListSkeleton count={5} />}
+      >
       <List>
         {notifications.map((item) => (
           <Item
@@ -123,7 +128,8 @@ const NotificationPage = () => {
           </Item>
         ))}
       </List>
-      {hasMore && !loading && !error && (
+      </LoadingContent>
+      {hasMore && !isLoading && !error && (
         <LoadMoreButton type="button" onClick={() => void handleLoadMore()} disabled={loadingMore}>
           {loadingMore ? '불러오는 중...' : '더 보기'}
         </LoadMoreButton>

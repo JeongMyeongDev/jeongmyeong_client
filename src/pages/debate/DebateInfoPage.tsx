@@ -3,8 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconStar from '../../assets/icon_star.svg';
+import { DebateInfoSkeleton } from '../../components/common/PageSkeletons';
 import { debateService } from '../../services/debateService';
 import { definitionService } from '../../services/definitionService';
+import { usePageLoading } from '../../hooks/usePageLoading';
 import type { Debate, Definition } from '../../types/debate';
 
 const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
@@ -36,28 +38,25 @@ const BackIcon = () => (
 const DebateInfoPage = () => {
   const navigate = useNavigate();
   const { id: debateId } = useParams();
+  const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
   const [debate, setDebate] = useState<Debate | null>(null);
   const [definitions, setDefinitions] = useState<Definition[]>([]);
   const [participantNames, setParticipantNames] = useState<string[]>([]);
   const [postCount, setPostCount] = useState(0);
-  const [loadError, setLoadError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!debateId) return;
 
     const loadInfo = async () => {
-      setIsLoading(true);
-      setDebate(null);
-      setDefinitions([]);
-      setParticipantNames([]);
-      setPostCount(0);
-      setLoadError('');
+      await executeAsync(async () => {
+        setDebate(null);
+        setDefinitions([]);
+        setParticipantNames([]);
+        setPostCount(0);
 
-      try {
         const [detailResponse, postsResponse, definitionsResponse] = await Promise.all([
           debateService.getById(debateId),
           debateService.getMessages(debateId, { page: 1, limit: 50 }),
@@ -80,15 +79,11 @@ const DebateInfoPage = () => {
         setDefinitions(definitionsResponse.data.definitions);
         setParticipantNames(Array.from(uniqueNames.values()).slice(0, 6));
         setPostCount(postsResponse.data.totalCount ?? posts.length);
-      } catch {
-        setLoadError('토론 정보를 불러오지 못했습니다.');
-      } finally {
-        setIsLoading(false);
-      }
+      });
     };
 
     void loadInfo();
-  }, [debateId]);
+  }, [debateId, executeAsync]);
 
   const renderHeader = () => (
     <HeaderRow>
@@ -151,20 +146,20 @@ const DebateInfoPage = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !debate) {
     return (
       <Wrapper>
         {renderHeader()}
-        <LoadingCard>토론 정보를 불러오는 중입니다.</LoadingCard>
+        {showLoadingUI && <DebateInfoSkeleton />}
       </Wrapper>
     );
   }
 
-  if (loadError || !debate) {
+  if (error || !debate) {
     return (
       <Wrapper>
         {renderHeader()}
-        <ErrorText>{loadError || '토론 정보를 찾을 수 없습니다.'}</ErrorText>
+        <ErrorText>{error || '토론 정보를 찾을 수 없습니다.'}</ErrorText>
       </Wrapper>
     );
   }
@@ -313,15 +308,6 @@ const ErrorText = styled.p`
   margin: 0 0 12px;
   color: #f04444;
   font-size: 12px;
-`;
-
-const LoadingCard = styled.section`
-  background: #ffffff;
-  border-radius: var(--card-radius);
-  padding: clamp(18px, 5.1vw, 22px);
-  color: #9a9a9a;
-  font-size: var(--body-sm);
-  text-align: center;
 `;
 
 const InfoCard = styled.section`

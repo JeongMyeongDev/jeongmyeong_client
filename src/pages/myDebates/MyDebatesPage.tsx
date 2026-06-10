@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import { LoadingContent } from '../../components/common/LoadingContent';
+import { DebateRoomCardSkeleton } from '../../components/common/PageSkeletons';
 import { debateService } from '../../services/debateService';
+import { usePageLoading } from '../../hooks/usePageLoading';
 import type { Debate } from '../../types/debate';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -12,23 +15,21 @@ const STATUS_LABEL: Record<string, string> = {
 
 const MyDebatesPage = () => {
   const navigate = useNavigate();
+  const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
   const [debates, setDebates] = useState<Debate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     const load = async () => {
-      try {
+      const result = await executeAsync(async () => {
         const { data } = await debateService.getMyDebates({ sort: 'createdAt', direction: 'desc', limit: 50 });
-        setDebates(data.debates);
-      } catch {
-        setError('내 토론을 불러오지 못했습니다.');
-      } finally {
-        setLoading(false);
+        return data;
+      });
+      if (result) {
+        setDebates(result.debates);
       }
     };
     void load();
-  }, []);
+  }, [executeAsync]);
 
   return (
     <Wrapper>
@@ -42,14 +43,18 @@ const MyDebatesPage = () => {
         <TopTitle>내 토론</TopTitle>
       </TopBar>
 
-      {loading && <CenterText>불러오는 중...</CenterText>}
       {error && <CenterText $error>{error}</CenterText>}
-      {!loading && !error && debates.length === 0 && (
+      {!isLoading && !error && debates.length === 0 && (
         <CenterText>만든 토론이 없습니다.</CenterText>
       )}
 
       <List>
-        {debates.map((debate) => (
+        <LoadingContent
+          isLoading={isLoading}
+          showLoadingUI={showLoadingUI}
+          skeleton={<DebateRoomCardSkeleton count={4} />}
+        >
+          {debates.map((debate) => (
           <Card key={debate.id} onClick={() => navigate(`/debate/${debate.id}`)}>
             <CardTop>
               <StatusBadge $status={debate.status}>
@@ -62,7 +67,8 @@ const MyDebatesPage = () => {
               <CardTag>#{debate.tagMaps[0].tag.name}</CardTag>
             )}
           </Card>
-        ))}
+          ))}
+        </LoadingContent>
       </List>
     </Wrapper>
   );

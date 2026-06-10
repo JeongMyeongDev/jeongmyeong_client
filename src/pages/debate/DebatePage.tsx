@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SideDrawer from '../../components/common/SideDrawer';
 import styled from 'styled-components';
+import { LoadingContent } from '../../components/common/LoadingContent';
+import { DebateRoomCardSkeleton } from '../../components/common/PageSkeletons';
 import btnDscionControl from '../../assets/btn_dscion_control.svg';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconAlarm2 from '../../assets/icon_alarm2.svg';
@@ -12,6 +14,7 @@ import iconShowInfo from '../../assets/icon_show_info.svg';
 import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
+import { usePageLoading } from '../../hooks/usePageLoading';
 import type { Debate } from '../../types/debate';
 
 type DebateRoomCard = {
@@ -71,14 +74,14 @@ const ModalMenuIcon = () => <img src={iconShowInfo} width="34" height="34" alt="
 const DebatePage = () => {
   const navigate = useNavigate();
   const { debates, fetchDebates } = useDebate();
+  const { isLoading, showLoadingUI, error: loadError, executeAsync } = usePageLoading();
   const [activeFilter, setActiveFilter] = useState('찬반토론');
-  const [listError, setListError] = useState('');
   const [selectedCard, setSelectedCard] = useState<DebateRoomCard | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     const loadDebates = async () => {
-      try {
+      await executeAsync(async () => {
         await fetchDebates({
           status: 'OPEN',
           type: FILTER_TYPE_MAP[activeFilter],
@@ -86,13 +89,10 @@ const DebatePage = () => {
           direction: 'desc',
           limit: 20,
         });
-        setListError('');
-      } catch {
-        setListError('토론 목록을 불러오지 못했습니다.');
-      }
+      });
     };
     void loadDebates();
-  }, [activeFilter, fetchDebates]);
+  }, [activeFilter, fetchDebates, executeAsync]);
 
   const cards = useMemo(
     () => debates.slice(0, 8).map(mapToRoomCard),
@@ -135,20 +135,26 @@ const DebatePage = () => {
       </FilterRow>
 
       <ListWrap>
-        {listError && <ErrorText>{listError}</ErrorText>}
-        {!listError && cards.length === 0 && <ErrorText>등록된 토론이 없습니다.</ErrorText>}
-        {cards.map((card) => (
-          <Card key={card.id} onClick={() => setSelectedCard(card)}>
-            <CardTop>
-              <StatusBadge $running={card.statusLabel === '진행중'}>
-                {card.statusLabel.replace(/\s+/g, '')}
-              </StatusBadge>
-              <ChatCircleIconImg src={iconChat} alt="" />
-            </CardTop>
-            <CardTitle>{card.title}</CardTitle>
-            <CardDesc>{card.description}</CardDesc>
-          </Card>
-        ))}
+        {loadError && <ErrorText>{loadError}</ErrorText>}
+        <LoadingContent
+          isLoading={isLoading}
+          showLoadingUI={showLoadingUI}
+          skeleton={<DebateRoomCardSkeleton count={4} />}
+        >
+          {!loadError && cards.length === 0 && <ErrorText>등록된 토론이 없습니다.</ErrorText>}
+          {cards.map((card) => (
+            <Card key={card.id} onClick={() => setSelectedCard(card)}>
+              <CardTop>
+                <StatusBadge $running={card.statusLabel === '진행중'}>
+                  {card.statusLabel.replace(/\s+/g, '')}
+                </StatusBadge>
+                <ChatCircleIconImg src={iconChat} alt="" />
+              </CardTop>
+              <CardTitle>{card.title}</CardTitle>
+              <CardDesc>{card.description}</CardDesc>
+            </Card>
+          ))}
+        </LoadingContent>
       </ListWrap>
 
       {selectedCard && (

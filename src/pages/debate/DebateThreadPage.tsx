@@ -12,10 +12,12 @@ import styled from "styled-components";
 import iconShowInfo from "../../assets/icon_show_info.svg";
 import logoSymbol from "../../assets/logo_symbol.svg";
 import { useDebate } from "../../hooks/useDebate";
+import { usePageLoading } from "../../hooks/usePageLoading";
 import { consensusService } from "../../services/consensusService";
 import { debateService } from "../../services/debateService";
 import { postService } from "../../services/postService";
 import { useAuthStore } from "../../stores/authStore";
+import ThreadSkeleton from "../../components/common/ThreadSkeleton";
 import type {
   Comment,
   Consensus,
@@ -171,6 +173,7 @@ const DebateThreadPage = () => {
   const { currentDebate, messages, fetchDebate, fetchMessages, createMessage } =
     useDebate();
   const { user } = useAuthStore();
+  const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
   const draftKey = debateId ? `debate-thread:${debateId}:composer` : "";
   const [message, setMessage] = useState(() =>
     draftKey ? (localStorage.getItem(draftKey) ?? "") : "",
@@ -179,7 +182,6 @@ const DebateThreadPage = () => {
     Record<string, Comment[]>
   >({});
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
-  const [loadError, setLoadError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [pendingSelection, setPendingSelection] =
@@ -208,20 +210,17 @@ const DebateThreadPage = () => {
     if (!debateId) return;
 
     const loadThread = async () => {
-      try {
+      await executeAsync(async () => {
         await Promise.all([
           fetchDebate(debateId),
           fetchMessages(debateId),
           refreshConsensuses(debateId),
         ]);
-        setLoadError("");
-      } catch {
-        setLoadError("토론 내용을 불러오지 못했습니다.");
-      }
+      });
     };
 
     void loadThread();
-  }, [debateId, fetchDebate, fetchMessages]);
+  }, [debateId, fetchDebate, fetchMessages, executeAsync]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => inputRef.current?.focus(), 250);
@@ -985,7 +984,13 @@ const DebateThreadPage = () => {
     <Wrapper>
       <Logo src={logoSymbol} alt="정명" />
 
-      <Header>
+      {showLoadingUI ? (
+        <ThreadSkeleton />
+      ) : (
+        !isLoading &&
+        currentDebate && (
+          <>
+            <Header>
         <IconButton
           type="button"
           aria-label="뒤로 가기"
@@ -1015,8 +1020,8 @@ const DebateThreadPage = () => {
         onMouseUp={handleTextSelection}
         onTouchEnd={handleTextSelection}
       >
-        {loadError && <ErrorText>{loadError}</ErrorText>}
-        {!loadError && threadMessages.length === 0 && (
+        {error && <ErrorText>{error}</ErrorText>}
+        {!error && threadMessages.length === 0 && (
           <EmptyCard>아직 의견이 없습니다. 첫 의견을 남겨보세요.</EmptyCard>
         )}
         {consensuses.length > 0 && (
@@ -1340,6 +1345,9 @@ const DebateThreadPage = () => {
             </SheetActionRow>
           </BottomSheet>
         </SheetBackdrop>
+      )}
+          </>
+        )
       )}
 
       <ComposerWrap>
