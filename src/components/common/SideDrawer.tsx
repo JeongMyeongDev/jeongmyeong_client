@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { label: '홈', path: '/' },
   { label: '토론 방', path: '/debate-room' },
   { label: '보관함', path: '/debate/archive' },
+  { label: '내 토론', path: '/my-debates' },
   { label: '프로필', path: '/profile' },
 ];
 
