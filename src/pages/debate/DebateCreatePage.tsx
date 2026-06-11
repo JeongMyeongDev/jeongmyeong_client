@@ -12,6 +12,24 @@ const TAG_MAX_COUNT = 5;
 const DEFAULT_DEBATE_TYPE = 'FREE' as const;
 const DRAFT_KEY = 'debate-create:draft';
 
+const getCommunityTextValidationError = (input: string, fieldName = '내용') => {
+  const text = input.normalize('NFC');
+
+  if (text.length > 5000) {
+    return `${fieldName}은 5000자 이하로 입력해 주세요.`;
+  }
+
+  if (/\p{Mark}{4,}/u.test(text)) {
+    return '같은 문자에 특수 기호가 과도하게 반복되었습니다.';
+  }
+
+  if (/(.)\1{30,}/u.test(text)) {
+    return '같은 문자를 과도하게 반복할 수 없습니다.';
+  }
+
+  return '';
+};
+
 const getInitialDraft = () => {
   const rawDraft = localStorage.getItem(DRAFT_KEY);
   if (!rawDraft) return { title: '', description: '', tags: [] as string[] };
@@ -60,6 +78,12 @@ const DebateCreatePage = () => {
   const addTag = () => {
     const trimmed = normalizeTag(tagInput);
     if (!trimmed || tags.includes(trimmed) || tags.length >= TAG_MAX_COUNT) return;
+    const tagError = getCommunityTextValidationError(trimmed, '태그');
+    if (tagError) {
+      setError(tagError);
+      return;
+    }
+    setError('');
     setTags((prev) => [...prev, trimmed]);
     setTagInput('');
   };
@@ -78,7 +102,10 @@ const DebateCreatePage = () => {
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
       const message = error.response?.data?.message;
-      if (Array.isArray(message)) return message.join(', ');
+      if (Array.isArray(message)) {
+        const firstMessage = message.find((item) => typeof item === 'string');
+        if (firstMessage) return firstMessage;
+      }
       if (typeof message === 'string') return message;
     }
     return '토론 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.';
@@ -102,6 +129,20 @@ const DebateCreatePage = () => {
       return;
     }
 
+    const normalizedTags = Array.from(new Set(tags.map(normalizeTag).filter(Boolean)));
+    const validationError =
+      getCommunityTextValidationError(title.trim(), '토론 제목') ||
+      getCommunityTextValidationError(description.trim(), '토론 설명') ||
+      normalizedTags
+        .map((tag) => getCommunityTextValidationError(tag, '태그'))
+        .find(Boolean) ||
+      '';
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setError('');
     setIsSubmitting(true);
     try {
@@ -109,7 +150,7 @@ const DebateCreatePage = () => {
         title: title.trim(),
         description: description.trim(),
         debateType: DEFAULT_DEBATE_TYPE,
-        tags: Array.from(new Set(tags.map(normalizeTag).filter(Boolean))),
+        tags: normalizedTags,
         closeConditionType: 'MANUAL',
       });
       localStorage.removeItem(DRAFT_KEY);

@@ -513,8 +513,8 @@ const DebateThreadPage = () => {
       setMessage("");
       if (draftKey) localStorage.removeItem(draftKey);
       inputRef.current?.focus();
-    } catch {
-      setSubmitError("메시지를 전송하지 못했습니다.");
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -597,6 +597,7 @@ const DebateThreadPage = () => {
     }
 
     if (action === "consensus") {
+      setSubmitError("");
       setConsensusDraft({
         selection: pendingSelection,
         term: pendingSelection.selectedText,
@@ -661,6 +662,7 @@ const DebateThreadPage = () => {
       });
       await refreshConsensuses(debateId);
       setConsensusDraft(null);
+      setSubmitError("");
       setActionMessage("합의안을 제안했습니다.");
     } catch (error) {
       setSubmitError(getMutationErrorMessage(error));
@@ -670,6 +672,7 @@ const DebateThreadPage = () => {
   };
 
   const openConsensusDetail = async (consensus: Consensus) => {
+    setSubmitError("");
     try {
       const { data } = await consensusService.getById(consensus.id);
       setSelectedConsensus(data.consensus);
@@ -699,6 +702,7 @@ const DebateThreadPage = () => {
       });
       if (data.consensus) setSelectedConsensus(data.consensus);
       await refreshConsensuses(debateId);
+      setSubmitError("");
       setActionMessage("합의안 의견을 반영했습니다.");
     } catch (error) {
       setSubmitError(getMutationErrorMessage(error));
@@ -1164,6 +1168,7 @@ const DebateThreadPage = () => {
         <SheetBackdrop onClick={() => setConsensusDraft(null)}>
           <BottomSheet onClick={(event) => event.stopPropagation()}>
             <SheetTitle>합의안 제안</SheetTitle>
+            {submitError && <SheetError>{submitError}</SheetError>}
             <SheetQuote>“{consensusDraft.selection.selectedText}”</SheetQuote>
             <SheetField>
               <SheetLabel>용어</SheetLabel>
@@ -1223,6 +1228,7 @@ const DebateThreadPage = () => {
         <SheetBackdrop onClick={() => setSelectedConsensus(null)}>
           <BottomSheet onClick={(event) => event.stopPropagation()}>
             <SheetTitle>{selectedConsensus.title}</SheetTitle>
+            {submitError && <SheetError>{submitError}</SheetError>}
             <ConsensusBadge>
               {CONSENSUS_STATUS_LABEL[selectedConsensus.status] ??
                 selectedConsensus.status}
@@ -1830,6 +1836,15 @@ const SheetTitle = styled.h2`
   color: #2f3238;
   font-size: var(--title-sm);
   font-weight: 700;
+`;
+
+const SheetError = styled.p`
+  margin: -4px 0 12px;
+  color: #f04444;
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
 const SheetQuote = styled.blockquote`
