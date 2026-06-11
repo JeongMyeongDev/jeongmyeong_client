@@ -1,5 +1,5 @@
 import { isAxiosError } from 'axios';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useDebate } from '../../hooks/useDebate';
@@ -9,7 +9,46 @@ const TITLE_MAX_LENGTH = 40;
 const DESCRIPTION_MAX_LENGTH = 120;
 const TAG_MAX_LENGTH = 12;
 const TAG_MAX_COUNT = 5;
-const DEFAULT_DEBATE_TYPE: 'FREE' = 'FREE';
+const DEFAULT_DEBATE_TYPE = 'FREE' as const;
+const DRAFT_KEY = 'debate-create:draft';
+
+const getCommunityTextValidationError = (input: string, fieldName = '내용') => {
+  const text = input.normalize('NFC');
+
+  if (text.length > 5000) {
+    return `${fieldName}은 5000자 이하로 입력해 주세요.`;
+  }
+
+  if (/\p{Mark}{4,}/u.test(text)) {
+    return '같은 문자에 특수 기호가 과도하게 반복되었습니다.';
+  }
+
+  if (/(.)\1{30,}/u.test(text)) {
+    return '같은 문자를 과도하게 반복할 수 없습니다.';
+  }
+
+  return '';
+};
+
+const getInitialDraft = () => {
+  const rawDraft = localStorage.getItem(DRAFT_KEY);
+  if (!rawDraft) return { title: '', description: '', tags: [] as string[] };
+  try {
+    const draft = JSON.parse(rawDraft) as {
+      title?: string;
+      description?: string;
+      tags?: string[];
+    };
+    return {
+      title: draft.title ?? '',
+      description: draft.description ?? '',
+      tags: Array.isArray(draft.tags) ? draft.tags : [],
+    };
+  } catch {
+    localStorage.removeItem(DRAFT_KEY);
+    return { title: '', description: '', tags: [] as string[] };
+  }
+};
 
 const BackIcon = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b3b3b" strokeWidth="2.2">
@@ -22,16 +61,29 @@ const DebateCreatePage = () => {
   const navigate = useNavigate();
   const { createDebate } = useDebate();
   const { isAuthenticated } = useAuthStore();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+  const [draft] = useState(getInitialDraft);
+  const [title, setTitle] = useState(draft.title);
+  const [description, setDescription] = useState(draft.description);
+  const [tags, setTags] = useState<string[]>(draft.tags);
   const [tagInput, setTagInput] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, tags }));
+  }, [title, description, tags]);
+
+  const normalizeTag = (value: string) => value.trim().toLowerCase();
+
   const addTag = () => {
-    const trimmed = tagInput.trim();
+    const trimmed = normalizeTag(tagInput);
     if (!trimmed || tags.includes(trimmed) || tags.length >= TAG_MAX_COUNT) return;
+    const tagError = getCommunityTextValidationError(trimmed, '태그');
+    if (tagError) {
+      setError(tagError);
+      return;
+    }
+    setError('');
     setTags((prev) => [...prev, trimmed]);
     setTagInput('');
   };
@@ -50,7 +102,10 @@ const DebateCreatePage = () => {
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
       const message = error.response?.data?.message;
-      if (Array.isArray(message)) return message.join(', ');
+      if (Array.isArray(message)) {
+        const firstMessage = message.find((item) => typeof item === 'string');
+        if (firstMessage) return firstMessage;
+      }
       if (typeof message === 'string') return message;
     }
     return '토론 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.';
@@ -74,6 +129,20 @@ const DebateCreatePage = () => {
       return;
     }
 
+    const normalizedTags = Array.from(new Set(tags.map(normalizeTag).filter(Boolean)));
+    const validationError =
+      getCommunityTextValidationError(title.trim(), '토론 제목') ||
+      getCommunityTextValidationError(description.trim(), '토론 설명') ||
+      normalizedTags
+        .map((tag) => getCommunityTextValidationError(tag, '태그'))
+        .find(Boolean) ||
+      '';
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setError('');
     setIsSubmitting(true);
     try {
@@ -81,9 +150,10 @@ const DebateCreatePage = () => {
         title: title.trim(),
         description: description.trim(),
         debateType: DEFAULT_DEBATE_TYPE,
-        tags,
+        tags: normalizedTags,
         closeConditionType: 'MANUAL',
       });
+      localStorage.removeItem(DRAFT_KEY);
       navigate('/debate-room');
     } catch (error) {
       setError(getErrorMessage(error));

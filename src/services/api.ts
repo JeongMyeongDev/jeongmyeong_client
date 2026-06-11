@@ -27,7 +27,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !isAuthRequest) {
       localStorage.removeItem('accessToken');
       if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+        window.location.href = '/login?expired=1';
       }
     }
     return Promise.reject(error);

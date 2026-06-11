@@ -3,8 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconStar from '../../assets/icon_star.svg';
+import { DebateInfoSkeleton } from '../../components/common/PageSkeletons';
 import { debateService } from '../../services/debateService';
-import type { Debate } from '../../types/debate';
+import { definitionService } from '../../services/definitionService';
+import { usePageLoading } from '../../hooks/usePageLoading';
+import type { Debate, Definition } from '../../types/debate';
 
 const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
   PROS_CONS: '찬반토론',
@@ -35,26 +38,29 @@ const BackIcon = () => (
 const DebateInfoPage = () => {
   const navigate = useNavigate();
   const { id: debateId } = useParams();
+  const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
   const [debate, setDebate] = useState<Debate | null>(null);
+  const [definitions, setDefinitions] = useState<Definition[]>([]);
   const [participantNames, setParticipantNames] = useState<string[]>([]);
   const [postCount, setPostCount] = useState(0);
-  const [loadError, setLoadError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [actionMessage, setActionMessage] = useState('');
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
     if (!debateId) return;
 
     const loadInfo = async () => {
-      setIsLoading(true);
-      setDebate(null);
-      setParticipantNames([]);
-      setPostCount(0);
-      setLoadError('');
+      await executeAsync(async () => {
+        setDebate(null);
+        setDefinitions([]);
+        setParticipantNames([]);
+        setPostCount(0);
 
-      try {
-        const [detailResponse, postsResponse] = await Promise.all([
+        const [detailResponse, postsResponse, definitionsResponse] = await Promise.all([
           debateService.getById(debateId),
           debateService.getMessages(debateId, { page: 1, limit: 50 }),
+          definitionService.getByDebate(debateId),
         ]);
 
         const loadedDebate = detailResponse.data.debate;
@@ -70,17 +76,14 @@ const DebateInfoPage = () => {
         });
 
         setDebate(loadedDebate);
+        setDefinitions(definitionsResponse.data.definitions);
         setParticipantNames(Array.from(uniqueNames.values()).slice(0, 6));
         setPostCount(postsResponse.data.totalCount ?? posts.length);
-      } catch {
-        setLoadError('토론 정보를 불러오지 못했습니다.');
-      } finally {
-        setIsLoading(false);
-      }
+      });
     };
 
     void loadInfo();
-  }, [debateId]);
+  }, [debateId, executeAsync]);
 
   const renderHeader = () => (
     <HeaderRow>
@@ -88,30 +91,75 @@ const DebateInfoPage = () => {
         <BackIcon />
       </HeaderIconButton>
       <HeaderActions>
-        <HeaderIconButton type="button" aria-label="저장">
+        <HeaderIconButton type="button" aria-label="저장" onClick={() => void handleBookmarkToggle()}>
           <TopIcon src={iconStar} alt="" />
         </HeaderIconButton>
-        <HeaderIconButton type="button" aria-label="알림">
+        <HeaderIconButton type="button" aria-label="알림" onClick={() => void handleSubscriptionToggle()}>
           <TopIcon src={iconAlarm} alt="" />
         </HeaderIconButton>
       </HeaderActions>
     </HeaderRow>
   );
 
-  if (isLoading) {
+  const handleJoin = async () => {
+    if (!debateId) return;
+    try {
+      await debateService.join(debateId);
+      setActionMessage('토론에 참여했습니다.');
+      navigate(`/debate/${debateId}`);
+    } catch {
+      setActionMessage('토론 참여에 실패했습니다.');
+    }
+  };
+
+  const handleBookmarkToggle = async () => {
+    if (!debateId) return;
+    try {
+      if (isBookmarked) {
+        await debateService.unbookmark(debateId);
+        setIsBookmarked(false);
+        setActionMessage('저장을 해제했습니다.');
+      } else {
+        await debateService.bookmark(debateId);
+        setIsBookmarked(true);
+        setActionMessage('토론을 저장했습니다.');
+      }
+    } catch {
+      setActionMessage('저장 상태를 변경하지 못했습니다.');
+    }
+  };
+
+  const handleSubscriptionToggle = async () => {
+    if (!debateId) return;
+    try {
+      if (isSubscribed) {
+        await debateService.unsubscribe(debateId);
+        setIsSubscribed(false);
+        setActionMessage('알림 구독을 해제했습니다.');
+      } else {
+        await debateService.subscribe(debateId);
+        setIsSubscribed(true);
+        setActionMessage('토론 알림을 구독했습니다.');
+      }
+    } catch {
+      setActionMessage('알림 설정을 변경하지 못했습니다.');
+    }
+  };
+
+  if (isLoading && !debate) {
     return (
       <Wrapper>
         {renderHeader()}
-        <LoadingCard>토론 정보를 불러오는 중입니다.</LoadingCard>
+        {showLoadingUI && <DebateInfoSkeleton />}
       </Wrapper>
     );
   }
 
-  if (loadError || !debate) {
+  if (error || !debate) {
     return (
       <Wrapper>
         {renderHeader()}
-        <ErrorText>{loadError || '토론 정보를 찾을 수 없습니다.'}</ErrorText>
+        <ErrorText>{error || '토론 정보를 찾을 수 없습니다.'}</ErrorText>
       </Wrapper>
     );
   }
@@ -119,14 +167,16 @@ const DebateInfoPage = () => {
   const tagName = debate.tagMaps?.[0]?.tag.name;
   const creatorName = debate.creator?.nickname ?? '';
   const createdDateLabel = formatCreatedDate(debate.createdAt);
-  const definitions = debate.definitions ?? [];
-
   return (
     <Wrapper>
       {renderHeader()}
 
       <Title>{debate.title}</Title>
       <Description>{debate.description}</Description>
+      <JoinButton type="button" onClick={() => void handleJoin()}>
+        참여하기
+      </JoinButton>
+      {actionMessage && <ActionMessage>{actionMessage}</ActionMessage>}
 
       <InfoCard>
         {tagName && <Tag>#{tagName}</Tag>}
@@ -159,7 +209,7 @@ const DebateInfoPage = () => {
 
       <SummaryCard>
         <SummaryText>진행된 의견 : {postCount}개</SummaryText>
-        <DefinitionTitle>정의된 사항</DefinitionTitle>
+        <DefinitionTitle>이 토론의 기준 정의</DefinitionTitle>
         {definitions.length > 0 ? (
           <DefinitionList>
             {definitions.map((definition) => (
@@ -170,7 +220,7 @@ const DebateInfoPage = () => {
             ))}
           </DefinitionList>
         ) : (
-          <EmptyText>아직 정의된 사항이 없습니다.</EmptyText>
+          <EmptyText>아직 승인된 기준 정의가 없습니다.</EmptyText>
         )}
       </SummaryCard>
     </Wrapper>
@@ -212,6 +262,25 @@ const TopIcon = styled.img`
   height: var(--icon-size);
 `;
 
+const JoinButton = styled.button`
+  width: 100%;
+  height: 48px;
+  margin: 0 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: #2dcd97;
+  color: #ffffff;
+  font-size: var(--body-md);
+  font-weight: 700;
+`;
+
+const ActionMessage = styled.p`
+  margin: -4px 0 12px;
+  text-align: center;
+  color: #2dcd97;
+  font-size: 13px;
+`;
+
 const Title = styled.h1`
   margin: 0;
   text-align: center;
@@ -239,15 +308,6 @@ const ErrorText = styled.p`
   margin: 0 0 12px;
   color: #f04444;
   font-size: 12px;
-`;
-
-const LoadingCard = styled.section`
-  background: #ffffff;
-  border-radius: var(--card-radius);
-  padding: clamp(18px, 5.1vw, 22px);
-  color: #9a9a9a;
-  font-size: var(--body-sm);
-  text-align: center;
 `;
 
 const InfoCard = styled.section`
