@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useAuth } from '../../hooks/useAuth';
@@ -54,6 +54,7 @@ const CloseIcon = () => (
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login, googleLogin } = useAuth();
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState('');
@@ -185,6 +186,9 @@ const LoginPage = () => {
             </IconGroup>
           </InputRow>
         </FieldGroup>
+        {searchParams.get('expired') === '1' && (
+          <InfoText>로그인이 만료되었습니다. 다시 로그인해 주세요.</InfoText>
+        )}
         {error && <ErrorText>{error}</ErrorText>}
         <LoginButton type="submit" disabled={isSubmitting}>
           {isSubmitting ? '로그인 중...' : '로그인하기'}
@@ -196,6 +200,9 @@ const LoginPage = () => {
         )}
         <SignUpLink type="button" onClick={() => navigate('/signup')}>
           회원가입
+        </SignUpLink>
+        <SignUpLink type="button" onClick={() => navigate('/password-reset')}>
+          비밀번호를 잊으셨나요?
         </SignUpLink>
       </Form>
     </Wrapper>
@@ -289,6 +296,12 @@ const IconButton = styled.button`
 const ErrorText = styled.p`
   font-size: 13px;
   color: #f04444;
+  margin: -12px 0 0;
+`;
+
+const InfoText = styled.p`
+  font-size: 13px;
+  color: #2dcd97;
   margin: -12px 0 0;
 `;
 

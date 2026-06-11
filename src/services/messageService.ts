@@ -1,37 +1,10 @@
 import api from './api';
+import type { PaginatedResponse, ApiResponse } from '../types/api';
 import type { ChatRoom, Message } from '../types/message';
-
-interface DebateListResponse {
-  success: boolean;
-  debates: ChatRoom[];
-  page: number;
-  limit: number;
-  totalCount: number;
-}
-
-interface DebatePostsResponse {
-  success: boolean;
-  posts: Message[];
-  page: number;
-  limit: number;
-  totalCount: number;
-}
-
-interface CreatePostResponse {
-  success: boolean;
-  post: {
-    id: string;
-    debateId: string;
-    authorId: string;
-    content: string;
-    status: 'VISIBLE' | 'HIDDEN' | 'DELETED';
-    createdAt: string;
-  };
-}
 
 export const messageService = {
   getChatRooms: () =>
-    api.get<DebateListResponse>('/debates', {
+    api.get<PaginatedResponse<{ debates: ChatRoom[] }>>('/debates', {
       params: {
         status: 'OPEN',
         sort: 'updatedAt',
@@ -40,12 +13,12 @@ export const messageService = {
       },
     }),
   getMessages: (roomId: string) =>
-    api.get<DebatePostsResponse>(`/debates/${roomId}/posts`, {
+    api.get<PaginatedResponse<{ posts: Message[] }>>(`/debates/${roomId}/posts`, {
       params: {
         page: 1,
         limit: 100,
       },
     }),
   sendMessage: (roomId: string, content: string) =>
-    api.post<CreatePostResponse>(`/debates/${roomId}/posts`, { content }),
+    api.post<ApiResponse<{ post: { id: string; debateId: string; authorId: string; content: string; status: 'VISIBLE' | 'HIDDEN' | 'DELETED'; createdAt: string } }>>(`/debates/${roomId}/posts`, { content }),
 };

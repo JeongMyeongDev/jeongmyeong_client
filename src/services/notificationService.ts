@@ -1,6 +1,11 @@
 import api from './api';
+import type { PaginatedResponse } from '../types/api';
 
-export type NotificationType = 'COMMENT_ON_POST' | 'REPLY_TO_COMMENT' | 'NEW_POST_IN_DEBATE';
+export type NotificationType =
+  | 'COMMENT_ON_POST'
+  | 'REPLY_TO_COMMENT'
+  | 'NEW_POST_IN_DEBATE'
+  | 'NEW_CONSENSUS_IN_DEBATE';
 
 export interface Notification {
   id: string;
@@ -13,14 +18,9 @@ export interface Notification {
   actor: { id: string; nickname: string; profileImage: string | null };
 }
 
-interface NotificationsResponse {
-  success: boolean;
-  notifications: Notification[];
-  unreadCount: number;
-}
-
 export const notificationService = {
-  getAll: () => api.get<NotificationsResponse>('/notifications'),
+  getAll: (params?: { page?: number; limit?: number }) =>
+    api.get<PaginatedResponse<{ notifications: Notification[]; unreadCount: number; hasMore: boolean }>>('/notifications', { params }),
   markAsRead: (id: string) => api.patch(`/notifications/${id}/read`),
   markAllAsRead: () => api.patch('/notifications/read-all'),
 };
