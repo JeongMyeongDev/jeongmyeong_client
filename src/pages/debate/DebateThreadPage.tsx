@@ -1645,17 +1645,9 @@ const ConsensusSummaryPanel = styled.div`
 const InlineConsensusStack = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: -2px;
-  padding-left: clamp(10px, 3vw, 14px);
-`;
-
-const InlineConsensusCard = styled.section`
-  width: 100%;
-  border-radius: 4px;
-  border-left: 3px solid #d8f5ec;
-  background: #fbfffd;
-  padding: 9px 10px 10px;
+  gap: 4px;
+  margin-top: -3px;
+  padding-left: clamp(14px, 4vw, 18px);
 `;
 
 const ConsensusMetaRow = styled.div`
@@ -1746,6 +1738,70 @@ const ConsensusAction = styled.button`
 
   &:disabled {
     opacity: 0.45;
+  }
+`;
+
+const InlineConsensusCard = styled.section`
+  width: min(100%, calc(100% - 4px));
+  border-radius: 4px;
+  border-left: 2px solid #d8f5ec;
+  background: #fbfffd;
+  padding: 5px 8px 6px;
+
+  ${ConsensusMetaRow} {
+    gap: 6px;
+    margin-bottom: 3px;
+  }
+
+  ${ConsensusBadge} {
+    height: 17px;
+    font-size: 10px;
+    padding: 0 6px;
+  }
+
+  ${ConsensusTerm} {
+    font-size: 11px;
+  }
+
+  ${ConsensusQuote} {
+    margin-bottom: 3px;
+    border-left-width: 2px;
+    padding-left: 6px;
+    font-size: 11px;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  ${ConsensusTitle} {
+    margin-bottom: 2px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  ${ConsensusContent} {
+    font-size: 11px;
+    line-height: 1.25;
+    -webkit-line-clamp: 1;
+  }
+
+  ${ConsensusCountRow} {
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 10px;
+  }
+
+  ${ConsensusActionRow} {
+    gap: 6px;
+    margin-top: 5px;
+  }
+
+  ${ConsensusAction} {
+    height: 22px;
+    font-size: 11px;
+    padding: 0 8px;
   }
 `;
 
