@@ -260,27 +260,29 @@ const MainPage = () => {
   return (
     <Wrapper>
       <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
-      {/* Logo */}
-      <Logo src={logoSymbol} alt="정명" />
+      <FixedHeaderArea>
+        {/* Logo */}
+        <Logo src={logoSymbol} alt="정명" />
 
-      {/* Header */}
-      <Header>
-        <IconBtn onClick={() => setIsDrawerOpen(true)} aria-label="메뉴">
-          <MenuIcon />
-        </IconBtn>
-        <SearchBar>
-          <SearchIcon />
-          <SearchInput
-            value={searchKeyword}
-            onChange={(event) => setSearchKeyword(event.target.value)}
-            placeholder="토론을 검색하세요."
-            aria-label="토론 검색"
-          />
-        </SearchBar>
-        <IconBtn onClick={() => navigate('/notifications')} aria-label="알림">
-          <BellIcon />
-        </IconBtn>
-      </Header>
+        {/* Header */}
+        <Header>
+          <IconBtn onClick={() => setIsDrawerOpen(true)} aria-label="메뉴">
+            <MenuIcon />
+          </IconBtn>
+          <SearchBar>
+            <SearchIcon />
+            <SearchInput
+              value={searchKeyword}
+              onChange={(event) => setSearchKeyword(event.target.value)}
+              placeholder="토론을 검색하세요."
+              aria-label="토론 검색"
+            />
+          </SearchBar>
+          <IconBtn onClick={() => navigate('/notifications')} aria-label="알림">
+            <BellIcon />
+          </IconBtn>
+        </Header>
+      </FixedHeaderArea>
 
       {/* 뜨는 토론 */}
       <Section>
@@ -406,6 +408,19 @@ const MainPage = () => {
 const Wrapper = styled.div`
   background: #f5f5f5;
   min-height: 100dvh;
+  padding-top: calc(clamp(10px, 3vw, 14px) + var(--logo-height) + clamp(10px, 2.8vw, 12px) + clamp(56px, 14.9vw, 64px));
+`;
+
+const FixedHeaderArea = styled.div`
+  position: fixed;
+  top: 0;
+  left: 50%;
+  z-index: 100;
+  width: 100%;
+  max-width: var(--app-max-width);
+  transform: translateX(-50%);
+  background: #f5f5f5;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
 `;
 
 const Header = styled.div`
@@ -413,6 +428,7 @@ const Header = styled.div`
   align-items: center;
   justify-content: space-between;
   padding: clamp(10px, 2.8vw, 12px) var(--page-x);
+  min-height: clamp(56px, 14.9vw, 64px);
 `;
 
 const IconBtn = styled.button`
@@ -457,7 +473,7 @@ const Logo = styled.img`
   width: var(--logo-width);
   height: var(--logo-height);
   display: block;
-  margin: var(--page-top) auto clamp(14px, 3.7vw, 16px);
+  margin: clamp(10px, 3vw, 14px) auto clamp(10px, 2.8vw, 12px);
 `;
 
 const Section = styled.div`

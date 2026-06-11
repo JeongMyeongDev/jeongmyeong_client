@@ -231,7 +231,7 @@ const HeaderRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin: 4px 0 12px;
 `;
 
 const HeaderRight = styled.div`

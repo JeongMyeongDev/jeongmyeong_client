@@ -56,6 +56,30 @@ type ConsensusDraft = {
   content: string;
 };
 
+type EditTarget =
+  | {
+      type: "POST";
+      postId: string;
+      content: string;
+    }
+  | {
+      type: "COMMENT";
+      postId: string;
+      commentId: string;
+      content: string;
+    };
+
+type DeleteTarget =
+  | {
+      type: "POST";
+      postId: string;
+    }
+  | {
+      type: "COMMENT";
+      postId: string;
+      commentId: string;
+    };
+
 const SELECTION_SOURCE_SELECTOR =
   "[data-selection-source-type][data-selection-source-id]";
 
@@ -193,6 +217,9 @@ const DebateThreadPage = () => {
   const [selectedConsensus, setSelectedConsensus] = useState<Consensus | null>(
     null,
   );
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [voteComment, setVoteComment] = useState("");
   const [activeCardMenuKey, setActiveCardMenuKey] = useState<string | null>(
     null,
@@ -525,50 +552,104 @@ const DebateThreadPage = () => {
     setCommentsByPostId((prev) => ({ ...prev, [postId]: data.comments }));
   };
 
-  const handleUpdatePost = async (postId: string, content: string) => {
-    const nextContent = window.prompt("수정할 내용을 입력하세요.", content);
-    if (!nextContent?.trim() || !debateId) return;
+  const openPostEditor = (postId: string, content: string) => {
+    setSubmitError("");
+    setActionMessage("");
+    setEditContent(content);
+    setEditTarget({ type: "POST", postId, content });
+  };
+
+  const openCommentEditor = (postId: string, comment: Comment) => {
+    setSubmitError("");
+    setActionMessage("");
+    setEditContent(comment.content);
+    setEditTarget({
+      type: "COMMENT",
+      postId,
+      commentId: comment.id,
+      content: comment.content,
+    });
+  };
+
+  const cancelInlineEdit = () => {
+    setEditTarget(null);
+    setEditContent("");
+    setSubmitError("");
+  };
+
+  const handleSubmitEdit = async () => {
+    if (!editTarget || isSubmitting) return;
+    const nextContent = editContent.trim();
+    if (!nextContent) {
+      setSubmitError("수정할 내용을 입력해 주세요.");
+      return;
+    }
+    if (editTarget.type === "POST" && !debateId) return;
+
+    setIsSubmitting(true);
     try {
-      await postService.update(postId, { content: nextContent.trim() });
-      await fetchMessages(debateId);
+      if (editTarget.type === "POST") {
+        const activeDebateId = debateId;
+        if (!activeDebateId) return;
+        await postService.update(editTarget.postId, { content: nextContent });
+        await fetchMessages(activeDebateId);
+      } else {
+        await postService.updateComment(editTarget.commentId, {
+          content: nextContent,
+        });
+        await refreshComments(editTarget.postId);
+      }
+      setEditTarget(null);
+      setEditContent("");
+      setSubmitError("");
+      setActionMessage(
+        editTarget.type === "POST"
+          ? "의견을 수정했습니다."
+          : "댓글을 수정했습니다.",
+      );
     } catch (error) {
       setSubmitError(getMutationErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeletePost = async (postId: string) => {
-    if (!window.confirm("이 의견을 삭제할까요?") || !debateId) return;
-    try {
-      await postService.delete(postId);
-      await fetchMessages(debateId);
-    } catch (error) {
-      setSubmitError(getMutationErrorMessage(error));
-    }
+  const openPostDeleteConfirm = (postId: string) => {
+    setSubmitError("");
+    setDeleteTarget({ type: "POST", postId });
   };
 
-  const handleUpdateComment = async (postId: string, comment: Comment) => {
-    const nextContent = window.prompt(
-      "수정할 댓글 내용을 입력하세요.",
-      comment.content,
-    );
-    if (!nextContent?.trim()) return;
-    try {
-      await postService.updateComment(comment.id, {
-        content: nextContent.trim(),
-      });
-      await refreshComments(postId);
-    } catch (error) {
-      setSubmitError(getMutationErrorMessage(error));
-    }
+  const openCommentDeleteConfirm = (postId: string, commentId: string) => {
+    setSubmitError("");
+    setDeleteTarget({ type: "COMMENT", postId, commentId });
   };
 
-  const handleDeleteComment = async (postId: string, commentId: string) => {
-    if (!window.confirm("이 댓글을 삭제할까요?")) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || isSubmitting) return;
+    if (deleteTarget.type === "POST" && !debateId) return;
+
+    setIsSubmitting(true);
     try {
-      await postService.deleteComment(commentId);
-      await refreshComments(postId);
+      if (deleteTarget.type === "POST") {
+        const activeDebateId = debateId;
+        if (!activeDebateId) return;
+        await postService.delete(deleteTarget.postId);
+        await fetchMessages(activeDebateId);
+      } else {
+        await postService.deleteComment(deleteTarget.commentId);
+        await refreshComments(deleteTarget.postId);
+      }
+      setDeleteTarget(null);
+      setSubmitError("");
+      setActionMessage(
+        deleteTarget.type === "POST"
+          ? "의견을 삭제했습니다."
+          : "댓글을 삭제했습니다.",
+      );
     } catch (error) {
       setSubmitError(getMutationErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -906,6 +987,8 @@ const DebateThreadPage = () => {
     const isDeleted = comment.status === "DELETED";
     const menuKey = `comment:${comment.id}`;
     const canManage = comment.author?.id === user?.id;
+    const isEditing =
+      editTarget?.type === "COMMENT" && editTarget.commentId === comment.id;
 
     return (
       <Fragment key={comment.id}>
@@ -937,22 +1020,22 @@ const DebateThreadPage = () => {
                     {canManage && (
                       <>
                         <CardMenuButton
-                          type="button"
-                          onClick={() => {
-                            setActiveCardMenuKey(null);
-                            void handleUpdateComment(postId, comment);
-                          }}
-                        >
-                          수정
+                        type="button"
+                        onClick={() => {
+                          setActiveCardMenuKey(null);
+                          openCommentEditor(postId, comment);
+                        }}
+                      >
+                        수정
                         </CardMenuButton>
                         <CardMenuButton
-                          type="button"
-                          onClick={() => {
-                            setActiveCardMenuKey(null);
-                            void handleDeleteComment(postId, comment.id);
-                          }}
-                        >
-                          삭제
+                        type="button"
+                        onClick={() => {
+                          setActiveCardMenuKey(null);
+                          openCommentDeleteConfirm(postId, comment.id);
+                        }}
+                      >
+                        삭제
                         </CardMenuButton>
                       </>
                     )}
@@ -973,10 +1056,33 @@ const DebateThreadPage = () => {
               </ActionGroup>
             )}
           </MetaRow>
-          {renderMessageText(
-            isDeleted ? "삭제된 댓글입니다." : comment.content,
-            isDeleted ? undefined : "COMMENT",
-            isDeleted ? undefined : comment.id,
+          {isEditing ? (
+            <InlineEditBox>
+              {submitError && <InlineEditError>{submitError}</InlineEditError>}
+              <InlineEditTextarea
+                value={editContent}
+                onChange={(event) => setEditContent(event.target.value)}
+                autoFocus
+              />
+              <InlineEditActions>
+                <InlineEditCancelButton type="button" onClick={cancelInlineEdit}>
+                  취소
+                </InlineEditCancelButton>
+                <InlineEditSaveButton
+                  type="button"
+                  onClick={() => void handleSubmitEdit()}
+                  disabled={isSubmitting || !editContent.trim()}
+                >
+                  저장
+                </InlineEditSaveButton>
+              </InlineEditActions>
+            </InlineEditBox>
+          ) : (
+            renderMessageText(
+              isDeleted ? "삭제된 댓글입니다." : comment.content,
+              isDeleted ? undefined : "COMMENT",
+              isDeleted ? undefined : comment.id,
+            )
           )}
         </MessageCard>
         {!isDeleted && renderInlineConsensusStack("COMMENT", comment.id)}
@@ -1040,6 +1146,8 @@ const DebateThreadPage = () => {
           const isDeleted = item.status === "DELETED";
           const menuKey = `post:${item.id}`;
           const canManage = item.author.id === user?.id;
+          const isEditing =
+            editTarget?.type === "POST" && editTarget.postId === item.id;
 
           return (
             <MessageGroup key={item.id}>
@@ -1076,7 +1184,7 @@ const DebateThreadPage = () => {
                                 type="button"
                                 onClick={() => {
                                   setActiveCardMenuKey(null);
-                                  void handleUpdatePost(item.id, item.content);
+                                  openPostEditor(item.id, item.content);
                                 }}
                               >
                                 수정
@@ -1085,7 +1193,7 @@ const DebateThreadPage = () => {
                                 type="button"
                                 onClick={() => {
                                   setActiveCardMenuKey(null);
-                                  void handleDeletePost(item.id);
+                                  openPostDeleteConfirm(item.id);
                                 }}
                               >
                                 삭제
@@ -1109,10 +1217,38 @@ const DebateThreadPage = () => {
                     </ActionGroup>
                   )}
                 </MetaRow>
-                {renderMessageText(
-                  isDeleted ? "삭제된 의견입니다." : item.content,
-                  isDeleted ? undefined : "POST",
-                  isDeleted ? undefined : item.id,
+                {isEditing ? (
+                  <InlineEditBox>
+                    {submitError && (
+                      <InlineEditError>{submitError}</InlineEditError>
+                    )}
+                    <InlineEditTextarea
+                      value={editContent}
+                      onChange={(event) => setEditContent(event.target.value)}
+                      autoFocus
+                    />
+                    <InlineEditActions>
+                      <InlineEditCancelButton
+                        type="button"
+                        onClick={cancelInlineEdit}
+                      >
+                        취소
+                      </InlineEditCancelButton>
+                      <InlineEditSaveButton
+                        type="button"
+                        onClick={() => void handleSubmitEdit()}
+                        disabled={isSubmitting || !editContent.trim()}
+                      >
+                        저장
+                      </InlineEditSaveButton>
+                    </InlineEditActions>
+                  </InlineEditBox>
+                ) : (
+                  renderMessageText(
+                    isDeleted ? "삭제된 의견입니다." : item.content,
+                    isDeleted ? undefined : "POST",
+                    isDeleted ? undefined : item.id,
+                  )
                 )}
               </MessageCard>
               {!isDeleted && renderInlineConsensusStack("POST", item.id)}
@@ -1162,6 +1298,45 @@ const DebateThreadPage = () => {
             복사
           </SelectionMenuButton>
         </SelectionMenu>
+      )}
+
+      {deleteTarget && (
+        <SheetBackdrop
+          onClick={() => {
+            setDeleteTarget(null);
+            setSubmitError("");
+          }}
+        >
+          <BottomSheet onClick={(event) => event.stopPropagation()}>
+            <SheetTitle>
+              {deleteTarget.type === "POST" ? "의견 삭제" : "댓글 삭제"}
+            </SheetTitle>
+            {submitError && <SheetError>{submitError}</SheetError>}
+            <DeleteConfirmText>
+              {deleteTarget.type === "POST"
+                ? "이 의견을 삭제할까요?"
+                : "이 댓글을 삭제할까요?"}
+            </DeleteConfirmText>
+            <SheetActionRow>
+              <SheetSecondaryButton
+                type="button"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setSubmitError("");
+                }}
+              >
+                취소
+              </SheetSecondaryButton>
+              <DangerButton
+                type="button"
+                onClick={() => void handleConfirmDelete()}
+                disabled={isSubmitting}
+              >
+                삭제
+              </DangerButton>
+            </SheetActionRow>
+          </BottomSheet>
+        </SheetBackdrop>
       )}
 
       {consensusDraft && (
@@ -1629,6 +1804,64 @@ const MessageText = styled.p`
   user-select: text;
 `;
 
+const InlineEditBox = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+`;
+
+const InlineEditTextarea = styled.textarea`
+  width: 100%;
+  min-height: 72px;
+  border: none;
+  border-radius: 8px;
+  background: #f0f0f0;
+  color: #555555;
+  font-size: var(--body-sm);
+  line-height: 1.45;
+  padding: 9px 10px;
+  resize: vertical;
+  outline: none;
+`;
+
+const InlineEditActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+`;
+
+const InlineEditButton = styled.button`
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
+
+  &:disabled {
+    opacity: 0.55;
+  }
+`;
+
+const InlineEditCancelButton = styled(InlineEditButton)`
+  background: #f0f0f0;
+  color: #7f7f7f;
+`;
+
+const InlineEditSaveButton = styled(InlineEditButton)`
+  background: #2dcd97;
+  color: #ffffff;
+`;
+
+const InlineEditError = styled.p`
+  margin: 0;
+  color: #f04444;
+  font-size: 12px;
+  line-height: 1.35;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
 const ReplyAction = styled.button`
   border: none;
   background: transparent;
@@ -1923,6 +2156,22 @@ const SheetPrimaryButton = styled(SheetSecondaryButton)`
   &:disabled {
     opacity: 0.6;
   }
+`;
+
+const DangerButton = styled(SheetSecondaryButton)`
+  background: #f04444;
+  color: #ffffff;
+
+  &:disabled {
+    opacity: 0.6;
+  }
+`;
+
+const DeleteConfirmText = styled.p`
+  margin: 0;
+  color: #555555;
+  font-size: var(--body-sm);
+  line-height: 1.5;
 `;
 
 const DetailTerm = styled.p`
