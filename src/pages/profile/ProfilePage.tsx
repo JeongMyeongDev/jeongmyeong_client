@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
 import { useAuthStore } from '../../stores/authStore';
+import { usePageLoading } from '../../hooks/usePageLoading';
 
 type MenuItem = { label: string; action: 'navigate' | 'toast'; value?: string };
 const MENU_ITEMS: MenuItem[] = [
@@ -19,11 +20,11 @@ const MENU_ITEMS: MenuItem[] = [
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, setUser, clearAuth } = useAuthStore();
+  const { isLoading, error, executeAsync } = usePageLoading();
   const [nickname, setNickname] = useState(user?.nickname ?? '');
   const [profileError, setProfileError] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [isLogoutLoading, setIsLogoutLoading] = useState(false);
 
   const displayName = isAuthenticated ? user?.nickname ?? '사용자' : '사용자 이름';
   const helperText = isAuthenticated
@@ -31,26 +32,25 @@ const ProfilePage = () => {
     : '로그인을 먼저 진행해주세요.';
 
   useEffect(() => {
-    setNickname(user?.nickname ?? '');
+    const timer = window.setTimeout(() => setNickname(user?.nickname ?? ''), 0);
+    return () => window.clearTimeout(timer);
   }, [user?.nickname]);
 
   const handleUpdateProfile = async () => {
-    if (!isAuthenticated || !user || !nickname.trim() || isSaving) return;
+    if (!isAuthenticated || !user || !nickname.trim() || isLoading) return;
 
-    setIsSaving(true);
-    try {
+    const result = await executeAsync(async () => {
       const { data } = await userService.updateMe({ nickname: nickname.trim() });
-      setUser({ ...user, ...data.user });
+      return data;
+    });
+    
+    if (result) {
+      setUser({ ...user, ...result.user });
       setProfileError('');
-    } catch (error) {
-      if (isAxiosError(error)) {
-        const message = error.response?.data?.message;
-        setProfileError(Array.isArray(message) ? message.join(', ') : message ?? '프로필 수정에 실패했습니다.');
-      } else {
-        setProfileError('프로필 수정에 실패했습니다.');
-      }
-    } finally {
-      setIsSaving(false);
+      setToastMessage('프로필이 저장되었습니다.');
+      setTimeout(() => setToastMessage(''), 2500);
+    } else if (error) {
+      setProfileError(error);
     }
   };
 
@@ -68,9 +68,9 @@ const ProfilePage = () => {
   };
 
   const handleLogout = async () => {
-    if (isSubmitting) return;
+    if (isLogoutLoading) return;
 
-    setIsSubmitting(true);
+    setIsLogoutLoading(true);
     try {
       if (isAuthenticated) {
         await authService.logout();
@@ -82,7 +82,7 @@ const ProfilePage = () => {
     } finally {
       localStorage.removeItem('accessToken');
       clearAuth();
-      setIsSubmitting(false);
+      setIsLogoutLoading(false);
       navigate('/login');
     }
   };
@@ -116,13 +116,14 @@ const ProfilePage = () => {
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             placeholder="닉네임"
+            disabled={isLoading}
           />
           <SaveButton
             type="button"
             onClick={() => void handleUpdateProfile()}
-            disabled={isSaving || !nickname.trim()}
+            disabled={isLoading || !nickname.trim()}
           >
-            {isSaving ? '저장 중...' : '프로필 저장'}
+            {isLoading ? '저장 중...' : '프로필 저장'}
           </SaveButton>
           {profileError && <ErrorText>{profileError}</ErrorText>}
         </ProfileEditCard>
@@ -139,8 +140,8 @@ const ProfilePage = () => {
       {toastMessage && <Toast>{toastMessage}</Toast>}
 
       {isAuthenticated && (
-        <LogoutButton type="button" onClick={handleLogout} disabled={isSubmitting}>
-          로그아웃
+        <LogoutButton type="button" onClick={handleLogout} disabled={isLogoutLoading}>
+          {isLogoutLoading ? '로그아웃 중...' : '로그아웃'}
         </LogoutButton>
       )}
     </Wrapper>
