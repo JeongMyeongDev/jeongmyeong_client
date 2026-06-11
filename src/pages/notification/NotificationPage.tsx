@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import { LoadingContent } from '../../components/common/LoadingContent';
+import { NotificationListSkeleton } from '../../components/common/PageSkeletons';
 import { notificationService, type Notification } from '../../services/notificationService';
+import { usePageLoading } from '../../hooks/usePageLoading';
 
 const TYPE_LABEL: Record<string, string> = {
   COMMENT_ON_POST: '회원님의 의견에 댓글이 달렸어요.',
   REPLY_TO_COMMENT: '회원님의 댓글에 답글이 달렸어요.',
   NEW_POST_IN_DEBATE: '참여 중인 토론에 새 글이 올라왔어요.',
+  NEW_CONSENSUS_IN_DEBATE: '구독 중인 토론에 새 합의안이 올라왔어요.',
 };
 
 const formatDate = (iso: string) => {
@@ -23,30 +27,49 @@ const formatDate = (iso: string) => {
 
 const NotificationPage = () => {
   const navigate = useNavigate();
+  const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const load = async () => {
-      try {
-        const { data } = await notificationService.getAll();
-        setNotifications(data.notifications);
-        setUnreadCount(data.unreadCount);
-      } catch {
-        setError('알림을 불러오지 못했습니다.');
-      } finally {
-        setLoading(false);
+      const result = await executeAsync(async () => {
+        const { data } = await notificationService.getAll({ page: 1, limit: 20 });
+        return data;
+      });
+      if (result) {
+        setNotifications(result.notifications);
+        setUnreadCount(result.unreadCount);
+        setPage(result.page);
+        setHasMore(result.hasMore);
       }
     };
     void load();
-  }, []);
+  }, [executeAsync]);
 
   const handleMarkAllAsRead = async () => {
     await notificationService.markAllAsRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setUnreadCount(0);
+  };
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const { data } = await notificationService.getAll({ page: page + 1, limit: 20 });
+      setNotifications((prev) => [...prev, ...data.notifications]);
+      setUnreadCount(data.unreadCount);
+      setPage(data.page);
+      setHasMore(data.hasMore);
+    } catch {
+      // Error handling - keep loadMore silent or add user feedback if needed
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const handleClickItem = async (item: Notification) => {
@@ -77,12 +100,16 @@ const NotificationPage = () => {
         )}
       </TopBar>
 
-      {loading && <CenterText>불러오는 중...</CenterText>}
       {error && <CenterText $error>{error}</CenterText>}
-      {!loading && !error && notifications.length === 0 && (
+      {!isLoading && !error && notifications.length === 0 && (
         <CenterText>알림이 없습니다.</CenterText>
       )}
 
+      <LoadingContent
+        isLoading={isLoading}
+        showLoadingUI={showLoadingUI}
+        skeleton={<NotificationListSkeleton count={5} />}
+      >
       <List>
         {notifications.map((item) => (
           <Item
@@ -101,6 +128,12 @@ const NotificationPage = () => {
           </Item>
         ))}
       </List>
+      </LoadingContent>
+      {hasMore && !isLoading && !error && (
+        <LoadMoreButton type="button" onClick={() => void handleLoadMore()} disabled={loadingMore}>
+          {loadingMore ? '불러오는 중...' : '더 보기'}
+        </LoadMoreButton>
+      )}
     </Wrapper>
   );
 };
@@ -227,6 +260,23 @@ const UnreadDot = styled.div`
   background: #2dcd97;
   flex-shrink: 0;
   margin-top: 4px;
+`;
+
+const LoadMoreButton = styled.button`
+  display: block;
+  width: calc(100% - 32px);
+  height: 44px;
+  margin: 12px 16px 0;
+  border: none;
+  border-radius: 999px;
+  background: #2dcd97;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+
+  &:disabled {
+    opacity: 0.6;
+  }
 `;
 
 export default NotificationPage;

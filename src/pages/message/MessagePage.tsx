@@ -2,12 +2,16 @@ import { isAxiosError } from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import logoSymbol from '../../assets/logo_symbol.svg';
+import { LoadingContent } from '../../components/common/LoadingContent';
+import { MessagePageSkeleton } from '../../components/common/PageSkeletons';
 import { useMessage } from '../../hooks/useMessage';
 import { useAuthStore } from '../../stores/authStore';
+import { usePageLoading } from '../../hooks/usePageLoading';
 
 const MessagePage = () => {
   const { user } = useAuthStore();
   const { chatRooms, currentMessages, fetchChatRooms, fetchMessages, sendMessage } = useMessage();
+  const { isLoading, showLoadingUI, executeAsync } = usePageLoading();
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
@@ -15,14 +19,16 @@ const MessagePage = () => {
 
   useEffect(() => {
     const loadRooms = async () => {
-      try {
+      const result = await executeAsync(async () => {
         await fetchChatRooms();
-      } catch {
+        return true;
+      });
+      if (!result) {
         setError('토론방 목록을 불러오지 못했습니다.');
       }
     };
     void loadRooms();
-  }, [fetchChatRooms]);
+  }, [fetchChatRooms, executeAsync]);
 
   const activeRoomId = selectedRoomId || chatRooms[0]?.id || '';
 
@@ -65,6 +71,11 @@ const MessagePage = () => {
     <Wrapper>
       <Logo src={logoSymbol} alt="정명" />
 
+      <LoadingContent
+        isLoading={isLoading}
+        showLoadingUI={showLoadingUI}
+        skeleton={<MessagePageSkeleton />}
+      >
       <RoomTabs>
         {chatRooms.map((room) => (
           <RoomTab
@@ -118,6 +129,7 @@ const MessagePage = () => {
       </ChatPanel>
 
       {error && <ErrorText>{error}</ErrorText>}
+      </LoadingContent>
     </Wrapper>
   );
 };

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import SideDrawer from '../../components/common/SideDrawer';
+import { LoadingContent } from '../../components/common/LoadingContent';
+import { DebateListItemSkeleton, FeaturedCardSkeleton } from '../../components/common/PageSkeletons';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconAlarm2 from '../../assets/icon_alarm2.svg';
 import btnDscionControl from '../../assets/btn_dscion_control.svg';
@@ -12,6 +14,7 @@ import iconShowInfo from '../../assets/icon_show_info.svg';
 import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
+import { usePageLoading } from '../../hooks/usePageLoading';
 import type { Debate } from '../../types/debate';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -153,11 +156,11 @@ const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => vo
 const MainPage = () => {
   const navigate = useNavigate();
   const { debates, fetchDebates } = useDebate();
+  const { isLoading, showLoadingUI, error: loadError, executeAsync } = usePageLoading();
   const [activeCategory, setActiveCategory] = useState('전체');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeDot, setActiveDot] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [listError, setListError] = useState('');
   const [selectedCard, setSelectedCard] = useState<ModalDebateItem | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollLeftRef = useRef(0);
@@ -165,20 +168,17 @@ const MainPage = () => {
 
   useEffect(() => {
     const loadDebates = async () => {
-      try {
+      await executeAsync(async () => {
         await fetchDebates({
           status: 'OPEN',
           sort: 'updatedAt',
           direction: 'desc',
           limit: 20,
         });
-        setListError('');
-      } catch {
-        setListError('토론 목록을 불러오지 못했습니다.');
-      }
+      });
     };
     void loadDebates();
-  }, [fetchDebates]);
+  }, [fetchDebates, executeAsync]);
 
   const handleScroll = () => {
     if (!scrollRef.current) return;
@@ -229,10 +229,11 @@ const MainPage = () => {
   }, [debates, searchKeyword, activeCategory]);
 
   useEffect(() => {
-    setActiveDot(0);
+    const timer = window.setTimeout(() => setActiveDot(0), 0);
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ left: 0, behavior: 'auto' });
     }
+    return () => window.clearTimeout(timer);
   }, [searchKeyword]);
 
   const debateItems: DebateListItem[] = filteredDebates.map((debate) => ({
@@ -289,13 +290,24 @@ const MainPage = () => {
           ref={scrollRef}
           onScroll={handleScroll}
         >
-          {featuredItems.map((item) => (
-            <FeaturedCard key={item.id} item={item} onClick={() => openFeaturedModal(item.modalData)} />
-          ))}
+          <LoadingContent
+            isLoading={isLoading}
+            showLoadingUI={showLoadingUI}
+            skeleton={
+              <>
+                <FeaturedCardSkeleton />
+                <FeaturedCardSkeleton />
+              </>
+            }
+          >
+            {featuredItems.map((item) => (
+              <FeaturedCard key={item.id} item={item} onClick={() => openFeaturedModal(item.modalData)} />
+            ))}
+          </LoadingContent>
         </CarouselWrapper>
         <Dots>
-          {featuredItems.map((_, i) => (
-            <Dot key={i} $active={i === currentDot} />
+          {(showLoadingUI ? [0, 1] : featuredItems).map((_, i) => (
+            <Dot key={i} $active={!showLoadingUI && i === currentDot} />
           ))}
         </Dots>
       </Section>
@@ -320,11 +332,17 @@ const MainPage = () => {
 
       {/* Debate List */}
       <DebateList>
-        {listError && <ListError>{listError}</ListError>}
-        {!listError && debateItems.length === 0 && <ListError>표시할 토론이 없습니다.</ListError>}
-        {debateItems.map((item) => (
-          <DebateCard key={item.id} item={item} onClick={() => setSelectedCard(item.modalData)} />
-        ))}
+        {loadError && <ListError>{loadError}</ListError>}
+        <LoadingContent
+          isLoading={isLoading}
+          showLoadingUI={showLoadingUI}
+          skeleton={<DebateListItemSkeleton count={4} />}
+        >
+          {!loadError && debateItems.length === 0 && <ListError>표시할 토론이 없습니다.</ListError>}
+          {debateItems.map((item) => (
+            <DebateCard key={item.id} item={item} onClick={() => setSelectedCard(item.modalData)} />
+          ))}
+        </LoadingContent>
       </DebateList>
 
       {selectedCard && (

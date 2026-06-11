@@ -1,4 +1,5 @@
 import api from './api';
+import type { ApiResponse } from '../types/api';
 import type {
   Comment,
   CommentSelection,
@@ -11,38 +12,20 @@ export interface UpdatePostRequest {
   content: string;
 }
 
-interface UpdatePostResponse {
-  success: boolean;
-  post: UpdatedPost;
-}
-
-interface DeletePostResponse {
-  success: boolean;
-  post: DeletedPost;
-}
-
-interface CommentListResponse {
-  success: boolean;
-  comments: Comment[];
-}
-
 export interface CreateCommentRequest {
   content: string;
   parentCommentId?: string;
   selection?: CommentSelection;
 }
 
-interface CreateCommentResponse {
-  success: boolean;
-  comment: Comment;
-  selectionTarget: Pick<SelectionTarget, 'id'> | null;
-}
-
 export const postService = {
   update: (postId: string, data: UpdatePostRequest) =>
-    api.patch<UpdatePostResponse>(`/posts/${postId}`, data),
-  delete: (postId: string) => api.delete<DeletePostResponse>(`/posts/${postId}`),
-  getComments: (postId: string) => api.get<CommentListResponse>(`/posts/${postId}/comments`),
+    api.patch<ApiResponse<{ post: UpdatedPost }>>(`/posts/${postId}`, data),
+  delete: (postId: string) => api.delete<ApiResponse<{ post: DeletedPost }>>(`/posts/${postId}`),
+  updateComment: (commentId: string, data: UpdatePostRequest) =>
+    api.patch<ApiResponse<{ comment: { id: string; content: string; updatedAt: string } }>>(`/comments/${commentId}`, data),
+  deleteComment: (commentId: string) => api.delete<ApiResponse<{ comment: { id: string; status: string; deletedAt: string } }>>(`/comments/${commentId}`),
+  getComments: (postId: string) => api.get<ApiResponse<{ comments: Comment[] }>>(`/posts/${postId}/comments`),
   createComment: (postId: string, data: CreateCommentRequest) =>
-    api.post<CreateCommentResponse>(`/posts/${postId}/comments`, data),
+    api.post<ApiResponse<{ comment: Comment; selectionTarget: Pick<SelectionTarget, 'id'> | null }>>(`/posts/${postId}/comments`, data),
 };
