@@ -4,6 +4,7 @@ import type {
   CreatedPost,
   Debate,
   DebateMessage,
+  DefinitionReferenceInput,
   SelectionSource,
   SelectionTarget,
 } from "../types/debate";
@@ -32,6 +33,7 @@ export interface ListDebatesParams {
 
 export interface CreatePostRequest {
   content: string;
+  definitionReferences?: DefinitionReferenceInput[];
 }
 
 export interface CreateSelectionTargetRequest {

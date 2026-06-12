@@ -6,6 +6,7 @@ export type ConsensusStatus = "OPEN" | "APPROVED" | "REJECTED" | "CLOSED";
 export type ConsensusVoteType = "APPROVE" | "REJECT" | "COMMENT";
 export type DefinitionScope = "IN_DEBATE" | "GLOBAL_REFERENCE";
 export type DefinitionStatus = "ACTIVE" | "ARCHIVED";
+export type DefinitionReferenceType = "DEBATE_STANDARD" | "GLOBAL_REFERENCE";
 
 export interface DebateTag {
   id: string;
@@ -53,9 +54,36 @@ export interface DebateDefinition {
     nickname: string;
     profileImage?: string | null;
   };
+  terms?: Array<{
+    id: string;
+    normalizedTerm: string;
+    originalTerm: string;
+  }>;
 }
 
 export type Definition = DebateDefinition;
+
+export interface DefinitionReference {
+  id: string;
+  debateId: string;
+  postId?: string | null;
+  commentId?: string | null;
+  definitionId: string;
+  selectedText: string;
+  startOffset: number;
+  endOffset: number;
+  referenceType: DefinitionReferenceType;
+  createdAt?: string;
+  definition: Definition;
+}
+
+export interface DefinitionReferenceInput {
+  definitionId: string;
+  selectedText: string;
+  startOffset: number;
+  endOffset: number;
+  referenceType: DefinitionReferenceType;
+}
 
 export interface DebateMessage {
   id: string;
@@ -69,6 +97,7 @@ export interface DebateMessage {
     nickname: string;
     profileImage?: string | null;
   };
+  definitionReferences?: DefinitionReference[];
 }
 
 export interface CreatedPost {
@@ -78,6 +107,7 @@ export interface CreatedPost {
   content: string;
   status: PostStatus;
   createdAt?: string;
+  definitionReferences?: DefinitionReference[];
 }
 
 export interface UpdatedPost {
@@ -173,4 +203,5 @@ export interface Comment {
   _count?: {
     replies: number;
   };
+  definitionReferences?: DefinitionReference[];
 }
