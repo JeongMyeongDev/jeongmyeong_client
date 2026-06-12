@@ -65,19 +65,13 @@ const DebateInfoPage = () => {
 
         const loadedDebate = detailResponse.data.debate;
         const posts = postsResponse.data.posts;
-        const uniqueNames = new Map<string, string>();
-
-        if (loadedDebate.creator?.nickname) {
-          uniqueNames.set(loadedDebate.creator.id, loadedDebate.creator.nickname);
-        }
-
-        posts.forEach((post) => {
-          uniqueNames.set(post.author.id, post.author.nickname);
-        });
+        const participantNames = loadedDebate.participants?.map(
+          (participant) => participant.user.nickname,
+        ) ?? [];
 
         setDebate(loadedDebate);
         setDefinitions(definitionsResponse.data.definitions);
-        setParticipantNames(Array.from(uniqueNames.values()).slice(0, 6));
+        setParticipantNames(participantNames.slice(0, 6));
         setPostCount(postsResponse.data.totalCount ?? posts.length);
       });
     };
@@ -104,7 +98,26 @@ const DebateInfoPage = () => {
   const handleJoin = async () => {
     if (!debateId) return;
     try {
-      await debateService.join(debateId);
+      const { data } = await debateService.join(debateId);
+      setDebate((prev) =>
+        prev
+          ? {
+              ...prev,
+              participantCount: data.participantCount,
+              participants: [
+                ...(prev.participants?.filter(
+                  (participant) => participant.user.id !== data.participant.userId,
+                ) ?? []),
+                data.participant,
+              ],
+            }
+          : prev,
+      );
+      setParticipantNames((prev) => {
+        const nextNames = new Set(prev);
+        nextNames.add(data.participant.user.nickname);
+        return Array.from(nextNames).slice(0, 6);
+      });
       setActionMessage('토론에 참여했습니다.');
       navigate(`/debate/${debateId}`);
     } catch {

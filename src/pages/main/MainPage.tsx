@@ -15,6 +15,7 @@ import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import { usePageLoading } from '../../hooks/usePageLoading';
+import { debateService } from '../../services/debateService';
 import type { Debate } from '../../types/debate';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -95,13 +96,16 @@ const formatCreatedDate = (createdAt?: string) => {
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
 };
 
+const getDebateParticipantCount = (debate: Debate) =>
+  debate.participantCount ?? debate.participants?.length ?? 0;
+
 const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
   id: debate.id,
   title: debate.title,
   description: debate.description,
   creatorName: debate.creator?.nickname ?? '사용자 이름',
   debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
-  participants: 3,
+  participants: getDebateParticipantCount(debate),
   tag: `#${debate.tagMaps?.[0]?.tag.name ?? '기술'}`,
   createdDateLabel: formatCreatedDate(debate.createdAt),
 });
@@ -162,6 +166,8 @@ const MainPage = () => {
   const [activeDot, setActiveDot] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCard, setSelectedCard] = useState<ModalDebateItem | null>(null);
+  const [joinError, setJoinError] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollLeftRef = useRef(0);
   const scrollStopTimerRef = useRef<number | null>(null);
@@ -205,7 +211,29 @@ const MainPage = () => {
     if (scrollRef.current && Math.abs(scrollRef.current.scrollLeft - lastScrollLeftRef.current) > 2) {
       return;
     }
+    setJoinError('');
     setSelectedCard(item);
+  };
+
+  const openDebateModal = (item: ModalDebateItem) => {
+    setJoinError('');
+    setSelectedCard(item);
+  };
+
+  const handleJoinDebate = async (debateId: string) => {
+    if (isJoining) return;
+
+    setJoinError('');
+    setIsJoining(true);
+    try {
+      await debateService.join(debateId);
+      navigate(`/debate/${debateId}`);
+      setSelectedCard(null);
+    } catch {
+      setJoinError('토론 참여에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   const filteredDebates = useMemo(() => {
@@ -249,7 +277,7 @@ const MainPage = () => {
     title: debate.title,
     description: debate.description,
     author: debate.creator?.nickname ?? '사용자',
-    participants: 0,
+    participants: getDebateParticipantCount(debate),
     status: debate.status === 'OPEN' ? 'OPEN' : 'WAITING',
     tag: `#${debate.tagMaps?.[0]?.tag.name ?? activeCategory}`,
     modalData: mapDebateToModalItem(debate),
@@ -340,7 +368,7 @@ const MainPage = () => {
         >
           {!loadError && debateItems.length === 0 && <ListError>표시할 토론이 없습니다.</ListError>}
           {debateItems.map((item) => (
-            <DebateCard key={item.id} item={item} onClick={() => setSelectedCard(item.modalData)} />
+            <DebateCard key={item.id} item={item} onClick={() => openDebateModal(item.modalData)} />
           ))}
         </LoadingContent>
       </DebateList>
@@ -376,6 +404,7 @@ const MainPage = () => {
             <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
             <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
             <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
+            {joinError && <ModalError>{joinError}</ModalError>}
 
             <ModalActionRow>
               <ModalActionIconButton type="button" aria-label="저장">
@@ -386,12 +415,10 @@ const MainPage = () => {
               </ModalActionIconButton>
               <JoinButton
                 type="button"
-                onClick={() => {
-                  navigate(`/debate/${selectedCard.id}`);
-                  setSelectedCard(null);
-                }}
+                disabled={isJoining}
+                onClick={() => void handleJoinDebate(selectedCard.id)}
               >
-                참여하기
+                {isJoining ? '참여 중...' : '참여하기'}
               </JoinButton>
             </ModalActionRow>
           </ModalCard>
@@ -873,6 +900,12 @@ const ModalMeta = styled.p`
   color: #9a9a9a;
 `;
 
+const ModalError = styled.p`
+  margin: 0 0 10px;
+  color: #f04444;
+  font-size: var(--body-sm);
+`;
+
 const ModalActionRow = styled.div`
   display: flex;
   align-items: center;
@@ -910,6 +943,11 @@ const JoinButton = styled.button`
   color: #ffffff;
   font-size: var(--title-sm);
   font-weight: 700;
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
 `;
 
 export default MainPage;
