@@ -52,7 +52,7 @@ const mapToRoomCard = (debate: Debate): DebateRoomCard => ({
   statusLabel: debate.status === 'OPEN' ? '진행중' : '준비중',
   creatorName: debate.creator?.nickname ?? '사용자 이름',
   debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
-  participants: 3,
+  participants: debate.participantCount ?? 0,
   tagLabel: `#${debate.tagMaps?.[0]?.tag.name ?? '기술'}`,
   createdDateLabel: formatCreatedDate(debate.createdAt),
 });

@@ -117,7 +117,7 @@ const DebateInfoPage = () => {
         <InfoText>토론 방식 : {debateTypeLabel}</InfoText>
         <InfoText>토론 상태 : 현재 {statusLabel}</InfoText>
         <InfoText>{createdDateLabel}</InfoText>
-        <InfoText>조회수 : 5,234회</InfoText>
+        <InfoText>참여 인원 : {debate?.participantCount ?? 0}명</InfoText>
       </InfoCard>
 
       <ParticipantsCard>
@@ -134,7 +134,6 @@ const DebateInfoPage = () => {
 
       <SummaryCard>
         <SummaryText>진행된 내용 : {postCount}개</SummaryText>
-        <SummaryText>정의한 용어 : 무슨 뜻에 대한 무슨 용어</SummaryText>
       </SummaryCard>
     </Wrapper>
   );

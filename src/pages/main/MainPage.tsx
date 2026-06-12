@@ -98,7 +98,7 @@ const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
   description: debate.description,
   creatorName: debate.creator?.nickname ?? '사용자 이름',
   debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
-  participants: 3,
+  participants: debate.participantCount ?? 0,
   tag: `#${debate.tagMaps?.[0]?.tag.name ?? '기술'}`,
   createdDateLabel: formatCreatedDate(debate.createdAt),
 });
@@ -258,7 +258,7 @@ const MainPage = () => {
     title: debate.title,
     description: debate.description,
     author: debate.creator?.nickname ?? '사용자',
-    participants: 0,
+    participants: debate.participantCount ?? 0,
     status: debate.status === 'OPEN' ? 'OPEN' : 'WAITING',
     tag: `#${debate.tagMaps?.[0]?.tag.name ?? activeCategory}`,
     modalData: mapDebateToModalItem(debate),

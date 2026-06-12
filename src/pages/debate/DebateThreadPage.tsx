@@ -140,7 +140,7 @@ const DebateThreadPage = () => {
       </Header>
 
       <PromptCard>
-        <PromptText>당신은 앞으로 AI의 전망을 잘 알고 있습니까?</PromptText>
+        <PromptText>{description}</PromptText>
         <PromptArrow aria-hidden />
       </PromptCard>
 
@@ -149,8 +149,9 @@ const DebateThreadPage = () => {
         {!loadError && visibleMessages.length === 0 && (
           <EmptyCard>아직 의견이 없습니다. 첫 의견을 남겨보세요.</EmptyCard>
         )}
-        {visibleMessages.map((item) => {
+        {visibleMessages.map((item, messageIndex) => {
           const comments = commentsByPostId[item.id] ?? [];
+          const postNumber = `#${messageIndex + 1}`;
 
           return (
             <MessageGroup key={item.id}>
@@ -163,7 +164,7 @@ const DebateThreadPage = () => {
                   }}
                 >
                   <MetaRow>
-                    <NumberText>#1</NumberText>
+                    <NumberText>{postNumber}</NumberText>
                     <Avatar />
                     <AuthorName>{item.author.nickname}</AuthorName>
                   </MetaRow>
@@ -171,7 +172,7 @@ const DebateThreadPage = () => {
                 </MessageCard>
               </MessageNode>
 
-              {comments.map((comment) => (
+              {comments.map((comment, commentIndex) => (
                 <MessageNode key={comment.id} $depth={1}>
                   <Connector aria-hidden />
                   <MessageCard
@@ -182,7 +183,7 @@ const DebateThreadPage = () => {
                     }}
                   >
                     <MetaRow>
-                      <NumberText>#1</NumberText>
+                      <NumberText>{postNumber}-{commentIndex + 1}</NumberText>
                       <Avatar />
                       <AuthorName>{comment.author?.nickname ?? '사용자 이름'}</AuthorName>
                     </MetaRow>
