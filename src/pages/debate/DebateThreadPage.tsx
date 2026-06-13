@@ -120,6 +120,8 @@ const getMentionPrefix = (name: string) => {
   return `@${normalizedName} `;
 };
 
+const getReplyGroupKey = (postId: string, commentId: string) => `${postId}:${commentId}`;
+
 const buildCommentGroups = (comments: Comment[]) => {
   const commentMap = new Map(comments.map((comment) => [comment.id, comment]));
   const rootIdMap = new Map<string, string>();
@@ -315,6 +317,7 @@ const DebateThreadPage = () => {
     null,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expandedReplyGroups, setExpandedReplyGroups] = useState<Record<string, boolean>>({});
   const canFinalizeConsensus =
     user?.role === "ADMIN" || currentDebate?.creator?.id === user?.id;
 
@@ -909,6 +912,11 @@ const DebateThreadPage = () => {
     setReplyTarget(null);
   };
 
+  const toggleReplyGroup = (postId: string, commentId: string) => {
+    const groupKey = getReplyGroupKey(postId, commentId);
+    setExpandedReplyGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedMessage = message.trim();
@@ -947,6 +955,12 @@ const DebateThreadPage = () => {
           ...prev,
           [replyTarget.postId]: data.comments,
         }));
+        if (replyTarget.parentCommentId) {
+          setExpandedReplyGroups((prev) => ({
+            ...prev,
+            [getReplyGroupKey(replyTarget.postId, replyTarget.parentCommentId as string)]: true,
+          }));
+        }
         setReplyTarget(null);
       } else {
         await createMessage(debateId, message, { definitionReferences });
@@ -1960,11 +1974,16 @@ const DebateThreadPage = () => {
                     <CommentGroupItem key={comment.id}>
                       {renderCommentCard(comment, item.id)}
                       {comment.replies.length > 0 && (
-                        <ReplyList>
-                          {comment.replies.map((reply) =>
-                            renderCommentCard(reply, item.id),
+                        <>
+                          <ReplyToggleButton type="button" onClick={() => toggleReplyGroup(item.id, comment.id)}>
+                            {expandedReplyGroups[getReplyGroupKey(item.id, comment.id)]
+                              ? "답글 숨기기"
+                              : `답글 ${comment.replies.length}개 보기`}
+                          </ReplyToggleButton>
+                          {expandedReplyGroups[getReplyGroupKey(item.id, comment.id)] && (
+                            <ReplyList>{comment.replies.map((reply) => renderCommentCard(reply, item.id))}</ReplyList>
                           )}
-                        </ReplyList>
+                        </>
                       )}
                     </CommentGroupItem>
                   ))}
@@ -2590,6 +2609,17 @@ const CommentGroupItem = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
+`;
+
+const ReplyToggleButton = styled.button`
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: #2dcd97;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 4px;
+  margin-left: 4px;
 `;
 
 const ReplyList = styled.div`
