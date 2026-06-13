@@ -13,6 +13,7 @@ import DebateCreatePage from '../pages/debate/DebateCreatePage';
 import DebateArchivePage from '../pages/debate/DebateArchivePage';
 import DebateInfoPage from '../pages/debate/DebateInfoPage';
 import DebateThreadPage from '../pages/debate/DebateThreadPage';
+import DebateTutorialPage from '../pages/debate/DebateTutorialPage';
 import DefinitionSearchPage from '../pages/definition/DefinitionSearchPage';
 import MessagePage from '../pages/message/MessagePage';
 import ProfilePage from '../pages/profile/ProfilePage';
@@ -40,6 +41,7 @@ const router = createBrowserRouter([
           { index: true, element: <MainPage /> },
           { path: 'debate-room', element: <DebatePage /> },
           { path: 'debate/:id/info', element: <DebateInfoPage /> },
+          { path: 'debate/:id/tutorial', element: <DebateTutorialPage /> },
           { path: 'debate/:id', element: <DebateThreadPage /> },
           { path: 'debate/create', element: <DebateCreatePage /> },
           { path: 'debate/archive', element: <DebateArchivePage /> },
