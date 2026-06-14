@@ -1,27 +1,50 @@
 import { isAxiosError } from 'axios';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import styled from 'styled-components';
-import iconChat from '../../assets/icon_chat.svg';
+import styled, { css } from 'styled-components';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { debateService } from '../../services/debateService';
 import type { Debate } from '../../types/debate';
 
-const GUIDE_ITEMS = [
+type TutorialTarget = 'topic' | 'input' | 'reply' | 'selection' | 'enter';
+
+type TutorialStep = {
+  target: TutorialTarget;
+  title: string;
+  description: string;
+  actionText: string;
+};
+
+const TUTORIAL_STEPS: TutorialStep[] = [
   {
-    step: '01',
-    title: '의견을 먼저 남겨요',
-    description: '아래 입력창에 내 생각을 적으면 토론 흐름에 의견 카드가 추가돼요.',
+    target: 'topic',
+    title: '토론 주제를 먼저 확인해요',
+    description: '상단 카드에서 오늘 토론할 주제와 설명을 확인할 수 있어요.',
+    actionText: '주제 카드를 눌러보세요',
   },
   {
-    step: '02',
-    title: '댓글로 이어서 대화해요',
-    description: '다른 사람의 의견을 누르면 답글을 달 수 있고, 멘션으로 누구에게 답하는지 보여줘요.',
+    target: 'input',
+    title: '내 의견을 입력해요',
+    description: '아래 입력창을 눌러 내 생각을 의견으로 남길 수 있어요.',
+    actionText: '입력창을 눌러보세요',
   },
   {
-    step: '03',
+    target: 'reply',
+    title: '댓글로 대화를 이어가요',
+    description: '다른 사람의 의견에 답하고 싶을 때는 댓글 버튼을 눌러요.',
+    actionText: '댓글 버튼을 눌러보세요',
+  },
+  {
+    target: 'selection',
     title: '중요한 문장은 선택해요',
-    description: '토론 중 기준이 될 문장을 선택하면 합의나 새 토론으로 확장할 수 있어요.',
+    description: '기준이 될 만한 문장을 선택해서 합의나 새 토론으로 확장할 수 있어요.',
+    actionText: '초록 문장을 눌러보세요',
+  },
+  {
+    target: 'enter',
+    title: '이제 토론에 입장해요',
+    description: '튜토리얼을 마쳤어요. 실제 토론방으로 들어가 의견을 남겨보세요.',
+    actionText: '토론 시작하기를 눌러보세요',
   },
 ];
 
@@ -36,9 +59,14 @@ const DebateTutorialPage = () => {
   const navigate = useNavigate();
   const { id: debateId } = useParams();
   const [debate, setDebate] = useState<Debate | null>(null);
+  const [stepIndex, setStepIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isEntering, setIsEntering] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [hintMessage, setHintMessage] = useState('');
+
+  const currentStep = TUTORIAL_STEPS[stepIndex];
+  const isActive = (target: TutorialTarget) => currentStep.target === target;
 
   useEffect(() => {
     if (!debateId) {
@@ -98,6 +126,25 @@ const DebateTutorialPage = () => {
     }
   };
 
+  const goNext = () => {
+    setHintMessage('');
+
+    if (currentStep.target === 'enter') {
+      void handleEnterDebate();
+      return;
+    }
+
+    setStepIndex((prev) => Math.min(prev + 1, TUTORIAL_STEPS.length - 1));
+  };
+
+  const handleDimClick = () => {
+    setHintMessage('밝게 강조된 부분을 눌러 다음 단계로 넘어가요.');
+  };
+
+  const topicTitle = debate?.title ?? '토론에 참여하기';
+  const topicDescription =
+    debate?.description ?? '토론 화면에서 의견을 남기고, 댓글을 달고, 중요한 문장을 선택하는 방법을 연습해볼게요.';
+
   return (
     <Wrapper>
       <Header>
@@ -105,67 +152,97 @@ const DebateTutorialPage = () => {
           <BackIcon />
         </IconButton>
         <Logo src={logoSymbol} alt="정명" />
-        <HeaderSpacer />
+        <SkipButton type="button" onClick={() => void handleEnterDebate()} disabled={isEntering || !debateId}>
+          건너뛰기
+        </SkipButton>
       </Header>
 
-      <Hero>
-        <Eyebrow>토론 참여 튜토리얼</Eyebrow>
-        <Title>{debate?.title ?? '토론에 참여하기'}</Title>
-        <Description>
-          {debate?.description ?? '토론 화면에서 의견을 남기고, 답글을 달고, 중요한 문장을 선택하는 방법을 알려드릴게요.'}
-        </Description>
-      </Hero>
+      <CoachFrame aria-label="토론 참여 튜토리얼">
+        <TopicCard type="button" $active={isActive('topic')} onClick={isActive('topic') ? goNext : undefined}>
+          <TopicLabel>토론 주제</TopicLabel>
+          <TopicTitle>{topicTitle}</TopicTitle>
+          <TopicDescription>{topicDescription}</TopicDescription>
+        </TopicCard>
 
-      <PreviewCard>
-        <PreviewTop>
-          <PreviewLabel>토론 화면 미리보기</PreviewLabel>
-          <PreviewIcon src={iconChat} alt="" />
-        </PreviewTop>
-        <MessageCard $active>
-          <MessageMeta>#1 사용자 이름</MessageMeta>
-          <MessageText>내 의견을 입력하면 이렇게 토론 흐름에 표시돼요.</MessageText>
-        </MessageCard>
-        <ReplyCard>
-          <MessageMeta>@사용자이름</MessageMeta>
-          <MessageText>댓글은 대화처럼 이어지고, 답글 대상은 멘션으로 보여요.</MessageText>
-        </ReplyCard>
-      </PreviewCard>
+        <ThreadPreview>
+          <QuestionBubble>당신은 이 주제에 대해 어떤 생각을 가지고 있나요?</QuestionBubble>
 
-      <GuideList>
-        {GUIDE_ITEMS.map((item) => (
-          <GuideCard key={item.step}>
-            <Step>{item.step}</Step>
-            <GuideTextWrap>
-              <GuideTitle>{item.title}</GuideTitle>
-              <GuideDescription>{item.description}</GuideDescription>
-            </GuideTextWrap>
-          </GuideCard>
-        ))}
-      </GuideList>
+          <PostCard>
+            <PostMeta>#1 과자좋아</PostMeta>
+            <PostContent>
+              저는 먼저 근거를 짧게 정리한 다음, 다른 사람 의견을 보며 생각을 확장해요.
+              <SelectionText $active={isActive('selection')} onClick={isActive('selection') ? goNext : undefined}>
+                기준이 되는 문장은 이렇게 선택할 수 있어요.
+              </SelectionText>
+            </PostContent>
+            <ReplyButton type="button" $active={isActive('reply')} onClick={isActive('reply') ? goNext : undefined}>
+              댓글 달기
+            </ReplyButton>
+          </PostCard>
+
+          <ReplyPreview>
+            <PostMeta>@과자좋아</PostMeta>
+            <PostContent>상대 의견에 답하면 멘션과 함께 댓글 흐름이 이어져요.</PostContent>
+          </ReplyPreview>
+        </ThreadPreview>
+
+        <InputBar $active={isActive('input')} onClick={isActive('input') ? goNext : undefined}>
+          <HashButton type="button">#</HashButton>
+          <FakeInput>입력창을 눌러 의견을 남겨보세요</FakeInput>
+          <SendButton type="button">보내기</SendButton>
+        </InputBar>
+
+        <EnterButton type="button" $active={isActive('enter')} onClick={isActive('enter') ? goNext : undefined} disabled={isEntering || !debateId}>
+          {isEntering ? '입장 중...' : '토론 시작하기'}
+        </EnterButton>
+
+        <DimLayer onClick={handleDimClick} />
+
+        <CoachMark $placement={currentStep.target === 'input' || currentStep.target === 'enter' ? 'top' : 'bottom'}>
+          <StepCounter>
+            {stepIndex + 1}/{TUTORIAL_STEPS.length}
+          </StepCounter>
+          <CoachTitle>{currentStep.title}</CoachTitle>
+          <CoachDescription>{currentStep.description}</CoachDescription>
+          <CoachAction>{hintMessage || currentStep.actionText}</CoachAction>
+        </CoachMark>
+      </CoachFrame>
 
       {isLoading && <StatusText>튜토리얼을 준비하고 있어요...</StatusText>}
       {errorMessage && <ErrorText>{errorMessage}</ErrorText>}
-
-      <BottomAction>
-        <EnterButton type="button" onClick={() => void handleEnterDebate()} disabled={isEntering || !debateId}>
-          {isEntering ? '입장 중...' : '토론 시작하기'}
-        </EnterButton>
-      </BottomAction>
     </Wrapper>
   );
 };
 
+const activeSpotlight = css`
+  position: relative;
+  z-index: 5;
+  pointer-events: auto;
+  box-shadow: 0 0 0 4px rgba(45, 205, 151, 0.3), 0 0 0 9999px rgba(0, 0, 0, 0);
+  animation: pulseSpotlight 1.2s ease-in-out infinite;
+`;
+
 const Wrapper = styled.div`
   min-height: 100dvh;
   background: #f5f5f5;
-  padding: clamp(20px, 5.6vw, 24px) var(--page-x) calc(clamp(92px, 24vw, 104px) + env(safe-area-inset-bottom));
+  padding: clamp(20px, 5.6vw, 24px) var(--page-x) clamp(22px, 6vw, 26px);
+
+  @keyframes pulseSpotlight {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.015);
+    }
+  }
 `;
 
 const Header = styled.header`
   display: grid;
-  grid-template-columns: var(--tap-size) 1fr var(--tap-size);
+  grid-template-columns: var(--tap-size) 1fr auto;
   align-items: center;
-  margin-bottom: clamp(20px, 6vw, 26px);
+  margin-bottom: clamp(16px, 4.7vw, 20px);
 `;
 
 const IconButton = styled.button`
@@ -185,20 +262,58 @@ const Logo = styled.img`
   justify-self: center;
 `;
 
-const HeaderSpacer = styled.div``;
+const SkipButton = styled.button`
+  min-width: 64px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  color: #8f8f8f;
+  font-size: var(--body-sm);
+  font-weight: 700;
 
-const Hero = styled.section`
-  margin-bottom: clamp(16px, 4.7vw, 20px);
+  &:disabled {
+    opacity: 0.5;
+  }
 `;
 
-const Eyebrow = styled.p`
+const CoachFrame = styled.main`
+  position: relative;
+  min-height: calc(100dvh - clamp(86px, 24vw, 104px));
+  border-radius: clamp(28px, 8.4vw, 36px);
+  background: #ffffff;
+  padding: clamp(16px, 4.7vw, 20px);
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(40, 40, 40, 0.08);
+`;
+
+const DimLayer = styled.button`
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: none;
+  background: rgba(20, 20, 20, 0.72);
+`;
+
+const TopicCard = styled.button<{ $active: boolean }>`
+  width: 100%;
+  border: none;
+  text-align: left;
+  border-radius: 22px;
+  background: #f7f7f7;
+  padding: clamp(16px, 4.7vw, 20px);
+  margin-bottom: clamp(14px, 3.7vw, 16px);
+  cursor: ${({ $active }) => ($active ? 'pointer' : 'default')};
+  ${({ $active }) => $active && activeSpotlight}
+`;
+
+const TopicLabel = styled.p`
   margin: 0 0 8px;
   color: #2dcd97;
   font-size: var(--body-sm);
   font-weight: 800;
 `;
 
-const Title = styled.h1`
+const TopicTitle = styled.h1`
   margin: 0;
   color: #2f3238;
   font-size: var(--title-md);
@@ -208,115 +323,193 @@ const Title = styled.h1`
   overflow-wrap: anywhere;
 `;
 
-const Description = styled.p`
-  margin: 10px 0 0;
+const TopicDescription = styled.p`
+  margin: 8px 0 0;
   color: #8f8f8f;
-  font-size: var(--body-md);
+  font-size: var(--body-sm);
   line-height: 1.45;
   word-break: keep-all;
   overflow-wrap: anywhere;
 `;
 
-const PreviewCard = styled.section`
-  border-radius: var(--card-radius);
-  background: #ffffff;
-  padding: clamp(16px, 4.7vw, 20px);
-  box-shadow: 0 12px 24px rgba(48, 48, 48, 0.05);
-  margin-bottom: clamp(16px, 4.7vw, 20px);
+const ThreadPreview = styled.section`
+  position: relative;
+  z-index: 1;
+  min-height: clamp(340px, 82vw, 420px);
 `;
 
-const PreviewTop = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
+const QuestionBubble = styled.div`
+  width: 100%;
+  border-radius: 22px;
+  background: #f5f5f5;
+  padding: 18px 16px;
+  color: #9b9b9b;
+  font-size: var(--body-sm);
+  text-align: center;
+  margin-bottom: 22px;
 `;
 
-const PreviewLabel = styled.p`
-  margin: 0;
-  color: #2f3238;
-  font-size: var(--body-md);
-  font-weight: 800;
-`;
-
-const PreviewIcon = styled.img`
-  width: clamp(46px, 13vw, 56px);
-  height: clamp(46px, 13vw, 56px);
-`;
-
-const MessageCard = styled.div<{ $active?: boolean }>`
+const PostCard = styled.article`
   border-radius: 18px;
-  background: ${({ $active }) => ($active ? '#ecfff8' : '#f7f7f7')};
-  border: 1px solid ${({ $active }) => ($active ? '#c8f7e6' : '#eeeeee')};
-  padding: 12px 14px;
+  background: #f8f8f8;
+  padding: 14px;
+  margin-bottom: 12px;
 `;
 
-const ReplyCard = styled(MessageCard)`
-  width: calc(100% - clamp(28px, 8.4vw, 36px));
-  margin: 10px 0 0 auto;
-  background: #f9f9f9;
+const ReplyPreview = styled(PostCard)`
+  width: calc(100% - clamp(32px, 10vw, 44px));
+  margin-left: auto;
+  background: #fbfbfb;
 `;
 
-const MessageMeta = styled.p`
-  margin: 0 0 6px;
+const PostMeta = styled.p`
+  margin: 0 0 8px;
   color: #aeaeae;
   font-size: var(--body-sm);
   font-weight: 700;
 `;
 
-const MessageText = styled.p`
+const PostContent = styled.p`
   margin: 0;
   color: #3d3f45;
   font-size: var(--body-sm);
-  line-height: 1.45;
+  line-height: 1.55;
   word-break: keep-all;
 `;
 
-const GuideList = styled.section`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+const SelectionText = styled.span<{ $active: boolean }>`
+  display: inline;
+  border-radius: 8px;
+  color: ${({ $active }) => ($active ? '#0aa971' : '#2dcd97')};
+  background: ${({ $active }) => ($active ? '#e6fff5' : 'transparent')};
+  font-weight: 800;
+  cursor: ${({ $active }) => ($active ? 'pointer' : 'default')};
+  ${({ $active }) => $active && activeSpotlight}
 `;
 
-const GuideCard = styled.article`
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  border-radius: 20px;
+const ReplyButton = styled.button<{ $active: boolean }>`
+  height: 34px;
+  margin-top: 12px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1.5px solid #2dcd97;
   background: #ffffff;
-  padding: 14px;
+  color: #2dcd97;
+  font-size: var(--body-sm);
+  font-weight: 800;
+  cursor: ${({ $active }) => ($active ? 'pointer' : 'default')};
+  ${({ $active }) => $active && activeSpotlight}
 `;
 
-const Step = styled.span`
-  min-width: clamp(38px, 10.2vw, 44px);
-  height: clamp(30px, 7.9vw, 34px);
+const InputBar = styled.div<{ $active: boolean }>`
+  display: grid;
+  grid-template-columns: 38px 1fr 58px;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  border-radius: 999px;
+  background: #f3f3f3;
+  padding: 6px;
+  cursor: ${({ $active }) => ($active ? 'pointer' : 'default')};
+  ${({ $active }) => $active && activeSpotlight}
+`;
+
+const HashButton = styled.button`
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #ffffff;
+  color: #9f9f9f;
+  font-size: 18px;
+  font-weight: 800;
+`;
+
+const FakeInput = styled.div`
+  min-width: 0;
+  color: #b0b0b0;
+  font-size: var(--body-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const SendButton = styled.button`
+  height: 36px;
+  border: none;
   border-radius: 999px;
   background: #2dcd97;
   color: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   font-size: var(--body-sm);
   font-weight: 800;
 `;
 
-const GuideTextWrap = styled.div`
-  min-width: 0;
+const EnterButton = styled.button<{ $active: boolean }>`
+  width: 100%;
+  height: clamp(50px, 13vw, 56px);
+  border: none;
+  border-radius: 999px;
+  background: #2dcd97;
+  color: #ffffff;
+  font-size: var(--title-sm);
+  font-weight: 800;
+  margin-top: 14px;
+  cursor: ${({ $active }) => ($active ? 'pointer' : 'default')};
+  ${({ $active }) => $active && activeSpotlight}
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
 `;
 
-const GuideTitle = styled.h2`
-  margin: 0;
-  color: #2f3238;
-  font-size: var(--body-md);
+const CoachMark = styled.aside<{ $placement: 'top' | 'bottom' }>`
+  position: absolute;
+  left: clamp(18px, 5.6vw, 24px);
+  right: clamp(18px, 5.6vw, 24px);
+  z-index: 6;
+  border-radius: 24px;
+  background: #ffffff;
+  padding: 16px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.18);
+
+  ${({ $placement }) =>
+    $placement === 'top'
+      ? css`
+          top: clamp(18px, 5.6vw, 24px);
+        `
+      : css`
+          bottom: clamp(20px, 6vw, 26px);
+        `}
+`;
+
+const StepCounter = styled.p`
+  margin: 0 0 8px;
+  color: #2dcd97;
+  font-size: var(--body-sm);
   font-weight: 800;
 `;
 
-const GuideDescription = styled.p`
-  margin: 6px 0 0;
+const CoachTitle = styled.h2`
+  margin: 0;
+  color: #2f3238;
+  font-size: var(--title-sm);
+  font-weight: 900;
+`;
+
+const CoachDescription = styled.p`
+  margin: 8px 0 12px;
   color: #8f8f8f;
   font-size: var(--body-sm);
   line-height: 1.45;
   word-break: keep-all;
+`;
+
+const CoachAction = styled.p`
+  margin: 0;
+  color: #2dcd97;
+  font-size: var(--body-md);
+  font-weight: 900;
 `;
 
 const StatusText = styled.p`
@@ -331,32 +524,6 @@ const ErrorText = styled.p`
   color: #f04444;
   font-size: var(--body-sm);
   text-align: center;
-`;
-
-const BottomAction = styled.div`
-  position: fixed;
-  left: 50%;
-  bottom: 0;
-  width: min(100%, var(--app-max-width));
-  transform: translateX(-50%);
-  padding: clamp(12px, 3.7vw, 16px) var(--page-x) max(clamp(12px, 3.7vw, 16px), env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(245, 245, 245, 0) 0%, #f5f5f5 28%, #f5f5f5 100%);
-`;
-
-const EnterButton = styled.button`
-  width: 100%;
-  height: clamp(50px, 13vw, 56px);
-  border: none;
-  border-radius: 999px;
-  background: #2dcd97;
-  color: #ffffff;
-  font-size: var(--title-sm);
-  font-weight: 800;
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
 `;
 
 export default DebateTutorialPage;
