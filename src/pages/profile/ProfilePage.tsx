@@ -6,6 +6,7 @@ import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
 import { useAuthStore } from '../../stores/authStore';
 import { usePageLoading } from '../../hooks/usePageLoading';
+import { sanitizePlainText } from '../../utils/textSanitizer';
 
 type MenuItem = { label: string; action: 'navigate' | 'toast'; value?: string };
 const MENU_ITEMS: MenuItem[] = [
@@ -114,7 +115,7 @@ const ProfilePage = () => {
         <ProfileEditCard>
           <ProfileInput
             value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
+            onChange={(e) => setNickname(sanitizePlainText(e.target.value))}
             placeholder="닉네임"
             disabled={isLoading}
           />

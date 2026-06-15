@@ -29,6 +29,7 @@ const formatDate = (date?: string) => {
 const DebateMetadataModal = ({ debate, onClose, onJoin }: DebateMetadataModalProps) => {
   const tagName = debate.tagMaps?.[0]?.tag.name;
   const creatorName = debate.creator?.nickname ?? '사용자 이름';
+  const participantCount = debate.participantCount ?? debate.participants?.length ?? 0;
 
   return (
     <Overlay role="dialog" aria-modal="true" aria-labelledby="debate-metadata-title">
@@ -54,7 +55,7 @@ const DebateMetadataModal = ({ debate, onClose, onJoin }: DebateMetadataModalPro
           </ProfileRow>
 
           <MetaText>토론 방식 : {DEBATE_TYPE_LABEL[debate.debateType]}</MetaText>
-          <MetaText>참여 인원 : 0</MetaText>
+          <MetaText>참여 인원 : {participantCount}</MetaText>
           <MetaText>{formatDate(debate.createdAt)}</MetaText>
         </Content>
 

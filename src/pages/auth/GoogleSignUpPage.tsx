@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../../hooks/useAuth';
+import { sanitizePlainText } from '../../utils/textSanitizer';
 
 type GoogleSignupState = {
   idToken?: string;
@@ -37,6 +38,11 @@ const GoogleSignUpPage = () => {
     e.preventDefault();
     setError('');
 
+    if (!nickname.trim()) {
+      setError('닉네임을 입력해 주세요.');
+      return;
+    }
+
     if (password !== passwordConfirm) {
       setError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
       return;
@@ -44,7 +50,7 @@ const GoogleSignUpPage = () => {
 
     setIsSubmitting(true);
     try {
-      await googleSignup(idToken, nickname, password, passwordConfirm);
+      await googleSignup(idToken, nickname.trim(), password, passwordConfirm);
       navigate('/', { replace: true });
     } catch (error) {
       setError(getErrorMessage(error));
@@ -67,7 +73,7 @@ const GoogleSignUpPage = () => {
             type="text"
             placeholder="닉네임을 입력하세요."
             value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
+            onChange={(e) => setNickname(sanitizePlainText(e.target.value))}
             required
           />
         </FieldGroup>

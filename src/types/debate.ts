@@ -25,16 +25,30 @@ export interface Debate {
   closedAt?: string | null;
   createdAt?: string;
   archivedAt?: string | null;
+
   resultSummary?: string | null;
   stanceDistribution?: StanceSummary | null;
+
   tagMaps?: Array<{ tag: DebateTag }>;
   creator?: {
     id: string;
     nickname: string;
+    profileImage?: string | null;
   };
+  participants?: Array<{
+    id: string;
+    joinedAt?: string;
+    roleInDebate?: "CREATOR" | "PARTICIPANT" | "MODERATOR";
+    user: {
+      id: string;
+      nickname: string;
+      profileImage?: string | null;
+    };
+  }>;
   definitions?: DebateDefinition[];
   participantCount?: number;
   sourceSelectionTarget?: SelectionTarget;
+
 }
 
 export interface DebateDefinition {

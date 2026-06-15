@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../../hooks/useAuth';
+import { sanitizePlainText } from '../../utils/textSanitizer';
 
 const EMAIL_VERIFIED_EVENT_KEY = 'emailVerifiedEvent';
 
@@ -107,6 +108,10 @@ const SignUpPage = () => {
     setIsEmailVerified(false);
 
     if (!agreed) return;
+    if (!nickname.trim()) {
+      setError('닉네임을 입력해 주세요.');
+      return;
+    }
     if (password !== passwordConfirm) {
       setError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
       return;
@@ -114,7 +119,7 @@ const SignUpPage = () => {
 
     setIsSubmitting(true);
     try {
-      await signup(email, nickname, password, passwordConfirm);
+      await signup(email, nickname.trim(), password, passwordConfirm);
       setSuccessMessage('인증 메일을 보냈습니다. 이메일 인증을 완료하면 계정이 생성됩니다.');
     } catch (error) {
       setError(getErrorMessage(error));
@@ -133,7 +138,7 @@ const SignUpPage = () => {
             type="text"
             placeholder="닉네임을 입력하세요."
             value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
+            onChange={(e) => setNickname(sanitizePlainText(e.target.value))}
             required
           />
         </FieldGroup>

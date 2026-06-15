@@ -107,6 +107,11 @@ interface JoinDebateResponse {
     joinedAt: string;
     lastReadAt?: string | null;
     roleInDebate: "CREATOR" | "PARTICIPANT" | "MODERATOR";
+    user: {
+      id: string;
+      nickname: string;
+      profileImage?: string | null;
+    };
   };
   participantCount: number;
 }

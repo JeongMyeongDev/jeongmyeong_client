@@ -15,6 +15,7 @@ import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import { usePageLoading } from '../../hooks/usePageLoading';
+import { debateService } from '../../services/debateService';
 import type { Debate } from '../../types/debate';
 
 type DebateRoomCard = {
@@ -48,6 +49,9 @@ const formatCreatedDate = (createdAt?: string) => {
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
 };
 
+const getDebateParticipantCount = (debate: Debate) =>
+  debate.participantCount ?? debate.participants?.length ?? 0;
+
 const mapToRoomCard = (debate: Debate): DebateRoomCard => ({
   id: debate.id,
   title: debate.title,
@@ -55,7 +59,7 @@ const mapToRoomCard = (debate: Debate): DebateRoomCard => ({
   statusLabel: debate.status === 'OPEN' ? '진행중' : '준비중',
   creatorName: debate.creator?.nickname ?? '사용자 이름',
   debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
-  participants: 3,
+  participants: getDebateParticipantCount(debate),
   tagLabel: `#${debate.tagMaps?.[0]?.tag.name ?? '기술'}`,
   createdDateLabel: formatCreatedDate(debate.createdAt),
 });
@@ -78,6 +82,8 @@ const DebatePage = () => {
   const [activeFilter, setActiveFilter] = useState('찬반토론');
   const [selectedCard, setSelectedCard] = useState<DebateRoomCard | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [joinError, setJoinError] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     const loadDebates = async () => {
@@ -98,6 +104,27 @@ const DebatePage = () => {
     () => debates.slice(0, 8).map(mapToRoomCard),
     [debates],
   );
+
+  const openDebateModal = (card: DebateRoomCard) => {
+    setJoinError('');
+    setSelectedCard(card);
+  };
+
+  const handleJoinDebate = async (debateId: string) => {
+    if (isJoining) return;
+
+    setJoinError('');
+    setIsJoining(true);
+    try {
+      await debateService.join(debateId);
+      navigate(`/debate/${debateId}/tutorial`);
+      setSelectedCard(null);
+    } catch {
+      setJoinError('토론 참여에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsJoining(false);
+    }
+  };
 
   return (
     <Wrapper>
@@ -143,7 +170,7 @@ const DebatePage = () => {
         >
           {!loadError && cards.length === 0 && <ErrorText>등록된 토론이 없습니다.</ErrorText>}
           {cards.map((card) => (
-            <Card key={card.id} onClick={() => setSelectedCard(card)}>
+            <Card key={card.id} onClick={() => openDebateModal(card)}>
               <CardTop>
                 <StatusBadge $running={card.statusLabel === '진행중'}>
                   {card.statusLabel.replace(/\s+/g, '')}
@@ -189,6 +216,7 @@ const DebatePage = () => {
             <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
             <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
             <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
+            {joinError && <ModalError>{joinError}</ModalError>}
 
             <ModalActionRow>
               <ModalActionIconButton type="button" aria-label="저장">
@@ -199,12 +227,10 @@ const DebatePage = () => {
               </ModalActionIconButton>
               <JoinButton
                 type="button"
-                onClick={() => {
-                  navigate(`/debate/${selectedCard.id}`);
-                  setSelectedCard(null);
-                }}
+                disabled={isJoining}
+                onClick={() => void handleJoinDebate(selectedCard.id)}
               >
-                참여하기
+                {isJoining ? '참여 중...' : '참여하기'}
               </JoinButton>
             </ModalActionRow>
           </ModalCard>
@@ -481,6 +507,12 @@ const ModalMeta = styled.p`
   color: #9a9a9a;
 `;
 
+const ModalError = styled.p`
+  margin: 0 0 10px;
+  color: #f04444;
+  font-size: var(--body-sm);
+`;
+
 const ModalActionRow = styled.div`
   display: flex;
   align-items: center;
@@ -518,6 +550,11 @@ const JoinButton = styled.button`
   color: #ffffff;
   font-size: var(--title-sm);
   font-weight: 700;
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
 `;
 
 export default DebatePage;
