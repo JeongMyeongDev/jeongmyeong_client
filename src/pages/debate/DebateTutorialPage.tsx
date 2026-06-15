@@ -334,7 +334,6 @@ const TopicDescription = styled.p`
 
 const ThreadPreview = styled.section`
   position: relative;
-  z-index: 1;
   min-height: clamp(340px, 82vw, 420px);
 `;
 
