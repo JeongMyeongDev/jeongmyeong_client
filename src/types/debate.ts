@@ -47,6 +47,8 @@ export interface Debate {
   }>;
   definitions?: DebateDefinition[];
   participantCount?: number;
+  isBookmarked?: boolean;
+  isSubscribed?: boolean;
   sourceSelectionTarget?: SelectionTarget;
 
 }

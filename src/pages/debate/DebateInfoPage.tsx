@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
@@ -34,6 +35,15 @@ const formatCreatedDate = (createdAt?: string) => {
   const date = new Date(createdAt);
   if (Number.isNaN(date.getTime())) return '';
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (isAxiosError(error)) {
+    const message = error.response?.data?.message;
+    if (Array.isArray(message)) return message.join(', ');
+    if (typeof message === 'string') return message;
+  }
+  return fallback;
 };
 
 const BackIcon = () => (
@@ -106,6 +116,8 @@ const DebateInfoPage = () => {
         ) ?? [];
 
         setDebate(loadedDebate);
+        setIsBookmarked(Boolean(loadedDebate.isBookmarked));
+        setIsSubscribed(Boolean(loadedDebate.isSubscribed));
         setDefinitions(definitionsResponse.data.definitions);
         setParticipantNames(participantNames.slice(0, 6));
         setPostCount(postsResponse.data.totalCount ?? posts.length);
@@ -161,8 +173,8 @@ const DebateInfoPage = () => {
       });
       setActionMessage('토론에 참여했습니다.');
       navigate(`/debate/${debateId}/tutorial`);
-    } catch {
-      setActionMessage('토론 참여에 실패했습니다.');
+    } catch (error) {
+      setActionMessage(getErrorMessage(error, '토론 참여에 실패했습니다.'));
     }
   };
 
@@ -178,8 +190,8 @@ const DebateInfoPage = () => {
         setIsBookmarked(true);
         setActionMessage('토론을 저장했습니다.');
       }
-    } catch {
-      setActionMessage('저장 상태를 변경하지 못했습니다.');
+    } catch (error) {
+      setActionMessage(getErrorMessage(error, '저장 상태를 변경하지 못했습니다.'));
     }
   };
 
@@ -195,8 +207,8 @@ const DebateInfoPage = () => {
         setIsSubscribed(true);
         setActionMessage('토론 알림을 구독했습니다.');
       }
-    } catch {
-      setActionMessage('알림 설정을 변경하지 못했습니다.');
+    } catch (error) {
+      setActionMessage(getErrorMessage(error, '알림 설정을 변경하지 못했습니다.'));
     }
   };
 
@@ -204,6 +216,8 @@ const DebateInfoPage = () => {
     if (!debateId) return;
     const { data } = await debateService.getById(debateId);
     setDebate(data.debate);
+    setIsBookmarked(Boolean(data.debate.isBookmarked));
+    setIsSubscribed(Boolean(data.debate.isSubscribed));
   };
 
   const handleCloseDebate = async () => {
@@ -217,8 +231,8 @@ const DebateInfoPage = () => {
       setIsCloseModalOpen(false);
       setResultSummary('');
       setActionMessage('토론을 종료했습니다.');
-    } catch {
-      setActionMessage('토론 종료에 실패했습니다.');
+    } catch (error) {
+      setActionMessage(getErrorMessage(error, '토론 종료에 실패했습니다.'));
     } finally {
       setIsLifecycleSubmitting(false);
     }
@@ -231,8 +245,8 @@ const DebateInfoPage = () => {
       await debateService.archive(debateId);
       await refreshDebateInfo();
       setActionMessage('토론을 아카이브했습니다.');
-    } catch {
-      setActionMessage('토론 아카이브에 실패했습니다.');
+    } catch (error) {
+      setActionMessage(getErrorMessage(error, '토론 아카이브에 실패했습니다.'));
     } finally {
       setIsLifecycleSubmitting(false);
     }

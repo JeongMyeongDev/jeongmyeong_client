@@ -843,12 +843,12 @@ const DebateThreadPage = () => {
       }
 
       if (currentDebate?.status === "CLOSED") {
-        setActionMessage("醫낅즺???좊줎?먯꽌???뺤쓽瑜??곌껐?????놁뒿?덈떎.");
+        setActionMessage("종료된 토론에서는 정의를 연결할 수 없습니다.");
         setEditSelection(null);
         return;
       }
       if (currentDebate?.status === "ARCHIVED") {
-        setActionMessage("?꾩뭅?대툕???좊줎? ?쎄린 ?꾩슜?낅땲??");
+        setActionMessage("아카이브된 토론은 읽기 전용입니다.");
         setEditSelection(null);
         return;
       }
@@ -2033,11 +2033,6 @@ const DebateThreadPage = () => {
         </IconButton>
       </Header>
 
-      <PromptCard>
-        <PromptText>당신은 앞으로 AI의 전망을 잘 알고 있습니까?</PromptText>
-        <PromptArrow aria-hidden />
-      </PromptCard>
-
       <ThreadArea
         onMouseUp={handleTextSelection}
         onTouchEnd={handleTextSelection}
@@ -2946,34 +2941,6 @@ const Description = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-`;
-
-const PromptCard = styled.section`
-  width: min(378px, calc(100% - var(--page-x) - var(--page-x)));
-  min-height: clamp(88px, 24.2vw, 104px);
-  margin: clamp(14px, 4.2vw, 18px) auto clamp(56px, 20.5vw, 88px);
-  border-radius: var(--card-radius);
-  background: #ffffff;
-  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.14);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(16px, 5.1vw, 22px);
-`;
-
-const PromptText = styled.p`
-  margin: 0;
-  color: #b0b0b0;
-  font-size: var(--body-sm);
-`;
-
-const PromptArrow = styled.span`
-  width: 22px;
-  height: 22px;
-  border-right: 2px solid #a6a6a6;
-  border-bottom: 2px solid #a6a6a6;
-  transform: rotate(45deg);
 `;
 
 const ThreadArea = styled.section`

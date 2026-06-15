@@ -11,17 +11,19 @@ import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import type { Debate } from '../../types/debate';
 
+type ArchiveFilter = '전체' | '찬반토론' | '합의토론' | '자유토론';
+
 type ArchiveCardItem = {
   id: string;
   title: string;
   description: string;
 };
 
-const FILTER_ITEMS = ['찬반토론', '합의토론', '댓글토론'];
-const FILTER_TYPE_MAP: Record<string, 'PROS_CONS' | 'CONSENSUS' | 'FREE'> = {
+const FILTER_ITEMS: ArchiveFilter[] = ['전체', '찬반토론', '합의토론', '자유토론'];
+const FILTER_TYPE_MAP: Partial<Record<ArchiveFilter, 'PROS_CONS' | 'CONSENSUS' | 'FREE'>> = {
   찬반토론: 'PROS_CONS',
   합의토론: 'CONSENSUS',
-  댓글토론: 'FREE',
+  자유토론: 'FREE',
 };
 
 const mapToArchiveCard = (debate: Debate): ArchiveCardItem => ({
@@ -35,26 +37,36 @@ const FilterIcon = () => <img src={btnDscionControl} width="48" height="34" alt=
 const DebateArchivePage = () => {
   const navigate = useNavigate();
   const { debates, fetchArchivedDebates } = useDebate();
-  const [activeFilter, setActiveFilter] = useState('찬반토론');
+  const [activeFilter, setActiveFilter] = useState<ArchiveFilter>('전체');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [submittedKeyword, setSubmittedKeyword] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [listError, setListError] = useState('');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     const loadDebates = async () => {
       try {
+        const type = FILTER_TYPE_MAP[activeFilter];
         await fetchArchivedDebates({
-          type: FILTER_TYPE_MAP[activeFilter],
+          ...(type ? { type } : {}),
+          ...(submittedKeyword.trim() ? { keyword: submittedKeyword.trim() } : {}),
           sort: 'archivedAt',
           direction: 'desc',
           limit: 20,
         });
         setListError('');
       } catch {
-        setListError('보관 토론 목록을 불러오지 못했습니다.');
+        setListError('보관된 토론 목록을 불러오지 못했습니다.');
       }
     };
     void loadDebates();
-  }, [activeFilter, fetchArchivedDebates]);
+  }, [activeFilter, fetchArchivedDebates, submittedKeyword]);
+
+  const handleSearchSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmittedKeyword(searchKeyword.trim());
+  };
 
   const archiveCards = useMemo(() => debates.slice(0, 8).map(mapToArchiveCard), [debates]);
 
@@ -68,7 +80,11 @@ const DebateArchivePage = () => {
           <TopIcon src={iconMenu} alt="" />
         </SideButton>
         <HeaderRight>
-          <SideButton type="button" aria-label="검색">
+          <SideButton
+            type="button"
+            aria-label="검색"
+            onClick={() => setIsSearchOpen((value) => !value)}
+          >
             <TopIcon src={iconSearch} alt="" />
           </SideButton>
           <SideButton type="button" aria-label="알림" onClick={() => navigate('/message')}>
@@ -76,6 +92,17 @@ const DebateArchivePage = () => {
           </SideButton>
         </HeaderRight>
       </HeaderRow>
+
+      {isSearchOpen && (
+        <SearchForm onSubmit={handleSearchSubmit}>
+          <SearchInput
+            value={searchKeyword}
+            onChange={(event) => setSearchKeyword(event.target.value)}
+            placeholder="보관된 토론 검색"
+          />
+          <SearchButton type="submit">검색</SearchButton>
+        </SearchForm>
+      )}
 
       <FilterRow>
         <FilterButton type="button" aria-label="필터">
@@ -97,9 +124,9 @@ const DebateArchivePage = () => {
         {listError && <ErrorText>{listError}</ErrorText>}
         {!listError && archiveCards.length === 0 && <ErrorText>보관된 토론이 없습니다.</ErrorText>}
         {archiveCards.map((card) => (
-          <Card key={card.id}>
+          <Card key={card.id} onClick={() => navigate(`/debate/${card.id}`)}>
             <CardTop>
-              <ClosedBadge>종결됨</ClosedBadge>
+              <ClosedBadge>종료됨</ClosedBadge>
               <ChatCircleIconImg src={iconChat} alt="" />
             </CardTop>
             <CardTitle>{card.title}</CardTitle>
@@ -154,11 +181,41 @@ const TopIcon = styled.img`
   height: clamp(24px, 6.5vw, 28px);
 `;
 
+const SearchForm = styled.form`
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+`;
+
+const SearchInput = styled.input`
+  flex: 1;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #333333;
+  font-size: var(--body-sm);
+  padding: 0 14px;
+  outline: none;
+`;
+
+const SearchButton = styled.button`
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: #2dcd97;
+  color: #ffffff;
+  font-size: var(--body-sm);
+  font-weight: 700;
+  padding: 0 14px;
+`;
+
 const FilterRow = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
+  overflow-x: auto;
 `;
 
 const FilterButton = styled.button`
@@ -202,6 +259,7 @@ const Card = styled.article`
   border-radius: var(--card-radius);
   padding: clamp(14px, 3.7vw, 16px) clamp(14px, 3.7vw, 16px) clamp(12px, 3.3vw, 14px);
   overflow: hidden;
+  cursor: pointer;
 `;
 
 const CardTop = styled.div`
@@ -235,7 +293,6 @@ const CardTitle = styled.h3`
   line-height: 1.2;
   font-weight: 700;
   color: #2f3238;
-  letter-spacing: -0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

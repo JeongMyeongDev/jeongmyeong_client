@@ -82,6 +82,9 @@ const DebatePage = () => {
   const [activeFilter, setActiveFilter] = useState('찬반토론');
   const [selectedCard, setSelectedCard] = useState<DebateRoomCard | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [submittedKeyword, setSubmittedKeyword] = useState('');
   const [joinError, setJoinError] = useState('');
   const [isJoining, setIsJoining] = useState(false);
 
@@ -91,6 +94,7 @@ const DebatePage = () => {
         await fetchDebates({
           status: 'OPEN',
           type: FILTER_TYPE_MAP[activeFilter],
+          ...(submittedKeyword.trim() ? { keyword: submittedKeyword.trim() } : {}),
           sort: 'updatedAt',
           direction: 'desc',
           limit: 20,
@@ -98,7 +102,12 @@ const DebatePage = () => {
       });
     };
     void loadDebates();
-  }, [activeFilter, fetchDebates, executeAsync]);
+  }, [activeFilter, fetchDebates, executeAsync, submittedKeyword]);
+
+  const handleSearchSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmittedKeyword(searchKeyword.trim());
+  };
 
   const cards = useMemo(
     () => debates.slice(0, 8).map(mapToRoomCard),
@@ -136,7 +145,11 @@ const DebatePage = () => {
           <TopIcon src={iconMenu} alt="" />
         </SideButton>
         <HeaderRight>
-          <SideButton type="button" aria-label="검색">
+          <SideButton
+            type="button"
+            aria-label="검색"
+            onClick={() => setIsSearchOpen((value) => !value)}
+          >
             <TopIcon src={iconSearch} alt="" />
           </SideButton>
           <SideButton type="button" aria-label="알림" onClick={() => navigate('/notifications')}>
@@ -144,6 +157,17 @@ const DebatePage = () => {
           </SideButton>
         </HeaderRight>
       </HeaderRow>
+
+      {isSearchOpen && (
+        <SearchForm onSubmit={handleSearchSubmit}>
+          <SearchInput
+            value={searchKeyword}
+            onChange={(event) => setSearchKeyword(event.target.value)}
+            placeholder="토론 검색"
+          />
+          <SearchButton type="submit">검색</SearchButton>
+        </SearchForm>
+      )}
 
       <FilterRow>
         <FilterButton type="button" aria-label="필터">
@@ -281,6 +305,35 @@ const SideButton = styled.button`
 const TopIcon = styled.img`
   width: clamp(24px, 6.5vw, 28px);
   height: clamp(24px, 6.5vw, 28px);
+`;
+
+const SearchForm = styled.form`
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+`;
+
+const SearchInput = styled.input`
+  flex: 1;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #333333;
+  font-size: var(--body-sm);
+  padding: 0 14px;
+  outline: none;
+`;
+
+const SearchButton = styled.button`
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: #2dcd97;
+  color: #ffffff;
+  font-size: var(--body-sm);
+  font-weight: 700;
+  padding: 0 14px;
 `;
 
 const FilterRow = styled.div`
