@@ -6,6 +6,7 @@ import type {
   CreateDebateRequest,
   CreatePostRequest,
   CreateSelectionTargetRequest,
+  CloseDebateRequest,
   ListDebatesParams,
 } from '../services/debateService';
 
@@ -51,6 +52,13 @@ export const useDebate = () => {
     return data.debate;
   }, [currentDebate, debates, setCurrentDebate, setDebates]);
 
+  const closeDebate = useCallback(async (id: string, payload?: CloseDebateRequest) => {
+    const { data } = await debateService.close(id, payload);
+    setCurrentDebate(currentDebate?.id === id ? { ...currentDebate, ...data.debate } : currentDebate);
+    setDebates(debates.map((debate) => (debate.id === id ? { ...debate, ...data.debate } : debate)));
+    return data.debate;
+  }, [currentDebate, debates, setCurrentDebate, setDebates]);
+
   const createSelectionTarget = useCallback(async (id: string, payload: CreateSelectionTargetRequest) => {
     const { data } = await debateService.createSelectionTarget(id, payload);
     return data.selectionTarget;
@@ -71,6 +79,7 @@ export const useDebate = () => {
     fetchMessages,
     createDebate,
     createMessage,
+    closeDebate,
     archiveDebate,
     createSelectionTarget,
     createConsensus,

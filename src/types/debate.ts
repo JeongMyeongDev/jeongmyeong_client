@@ -19,6 +19,9 @@ export interface Debate {
   description: string;
   debateType: DebateType;
   status: DebateStatus;
+  parentDebateId?: string | null;
+  sourceSelectionTargetId?: string | null;
+  closedAt?: string | null;
   createdAt?: string;
   archivedAt?: string | null;
   tagMaps?: Array<{ tag: DebateTag }>;
@@ -28,6 +31,7 @@ export interface Debate {
   };
   definitions?: DebateDefinition[];
   participantCount?: number;
+  sourceSelectionTarget?: SelectionTarget;
 }
 
 export interface DebateDefinition {
@@ -137,6 +141,12 @@ export interface SelectionTarget {
     profileImage?: string | null;
   };
   createdAt?: string;
+}
+
+export interface DebateParentResponse {
+  parentDebate: Debate | null;
+  selectedText: string | null;
+  sourceSelectionTarget?: SelectionTarget | null;
 }
 
 export interface Consensus {

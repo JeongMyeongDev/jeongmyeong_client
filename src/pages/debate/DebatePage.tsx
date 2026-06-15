@@ -151,6 +151,7 @@ const DebatePage = () => {
                 <ChatCircleIconImg src={iconChat} alt="" />
               </CardTop>
               <CardTitle>{card.title}</CardTitle>
+              <TypeBadge>{card.debateTypeLabel}</TypeBadge>
               <CardDesc>{card.description}</CardDesc>
             </Card>
           ))}
@@ -351,6 +352,21 @@ const CardTitle = styled.h3`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+`;
+
+const TypeBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  height: 22px;
+  max-width: 100%;
+  margin-bottom: 6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: #2dcd97;
+  font-size: 11px;
+  font-weight: 700;
 `;
 
 const CardDesc = styled.p`

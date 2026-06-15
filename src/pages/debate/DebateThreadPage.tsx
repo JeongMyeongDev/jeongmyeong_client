@@ -24,6 +24,8 @@ import type {
   Comment,
   Consensus,
   ConsensusVoteType,
+  Debate,
+  DebateType,
   Definition,
   DefinitionReference,
   DefinitionReferenceInput,
@@ -78,6 +80,13 @@ type ConsensusDraft = {
   content: string;
 };
 
+type ChildDebateDraft = {
+  selection: PendingSelection;
+  title: string;
+  description: string;
+  debateType: DebateType;
+};
+
 type EditTarget =
   | {
       type: "POST";
@@ -114,6 +123,12 @@ const CONSENSUS_STATUS_LABEL: Record<string, string> = {
 
 const buildConsensusSourceKey = (sourceType: SelectionSource, sourceId: string) =>
   `${sourceType}:${sourceId}`;
+
+const DEBATE_TYPE_OPTIONS: Array<{ value: DebateType; label: string }> = [
+  { value: "FREE", label: "자유 토론" },
+  { value: "CONSENSUS", label: "합의 토론" },
+  { value: "PROS_CONS", label: "찬반 토론" },
+];
 
 const getMentionPrefix = (name: string) => {
   const normalizedName = name.replace(/\s+/g, "") || "사용자";
@@ -297,6 +312,9 @@ const DebateThreadPage = () => {
   const [consensusDraft, setConsensusDraft] = useState<ConsensusDraft | null>(
     null,
   );
+  const [childDebates, setChildDebates] = useState<Debate[]>([]);
+  const [childDebateDraft, setChildDebateDraft] =
+    useState<ChildDebateDraft | null>(null);
   const [selectedConsensus, setSelectedConsensus] = useState<Consensus | null>(
     null,
   );
@@ -320,10 +338,23 @@ const DebateThreadPage = () => {
   const [expandedReplyGroups, setExpandedReplyGroups] = useState<Record<string, boolean>>({});
   const canFinalizeConsensus =
     user?.role === "ADMIN" || currentDebate?.creator?.id === user?.id;
+  const isDebateReadOnly =
+    currentDebate?.status === "CLOSED" || currentDebate?.status === "ARCHIVED";
+  const readOnlyMessage =
+    currentDebate?.status === "ARCHIVED"
+      ? "아카이브된 토론입니다."
+      : currentDebate?.status === "CLOSED"
+        ? "종료된 토론입니다."
+        : "";
 
   const refreshConsensuses = async (id: string) => {
     const { data } = await debateService.getConsensuses(id);
     setConsensuses(data.consensuses);
+  };
+
+  const refreshChildDebates = async (id: string) => {
+    const { data } = await debateService.getChildDebates(id);
+    setChildDebates(data.childDebates);
   };
 
   useEffect(() => {
@@ -335,6 +366,7 @@ const DebateThreadPage = () => {
           fetchDebate(debateId),
           fetchMessages(debateId),
           refreshConsensuses(debateId),
+          refreshChildDebates(debateId),
         ]);
       });
     };
@@ -410,12 +442,30 @@ const DebateThreadPage = () => {
     return map;
   }, [consensuses]);
 
+  const childDebatesBySource = useMemo(() => {
+    const map = new Map<string, Debate[]>();
+
+    childDebates.forEach((childDebate) => {
+      const target = childDebate.sourceSelectionTarget;
+      if (!target?.sourceType || !target.sourceId) return;
+
+      const key = buildConsensusSourceKey(target.sourceType, target.sourceId);
+      const sourceChildDebates = map.get(key) ?? [];
+      sourceChildDebates.push(childDebate);
+      map.set(key, sourceChildDebates);
+    });
+
+    return map;
+  }, [childDebates]);
+
   const openConsensusCount = consensuses.filter(
     (consensus) => consensus.status === "OPEN",
   ).length;
   const approvedConsensusCount = consensuses.filter(
     (consensus) => consensus.status === "APPROVED",
   ).length;
+  const isConsensusDebate = currentDebate?.debateType === "CONSENSUS";
+  const isProsConsDebate = currentDebate?.debateType === "PROS_CONS";
   const matchingDebateDefinitions = useMemo(
     () =>
       debateDefinitions.filter((definition) =>
@@ -471,6 +521,7 @@ const DebateThreadPage = () => {
     const intervalId = window.setInterval(() => {
       void fetchMessages(debateId);
       void refreshConsensuses(debateId);
+      void refreshChildDebates(debateId);
       const postIds = threadMessages.map((item) => item.id);
       void Promise.all(
         postIds.map(async (postId) => {
@@ -921,6 +972,14 @@ const DebateThreadPage = () => {
     event.preventDefault();
     const trimmedMessage = message.trim();
     if (!debateId || !trimmedMessage || isSubmitting) return;
+    if (isDebateReadOnly) {
+      setSubmitError(
+        currentDebate?.status === "ARCHIVED"
+          ? "아카이브된 토론은 읽기 전용입니다."
+          : "종료된 토론에서는 새 내용을 작성할 수 없습니다.",
+      );
+      return;
+    }
 
     setSubmitError("");
     setIsSubmitting(true);
@@ -1176,13 +1235,15 @@ const DebateThreadPage = () => {
       return;
     }
 
-    try {
-      await createSelectionTargetForAction(pendingSelection);
-      setActionMessage("하위 토론 생성은 다음 단계에서 연결됩니다.");
-      clearSelectionMenu();
-    } catch (error) {
-      setSubmitError(getMutationErrorMessage(error));
-    }
+    setSubmitError("");
+    setChildDebateDraft({
+      selection: pendingSelection,
+      title: "",
+      description: "",
+      debateType: "FREE",
+    });
+    setPendingSelection(null);
+    window.getSelection()?.removeAllRanges();
   };
 
   const handleCopySelection = async () => {
@@ -1231,6 +1292,40 @@ const DebateThreadPage = () => {
       setConsensusDraft(null);
       setSubmitError("");
       setActionMessage("합의안을 제안했습니다.");
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitChildDebateDraft = async () => {
+    if (!debateId || !childDebateDraft || isSubmitting) return;
+    if (currentDebate?.status !== "OPEN") {
+      setSubmitError("종료되었거나 보관된 토론에서는 하위 토론을 만들 수 없습니다.");
+      return;
+    }
+    if (!childDebateDraft.title.trim() || !childDebateDraft.description.trim()) {
+      setSubmitError("제목과 설명을 모두 입력해 주세요.");
+      return;
+    }
+
+    setSubmitError("");
+    setIsSubmitting(true);
+    try {
+      const selectionTarget = await createSelectionTargetForAction(
+        childDebateDraft.selection,
+      );
+      if (!selectionTarget) return;
+
+      await debateService.createChildDebate(selectionTarget.id, {
+        title: childDebateDraft.title.trim(),
+        description: childDebateDraft.description.trim(),
+        debateType: childDebateDraft.debateType,
+      });
+      await refreshChildDebates(debateId);
+      setChildDebateDraft(null);
+      setActionMessage("하위 토론을 만들었습니다.");
     } catch (error) {
       setSubmitError(getMutationErrorMessage(error));
     } finally {
@@ -1558,6 +1653,38 @@ const DebateThreadPage = () => {
     );
   };
 
+  const renderInlineChildDebateStack = (
+    sourceType: SelectionSource,
+    sourceId: string,
+  ) => {
+    const sourceChildDebates =
+      childDebatesBySource.get(buildConsensusSourceKey(sourceType, sourceId)) ??
+      [];
+    if (sourceChildDebates.length === 0) return null;
+
+    return (
+      <InlineChildDebateStack>
+        <InlineChildDebateTitle>연결된 하위 토론</InlineChildDebateTitle>
+        {sourceChildDebates.map((childDebate) => (
+          <InlineChildDebateCard key={childDebate.id}>
+            <ChildDebateTitleText>{childDebate.title}</ChildDebateTitleText>
+            {childDebate.sourceSelectionTarget?.selectedText && (
+              <ChildDebateQuote>
+                {childDebate.sourceSelectionTarget.selectedText}
+              </ChildDebateQuote>
+            )}
+            <ChildDebateAction
+              type="button"
+              onClick={() => navigate(`/debate/${childDebate.id}`)}
+            >
+              이동
+            </ChildDebateAction>
+          </InlineChildDebateCard>
+        ))}
+      </InlineChildDebateStack>
+    );
+  };
+
   const renderCommentCard = (comment: Comment, postId: string) => {
     const isDeleted = comment.status === "DELETED";
     const menuKey = `comment:${comment.id}`;
@@ -1728,6 +1855,7 @@ const DebateThreadPage = () => {
           )}
         </MessageCard>
         {!isDeleted && renderInlineConsensusStack("COMMENT", comment.id)}
+        {!isDeleted && renderInlineChildDebateStack("COMMENT", comment.id)}
       </Fragment>
     );
   };
@@ -1776,11 +1904,30 @@ const DebateThreadPage = () => {
         {!error && threadMessages.length === 0 && (
           <EmptyCard>아직 의견이 없습니다. 첫 의견을 남겨보세요.</EmptyCard>
         )}
-        {consensuses.length > 0 && (
+        {isConsensusDebate && (
           <ConsensusSummaryPanel>
             진행 중 합의안 {openConsensusCount}개 · 승인된 기준 정의{" "}
             {approvedConsensusCount}개
           </ConsensusSummaryPanel>
+        )}
+        {isProsConsDebate && (
+          <StancePanel>
+            <StancePanelTitle>입장 표시</StancePanelTitle>
+            {/* TODO: 서버에 찬반 입장 저장 모델이 추가되면 이 선택을 persisted stance로 연결합니다. */}
+            <StanceButtonRow>
+              <StanceButton type="button">찬성</StanceButton>
+              <StanceButton type="button">반대</StanceButton>
+              <StanceButton type="button">중립</StanceButton>
+            </StanceButtonRow>
+            <StanceHelpText>
+              입장 표시 기능은 준비 중입니다.
+            </StanceHelpText>
+          </StancePanel>
+        )}
+        {currentDebate.status !== "OPEN" && (
+          <ReadOnlyPanel>
+            종료되었거나 보관된 토론입니다. 하위 토론 생성은 사용할 수 없습니다.
+          </ReadOnlyPanel>
         )}
         {threadMessages.map((item) => {
           const comments = commentsByPostId[item.id] ?? [];
@@ -1967,6 +2114,7 @@ const DebateThreadPage = () => {
                 )}
               </MessageCard>
               {!isDeleted && renderInlineConsensusStack("POST", item.id)}
+              {!isDeleted && renderInlineChildDebateStack("POST", item.id)}
 
               {commentGroups.length > 0 && (
                 <CommentList>
@@ -2008,12 +2156,14 @@ const DebateThreadPage = () => {
           >
             합의안
           </SelectionMenuButton>
-          <SelectionMenuButton
-            type="button"
-            onClick={() => void handleSelectionAction("child")}
-          >
-            하위 토론
-          </SelectionMenuButton>
+          {currentDebate?.status === "OPEN" && (
+            <SelectionMenuButton
+              type="button"
+              onClick={() => void handleSelectionAction("child")}
+            >
+              하위 토론
+            </SelectionMenuButton>
+          )}
           <SelectionMenuButton type="button" onClick={handleCopySelection}>
             복사
           </SelectionMenuButton>
@@ -2252,6 +2402,74 @@ const DebateThreadPage = () => {
         </SheetBackdrop>
       )}
 
+      {childDebateDraft && (
+        <SheetBackdrop onClick={() => setChildDebateDraft(null)}>
+          <BottomSheet onClick={(event) => event.stopPropagation()}>
+            <SheetTitle>하위 토론 만들기</SheetTitle>
+            {submitError && <SheetError>{submitError}</SheetError>}
+            <SheetQuote>{childDebateDraft.selection.selectedText}</SheetQuote>
+            <SheetField>
+              <SheetLabel>제목</SheetLabel>
+              <SheetInput
+                value={childDebateDraft.title}
+                onChange={(event) =>
+                  setChildDebateDraft((prev) =>
+                    prev ? { ...prev, title: event.target.value } : prev,
+                  )
+                }
+                placeholder="하위 토론 제목"
+              />
+            </SheetField>
+            <SheetField>
+              <SheetLabel>설명</SheetLabel>
+              <SheetTextarea
+                value={childDebateDraft.description}
+                onChange={(event) =>
+                  setChildDebateDraft((prev) =>
+                    prev ? { ...prev, description: event.target.value } : prev,
+                  )
+                }
+                placeholder="토론에서 다룰 쟁점을 적어주세요."
+              />
+            </SheetField>
+            <SheetField>
+              <SheetLabel>토론 방식</SheetLabel>
+              <SheetSelect
+                value={childDebateDraft.debateType}
+                onChange={(event) =>
+                  setChildDebateDraft((prev) =>
+                    prev
+                      ? { ...prev, debateType: event.target.value as DebateType }
+                      : prev,
+                  )
+                }
+              >
+                {DEBATE_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </SheetSelect>
+            </SheetField>
+            <SheetActionRow>
+              <SheetSecondaryButton
+                type="button"
+                onClick={() => setChildDebateDraft(null)}
+              >
+                취소
+              </SheetSecondaryButton>
+              <SheetPrimaryButton
+                type="button"
+                onClick={() => void handleSubmitChildDebateDraft()}
+                disabled={isSubmitting}
+              >
+                만들기
+              </SheetPrimaryButton>
+            </SheetActionRow>
+          </BottomSheet>
+        </SheetBackdrop>
+      )}
+
       {selectedConsensus && (
         <SheetBackdrop onClick={() => setSelectedConsensus(null)}>
           <BottomSheet onClick={(event) => event.stopPropagation()}>
@@ -2423,6 +2641,9 @@ const DebateThreadPage = () => {
       )}
 
       <ComposerWrap>
+        {readOnlyMessage && (
+          <ReadOnlyComposerNotice>{readOnlyMessage}</ReadOnlyComposerNotice>
+        )}
         {submitError && <SubmitError>{submitError}</SubmitError>}
         {actionMessage && (
           <ComposerToastLayer>
@@ -2454,11 +2675,12 @@ const DebateThreadPage = () => {
             onTouchEnd={handleComposerSelection}
             placeholder="입력창.."
             aria-label="토론 메시지 입력"
+            disabled={isDebateReadOnly}
           />
           <SendButton
             type="submit"
             aria-label="메시지 전송"
-            disabled={!message.trim() || isSubmitting}
+            disabled={!message.trim() || isSubmitting || isDebateReadOnly}
           >
             <SendIcon />
           </SendButton>
@@ -2911,12 +3133,108 @@ const ConsensusSummaryPanel = styled.div`
   padding: 10px 12px;
 `;
 
+const StancePanel = styled(ConsensusSummaryPanel)`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #ffffff;
+  color: #555555;
+`;
+
+const StancePanelTitle = styled.strong`
+  font-size: 12px;
+  color: #555555;
+`;
+
+const StanceButtonRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+`;
+
+const StanceButton = styled.button`
+  height: 32px;
+  border: 1px solid #d8d8d8;
+  border-radius: 999px;
+  background: #f7f7f7;
+  color: #6f6f6f;
+  font-size: 12px;
+  font-weight: 700;
+`;
+
+const StanceHelpText = styled.p`
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.35;
+`;
+
+const ReadOnlyPanel = styled(ConsensusSummaryPanel)`
+  background: #f1f1f1;
+  color: #888888;
+`;
+
 const InlineConsensusStack = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-top: -3px;
   padding-left: clamp(14px, 4vw, 18px);
+`;
+
+const InlineChildDebateStack = styled(InlineConsensusStack)`
+  gap: 6px;
+`;
+
+const InlineChildDebateTitle = styled.span`
+  color: #7f7f7f;
+  font-size: 12px;
+  font-weight: 700;
+`;
+
+const InlineChildDebateCard = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  border-radius: 8px;
+  background: #ffffff;
+  border-left: 3px solid #2dcd97;
+  padding: 9px 10px;
+`;
+
+const ChildDebateTitleText = styled.strong`
+  min-width: 0;
+  color: #555555;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const ChildDebateQuote = styled.p`
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+`;
+
+const ChildDebateAction = styled.button`
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 48px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: #2dcd97;
+  font-size: 12px;
+  font-weight: 700;
 `;
 
 const ConsensusMetaRow = styled.div`
@@ -3136,6 +3454,18 @@ const SheetLabel = styled.span`
 `;
 
 const SheetInput = styled.input`
+  width: 100%;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #f0f0f0;
+  color: #555555;
+  font-size: 14px;
+  padding: 0 12px;
+  outline: none;
+`;
+
+const SheetSelect = styled.select`
   width: 100%;
   height: 40px;
   border: none;
@@ -3546,6 +3876,13 @@ const SubmitError = styled.p`
   text-align: center;
   color: #f04444;
   font-size: 12px;
+`;
+
+const ReadOnlyComposerNotice = styled.p`
+  margin: 0 0 8px;
+  text-align: center;
+  color: #8f8f8f;
+  font-size: 13px;
 `;
 
 const ActionNotice = styled.p`

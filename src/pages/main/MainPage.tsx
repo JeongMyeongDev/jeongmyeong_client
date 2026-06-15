@@ -141,9 +141,12 @@ const FeaturedCard = ({
 const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => void }) => (
   <DCard onClick={onClick}>
     <DLeft>
-      <DStatusBadge>
-        {(item.status === 'OPEN' ? '진행중' : '준비중').replace(/\s+/g, '')}
-      </DStatusBadge>
+      <DMetaRow>
+        <DStatusBadge>
+          {(item.status === 'OPEN' ? '진행중' : '준비중').replace(/\s+/g, '')}
+        </DStatusBadge>
+        <DTypeBadge>{item.modalData.debateTypeLabel}</DTypeBadge>
+      </DMetaRow>
       <DTitle>{item.title}</DTitle>
       <DDesc>{item.description}</DDesc>
     </DLeft>
@@ -746,6 +749,13 @@ const DLeft = styled.div`
   min-width: 0;
 `;
 
+const DMetaRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+`;
+
 const DStatusBadge = styled.span`
   height: 22px;
   padding: 0 16px;
@@ -763,6 +773,14 @@ const DStatusBadge = styled.span`
   white-space: nowrap;
   word-break: keep-all;
   overflow-wrap: normal;
+`;
+
+const DTypeBadge = styled(DStatusBadge)`
+  min-width: auto;
+  border-color: transparent;
+  background: #eefaf6;
+  color: #2dcd97;
+  padding: 0 10px;
 `;
 
 const DTitle = styled.h4`
