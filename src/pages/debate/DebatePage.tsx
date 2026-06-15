@@ -126,7 +126,7 @@ const DebatePage = () => {
     setIsJoining(true);
     try {
       await debateService.join(debateId);
-      navigate(`/debate/${debateId}/tutorial`);
+      navigate(`/debate/${debateId}`);
       setSelectedCard(null);
     } catch {
       setJoinError('토론 참여에 실패했습니다. 잠시 후 다시 시도해 주세요.');

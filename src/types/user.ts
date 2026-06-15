@@ -6,4 +6,7 @@ export interface User {
   role?: 'USER' | 'ADMIN';
   status?: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
   createdAt?: string;
+  hasCompletedOnboarding?: boolean;
+  onboardingCompletedAt?: string | null;
+  onboardingVersion?: number;
 }

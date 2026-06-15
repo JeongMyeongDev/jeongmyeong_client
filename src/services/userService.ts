@@ -13,4 +13,5 @@ export const userService = {
   getMySettings: () => api.get<ApiResponse<{ notificationsEnabled: boolean }>>('/users/me/settings'),
   updateMySettings: (data: { notificationsEnabled: boolean }) =>
     api.patch<ApiResponse<{ notificationsEnabled: boolean }>>('/users/me/settings', data),
+  completeOnboarding: () => api.patch<ApiResponse<{ user: User }>>('/users/me/onboarding-complete'),
 };

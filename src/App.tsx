@@ -8,7 +8,7 @@ const App = () => {
   const hideBottomNav =
     location.pathname.startsWith('/debate/create') ||
     location.pathname.endsWith('/info') ||
-    location.pathname.endsWith('/tutorial') ||
+    location.pathname === '/onboarding' ||
     isDebateThread;
 
   return (

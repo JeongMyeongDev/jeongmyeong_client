@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 
 export const useAuth = () => {
   const { user, isAuthenticated, setUser, clearAuth, setInitialized } = useAuthStore();
@@ -19,6 +20,7 @@ export const useAuth = () => {
     localStorage.setItem('accessToken', data.accessToken);
     setUser(data.user);
     setInitialized();
+    return data.user;
   }, [setInitialized, setUser]);
 
   const googleLogin = useCallback(async (idToken: string) => {
@@ -26,6 +28,7 @@ export const useAuth = () => {
     localStorage.setItem('accessToken', data.accessToken);
     setUser(data.user);
     setInitialized();
+    return data.user;
   }, [setInitialized, setUser]);
 
   const googleSignup = useCallback(async (
@@ -43,7 +46,14 @@ export const useAuth = () => {
     localStorage.setItem('accessToken', data.accessToken);
     setUser(data.user);
     setInitialized();
+    return data.user;
   }, [setInitialized, setUser]);
+
+  const completeOnboarding = useCallback(async () => {
+    const { data } = await userService.completeOnboarding();
+    setUser(data.user);
+    return data.user;
+  }, [setUser]);
 
   const logout = useCallback(async () => {
     await authService.logout();
@@ -51,5 +61,14 @@ export const useAuth = () => {
     clearAuth();
   }, [clearAuth]);
 
-  return { user, isAuthenticated, signup, login, googleLogin, googleSignup, logout };
+  return {
+    user,
+    isAuthenticated,
+    signup,
+    login,
+    googleLogin,
+    googleSignup,
+    completeOnboarding,
+    logout,
+  };
 };

@@ -126,8 +126,8 @@ const LoginPage = () => {
       setError('');
       setIsSubmitting(true);
       try {
-        await googleLogin(response.credential);
-        navigate('/', { replace: true });
+        const user = await googleLogin(response.credential);
+        navigate(user?.hasCompletedOnboarding === false ? '/onboarding' : '/', { replace: true });
       } catch (error) {
         if (isAxiosError(error) && error.response?.status === 404) {
           const googleEmail = getGoogleSignupEmail(error, response.credential);
@@ -185,8 +185,8 @@ const LoginPage = () => {
     setError('');
     setIsSubmitting(true);
     try {
-      await login(email, password);
-      navigate('/', { replace: true });
+      const user = await login(email, password);
+      navigate(user?.hasCompletedOnboarding === false ? '/onboarding' : '/', { replace: true });
     } catch (error) {
       setError(getErrorMessage(error));
     } finally {

@@ -50,8 +50,8 @@ const GoogleSignUpPage = () => {
 
     setIsSubmitting(true);
     try {
-      await googleSignup(idToken, nickname.trim(), password, passwordConfirm);
-      navigate('/', { replace: true });
+      const user = await googleSignup(idToken, nickname.trim(), password, passwordConfirm);
+      navigate(user?.hasCompletedOnboarding === false ? '/onboarding' : '/', { replace: true });
     } catch (error) {
       setError(getErrorMessage(error));
     } finally {

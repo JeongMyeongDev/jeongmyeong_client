@@ -172,7 +172,7 @@ const DebateInfoPage = () => {
         return Array.from(nextNames).slice(0, 6);
       });
       setActionMessage('토론에 참여했습니다.');
-      navigate(`/debate/${debateId}/tutorial`);
+      navigate(`/debate/${debateId}`);
     } catch (error) {
       setActionMessage(getErrorMessage(error, '토론 참여에 실패했습니다.'));
     }

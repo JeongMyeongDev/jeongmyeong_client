@@ -1,72 +1,122 @@
 import { isAxiosError } from 'axios';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import AccountManagementSection from '../../components/profile/AccountManagementSection';
+import ProfileEditCard from '../../components/profile/ProfileEditCard';
+import ProfileHeaderCard from '../../components/profile/ProfileHeaderCard';
+import ProfileMenuRow from '../../components/profile/ProfileMenuRow';
+import ProfileSection from '../../components/profile/ProfileSection';
 import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
 import { useAuthStore } from '../../stores/authStore';
-import { usePageLoading } from '../../hooks/usePageLoading';
 import { sanitizePlainText } from '../../utils/textSanitizer';
 
-type MenuItem = { label: string; action: 'navigate' | 'toast'; value?: string };
-const MENU_ITEMS: MenuItem[] = [
-  { label: '내 토론', action: 'navigate', value: '/my-debates' },
-  { label: '고객센터', action: 'toast' },
-  { label: '알림설정', action: 'navigate', value: '/notifications' },
-  { label: '개인/보안', action: 'toast' },
-  { label: '공지사항', action: 'toast' },
-  { label: '앱 정보', action: 'toast' },
-];
+type MenuRow = {
+  label: string;
+  action: () => void;
+};
+
+const TOAST_DURATION = 2500;
 
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, setUser, clearAuth } = useAuthStore();
-  const { isLoading, error, executeAsync } = usePageLoading();
+  const [isEditing, setIsEditing] = useState(false);
   const [nickname, setNickname] = useState(user?.nickname ?? '');
+  const [profileImage, setProfileImage] = useState(user?.profileImage ?? '');
   const [profileError, setProfileError] = useState('');
   const [toastMessage, setToastMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [isLogoutLoading, setIsLogoutLoading] = useState(false);
 
-  const displayName = isAuthenticated ? user?.nickname ?? '사용자' : '사용자 이름';
-  const helperText = isAuthenticated
-    ? `${user?.nickname ?? '사용자'}님 환영합니다.`
-    : '로그인을 먼저 진행해주세요.';
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [isAuthenticated, navigate, user]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setNickname(user?.nickname ?? ''), 0);
-    return () => window.clearTimeout(timer);
-  }, [user?.nickname]);
-
-  const handleUpdateProfile = async () => {
-    if (!isAuthenticated || !user || !nickname.trim() || isLoading) return;
-
-    const result = await executeAsync(async () => {
-      const { data } = await userService.updateMe({ nickname: nickname.trim() });
-      return data;
-    });
-    
-    if (result) {
-      setUser({ ...user, ...result.user });
-      setProfileError('');
-      setToastMessage('프로필이 저장되었습니다.');
-      setTimeout(() => setToastMessage(''), 2500);
-    } else if (error) {
-      setProfileError(error);
-    }
-  };
+    if (!user) return;
+    setNickname(user.nickname);
+    setProfileImage(user.profileImage ?? '');
+  }, [user]);
 
   const showToast = (message: string) => {
     setToastMessage(message);
-    setTimeout(() => setToastMessage(''), 2500);
+    window.setTimeout(() => setToastMessage(''), TOAST_DURATION);
   };
 
-  const handleMenuClick = (item: MenuItem) => {
-    if (item.action === 'navigate' && item.value) {
-      navigate(item.value);
-    } else {
-      showToast('준비 중입니다.');
+  const handleStartEdit = () => {
+    if (!user) return;
+    setNickname(user.nickname);
+    setProfileImage(user.profileImage ?? '');
+    setProfileError('');
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    if (!user) return;
+    setNickname(user.nickname);
+    setProfileImage(user.profileImage ?? '');
+    setProfileError('');
+    setIsEditing(false);
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!user || isSaving) return;
+
+    const sanitizedNickname = sanitizePlainText(nickname).trim();
+    const trimmedProfileImage = profileImage.trim();
+
+    if (!sanitizedNickname) {
+      setProfileError('닉네임을 입력해 주세요.');
+      return;
+    }
+
+    setIsSaving(true);
+    setProfileError('');
+
+    try {
+      const { data } = await userService.updateMe({
+        nickname: sanitizedNickname,
+        profileImage: trimmedProfileImage || undefined,
+      });
+      setUser({ ...user, ...data.user });
+      setIsEditing(false);
+      showToast('프로필이 저장되었습니다.');
+    } catch (error) {
+      const message = isAxiosError(error) ? error.response?.data?.message : null;
+      setProfileError(typeof message === 'string' ? message : '프로필 저장에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const activityRows = useMemo<MenuRow[]>(
+    () => [
+      { label: '내 토론', action: () => navigate('/my-debates') },
+      { label: '알림', action: () => navigate('/notifications') },
+    ],
+    [navigate],
+  );
+
+  const settingRows = useMemo<MenuRow[]>(
+    () => [
+      { label: '알림 설정', action: () => navigate('/notifications') },
+      { label: '튜토리얼 다시 보기', action: () => showToast('튜토리얼 기능은 준비 중입니다.') },
+    ],
+    [navigate],
+  );
+
+  const serviceRows = useMemo<MenuRow[]>(
+    () => [
+      { label: '공지사항', action: () => showToast('아직 등록된 공지사항이 없습니다.') },
+      { label: '고객센터', action: () => showToast('고객센터 기능은 준비 중입니다.') },
+      { label: '앱 정보', action: () => showToast('정명 MVP 테스트 버전입니다.') },
+    ],
+    [],
+  );
 
   const handleLogout = async () => {
     if (isLogoutLoading) return;
@@ -88,63 +138,57 @@ const ProfilePage = () => {
     }
   };
 
+  if (!user) {
+    return (
+      <Wrapper>
+        <TopSpacing />
+        <FallbackText>로그인이 필요합니다.</FallbackText>
+      </Wrapper>
+    );
+  }
+
   return (
     <Wrapper>
       <TopSpacing />
 
-      <ProfileRow>
-        <Avatar />
-        <NameWrap>
-          <Name>{displayName}</Name>
-          <SubText>{helperText}</SubText>
-        </NameWrap>
-      </ProfileRow>
+      <ContentStack>
+        <ProfileHeaderCard user={user} onEditClick={handleStartEdit} />
 
-      {!isAuthenticated && (
-        <AuthActionRow>
-          <SignUpButton type="button" onClick={() => navigate('/signup')}>
-            회원가입
-          </SignUpButton>
-          <LoginButton type="button" onClick={() => navigate('/login')}>
-            로그인
-          </LoginButton>
-        </AuthActionRow>
-      )}
-
-      {isAuthenticated && (
-        <ProfileEditCard>
-          <ProfileInput
-            value={nickname}
-            onChange={(e) => setNickname(sanitizePlainText(e.target.value))}
-            placeholder="닉네임"
-            disabled={isLoading}
+        {isEditing && (
+          <ProfileEditCard
+            nickname={nickname}
+            profileImage={profileImage}
+            isSaving={isSaving}
+            errorMessage={profileError}
+            onNicknameChange={(value) => setNickname(sanitizePlainText(value))}
+            onProfileImageChange={setProfileImage}
+            onCancel={handleCancelEdit}
+            onSave={() => void handleUpdateProfile()}
           />
-          <SaveButton
-            type="button"
-            onClick={() => void handleUpdateProfile()}
-            disabled={isLoading || !nickname.trim()}
-          >
-            {isLoading ? '저장 중...' : '프로필 저장'}
-          </SaveButton>
-          {profileError && <ErrorText>{profileError}</ErrorText>}
-        </ProfileEditCard>
-      )}
+        )}
 
-      <MenuCard>
-        {MENU_ITEMS.map((item) => (
-          <MenuItem key={item.label} onClick={() => handleMenuClick(item)}>
-            {item.label}
-          </MenuItem>
-        ))}
-      </MenuCard>
+        <ProfileSection title="내 활동">
+          {activityRows.map((row) => (
+            <ProfileMenuRow key={row.label} label={row.label} onClick={row.action} />
+          ))}
+        </ProfileSection>
+
+        <ProfileSection title="설정">
+          {settingRows.map((row) => (
+            <ProfileMenuRow key={row.label} label={row.label} onClick={row.action} />
+          ))}
+        </ProfileSection>
+
+        <ProfileSection title="서비스">
+          {serviceRows.map((row) => (
+            <ProfileMenuRow key={row.label} label={row.label} onClick={row.action} />
+          ))}
+        </ProfileSection>
+
+        <AccountManagementSection isLogoutLoading={isLogoutLoading} onLogout={() => void handleLogout()} />
+      </ContentStack>
 
       {toastMessage && <Toast>{toastMessage}</Toast>}
-
-      {isAuthenticated && (
-        <LogoutButton type="button" onClick={handleLogout} disabled={isLogoutLoading}>
-          {isLogoutLoading ? '로그아웃 중...' : '로그아웃'}
-        </LogoutButton>
-      )}
     </Wrapper>
   );
 };
@@ -159,127 +203,17 @@ const TopSpacing = styled.div`
   height: var(--page-top);
 `;
 
-const ProfileRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: clamp(12px, 3.7vw, 16px);
-  margin-bottom: clamp(16px, 4.2vw, 18px);
-`;
-
-const Avatar = styled.div`
-  width: clamp(112px, 34.4vw, 148px);
-  height: clamp(112px, 34.4vw, 148px);
-  border-radius: 50%;
-  background: #d4d4d6;
-  flex-shrink: 0;
-`;
-
-const NameWrap = styled.div`
+const ContentStack = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: clamp(16px, 4.4vw, 20px);
 `;
 
-const Name = styled.h1`
+const FallbackText = styled.p`
   margin: 0;
-  font-size: var(--title-sm);
-  font-weight: 700;
-  color: #2f3238;
-`;
-
-const SubText = styled.p`
-  margin: 0;
-  font-size: var(--body-sm);
-  color: #8f8f8f;
-`;
-
-const AuthActionRow = styled.div`
-  display: flex;
-  gap: 12px;
-  margin-bottom: 22px;
-`;
-
-const SignUpButton = styled.button`
-  flex: 1;
-  height: clamp(48px, 12.6vw, 54px);
-  border-radius: 999px;
-  border: 1.5px solid #1b1b1b;
-  background: #f5f5f5;
-  color: #2f3238;
-  font-size: clamp(16px, 4.2vw, 18px);
-  font-weight: 700;
-`;
-
-const LoginButton = styled.button`
-  flex: 1;
-  height: clamp(48px, 12.6vw, 54px);
-  border-radius: 999px;
-  border: none;
-  background: #2dcd97;
-  color: #ffffff;
-  font-size: clamp(16px, 4.2vw, 18px);
-  font-weight: 700;
-`;
-
-const ProfileEditCard = styled.section`
-  background: #efefef;
-  border-radius: var(--card-radius);
-  padding: clamp(14px, 3.7vw, 16px);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 18px;
-`;
-
-const ProfileInput = styled.input`
-  height: 44px;
-  border: 1.5px solid #c8c8c8;
-  border-radius: 999px;
-  background: #ffffff;
-  padding: 0 14px;
-  font-size: var(--body-sm);
-  outline: none;
-`;
-
-const SaveButton = styled.button`
-  height: 44px;
-  border: none;
-  border-radius: 999px;
-  background: #2dcd97;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 700;
-
-  &:disabled {
-    opacity: 0.65;
-  }
-`;
-
-const ErrorText = styled.p`
-  margin: 0;
-  font-size: 13px;
-  color: #f04444;
-`;
-
-const MenuCard = styled.section`
-  background: #efefef;
-  border-radius: var(--card-radius);
-  padding: clamp(16px, 4.7vw, 20px) clamp(16px, 4.2vw, 18px);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-`;
-
-const MenuItem = styled.button`
-  text-align: left;
-  border: none;
-  background: transparent;
   color: #8f8f8f;
   font-size: var(--body-sm);
-  font-weight: 500;
-  line-height: 1.45;
-  padding: 0;
-  cursor: pointer;
+  text-align: center;
 `;
 
 const Toast = styled.div`
@@ -287,6 +221,7 @@ const Toast = styled.div`
   bottom: 100px;
   left: 50%;
   transform: translateX(-50%);
+  max-width: calc(100% - 32px);
   background: rgba(0, 0, 0, 0.72);
   color: #fff;
   font-size: 14px;
@@ -295,21 +230,6 @@ const Toast = styled.div`
   white-space: nowrap;
   z-index: 600;
   pointer-events: none;
-`;
-
-const LogoutButton = styled.button`
-  display: block;
-  margin: clamp(26px, 7.4vw, 32px) auto 0;
-  border: none;
-  background: transparent;
-  color: #d84c4c;
-  font-size: clamp(16px, 4.2vw, 18px);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-
-  &:disabled {
-    opacity: 0.6;
-  }
 `;
 
 export default ProfilePage;

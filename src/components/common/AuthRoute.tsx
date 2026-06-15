@@ -2,10 +2,12 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 
 const AuthRoute = () => {
-  const { isAuthenticated, isInitialized } = useAuthStore();
+  const { isAuthenticated, isInitialized, user } = useAuthStore();
 
   if (!isInitialized) return null;
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  if (isAuthenticated) {
+    return <Navigate to={user?.hasCompletedOnboarding === false ? '/onboarding' : '/'} replace />;
+  }
 
   return <Outlet />;
 };
