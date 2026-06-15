@@ -1,5 +1,6 @@
 export type DebateType = "FREE" | "CONSENSUS" | "PROS_CONS";
 export type DebateStatus = "OPEN" | "CLOSED" | "ARCHIVED";
+export type DebateStance = "PRO" | "CON" | "NEUTRAL";
 export type PostStatus = "VISIBLE" | "HIDDEN" | "DELETED";
 export type SelectionSource = "POST" | "COMMENT";
 export type ConsensusStatus = "OPEN" | "APPROVED" | "REJECTED" | "CLOSED";
@@ -24,6 +25,8 @@ export interface Debate {
   closedAt?: string | null;
   createdAt?: string;
   archivedAt?: string | null;
+  resultSummary?: string | null;
+  stanceDistribution?: StanceSummary | null;
   tagMaps?: Array<{ tag: DebateTag }>;
   creator?: {
     id: string;
@@ -93,6 +96,7 @@ export interface DebateMessage {
   id: string;
   debateId: string;
   content: string;
+  stance?: DebateStance | null;
   status: PostStatus;
   createdAt: string;
   updatedAt?: string;
@@ -109,6 +113,7 @@ export interface CreatedPost {
   debateId: string;
   authorId: string;
   content: string;
+  stance?: DebateStance | null;
   status: PostStatus;
   createdAt?: string;
   definitionReferences?: DefinitionReference[];
@@ -188,6 +193,32 @@ export interface ConsensusVote {
     nickname: string;
     profileImage?: string | null;
   };
+}
+
+export interface DebateProgress {
+  isBlocked: boolean;
+  blockingType: "CONSENSUS" | "CHILD_DEBATE" | "BOTH" | null;
+  blockingConsensus?: Pick<Consensus, "id" | "term" | "title" | "status" | "createdAt"> & {
+    selectionTarget?: Pick<SelectionTarget, "id" | "selectedText"> | null;
+  } | null;
+  blockingChildDebate?: Pick<Debate, "id" | "title" | "status" | "createdAt"> & {
+    sourceSelectionTarget?: Pick<SelectionTarget, "id" | "selectedText"> | null;
+  } | null;
+}
+
+export interface DebateUserStance {
+  id: string;
+  debateId: string;
+  userId: string;
+  stance: DebateStance;
+  updatedAt?: string;
+}
+
+export interface StanceSummary {
+  PRO: number;
+  CON: number;
+  NEUTRAL: number;
+  total: number;
 }
 
 export interface CommentSelection {

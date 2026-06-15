@@ -4,9 +4,13 @@ import type {
   CreatedPost,
   Debate,
   DebateMessage,
+  DebateProgress,
+  DebateStance,
+  DebateUserStance,
   DefinitionReferenceInput,
   SelectionSource,
   SelectionTarget,
+  StanceSummary,
 } from "../types/debate";
 
 // ─── Request Types ──────────────────────────────────────────
@@ -33,6 +37,7 @@ export interface ListDebatesParams {
 
 export interface CreatePostRequest {
   content: string;
+  stance?: DebateStance;
   definitionReferences?: DefinitionReferenceInput[];
 }
 
@@ -75,6 +80,22 @@ interface DebateListResponse {
 interface DebateDetailResponse {
   success: boolean;
   debate: Debate;
+}
+
+interface DebateProgressResponse {
+  success: boolean;
+  progress: DebateProgress;
+}
+
+interface DebateUserStanceResponse {
+  success: boolean;
+  stance: DebateUserStance | null;
+  summary?: StanceSummary;
+}
+
+interface DebateStanceSummaryResponse {
+  success: boolean;
+  summary: StanceSummary;
 }
 
 interface JoinDebateResponse {
@@ -163,6 +184,14 @@ export const debateService = {
 
   // 상세
   getById: (id: string) => api.get<DebateDetailResponse>(`/debates/${id}`),
+  getProgress: (id: string) =>
+    api.get<DebateProgressResponse>(`/debates/${id}/progress`),
+  getMyStance: (id: string) =>
+    api.get<DebateUserStanceResponse>(`/debates/${id}/my-stance`),
+  updateStance: (id: string, stance: DebateStance) =>
+    api.patch<DebateUserStanceResponse>(`/debates/${id}/stance`, { stance }),
+  getStanceSummary: (id: string) =>
+    api.get<DebateStanceSummaryResponse>(`/debates/${id}/stance-summary`),
   getChildDebates: (id: string) =>
     api.get<ChildDebateListResponse>(`/debates/${id}/child-debates`),
   getParent: (id: string) =>

@@ -39,7 +39,7 @@ export const useDebate = () => {
     return data.debate;
   }, []);
 
-  const createMessage = useCallback(async (id: string, content: string, payload?: Pick<CreatePostRequest, 'definitionReferences'>) => {
+  const createMessage = useCallback(async (id: string, content: string, payload?: Omit<CreatePostRequest, 'content'>) => {
     const { data } = await debateService.createPost(id, { content, ...payload });
     await fetchMessages(id);
     return data.post;

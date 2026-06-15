@@ -1,4 +1,4 @@
-import {
+﻿import {
   Fragment,
   useEffect,
   useMemo,
@@ -25,12 +25,15 @@ import type {
   Consensus,
   ConsensusVoteType,
   Debate,
+  DebateProgress,
+  DebateStance,
   DebateType,
   Definition,
   DefinitionReference,
   DefinitionReferenceInput,
   DefinitionReferenceType,
   SelectionSource,
+  StanceSummary,
 } from "../../types/debate";
 
 type ReplyTarget = {
@@ -130,12 +133,34 @@ const DEBATE_TYPE_OPTIONS: Array<{ value: DebateType; label: string }> = [
   { value: "PROS_CONS", label: "찬반 토론" },
 ];
 
+const STANCE_LABEL: Record<DebateStance, string> = {
+  PRO: "찬성",
+  CON: "반대",
+  NEUTRAL: "중립",
+};
+
+const EMPTY_STANCE_SUMMARY: StanceSummary = {
+  PRO: 0,
+  CON: 0,
+  NEUTRAL: 0,
+  total: 0,
+};
+
+const STANCE_FILTERS: Array<"ALL" | DebateStance> = [
+  "ALL",
+  "PRO",
+  "CON",
+  "NEUTRAL",
+];
+
 const getMentionPrefix = (name: string) => {
   const normalizedName = name.replace(/\s+/g, "") || "사용자";
   return `@${normalizedName} `;
 };
 
 const getReplyGroupKey = (postId: string, commentId: string) => `${postId}:${commentId}`;
+const getInlineStackKey = (sourceType: SelectionSource, sourceId: string) =>
+  `${sourceType}:${sourceId}`;
 
 const buildCommentGroups = (comments: Comment[]) => {
   const commentMap = new Map(comments.map((comment) => [comment.id, comment]));
@@ -315,6 +340,11 @@ const DebateThreadPage = () => {
   const [childDebates, setChildDebates] = useState<Debate[]>([]);
   const [childDebateDraft, setChildDebateDraft] =
     useState<ChildDebateDraft | null>(null);
+  const [progress, setProgress] = useState<DebateProgress | null>(null);
+  const [myStance, setMyStance] = useState<DebateStance | null>(null);
+  const [stanceSummary, setStanceSummary] =
+    useState<StanceSummary>(EMPTY_STANCE_SUMMARY);
+  const [stanceFilter, setStanceFilter] = useState<"ALL" | DebateStance>("ALL");
   const [selectedConsensus, setSelectedConsensus] = useState<Consensus | null>(
     null,
   );
@@ -336,10 +366,15 @@ const DebateThreadPage = () => {
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedReplyGroups, setExpandedReplyGroups] = useState<Record<string, boolean>>({});
+  const [expandedConsensusStacks, setExpandedConsensusStacks] = useState<Record<string, boolean>>({});
+  const [expandedChildDebateStacks, setExpandedChildDebateStacks] = useState<Record<string, boolean>>({});
   const canFinalizeConsensus =
     user?.role === "ADMIN" || currentDebate?.creator?.id === user?.id;
   const isDebateReadOnly =
     currentDebate?.status === "CLOSED" || currentDebate?.status === "ARCHIVED";
+  const isConsensusBlocked =
+    currentDebate?.debateType === "CONSENSUS" && Boolean(progress?.isBlocked);
+  const isComposerDisabled = isDebateReadOnly || isConsensusBlocked;
   const readOnlyMessage =
     currentDebate?.status === "ARCHIVED"
       ? "아카이브된 토론입니다."
@@ -357,6 +392,20 @@ const DebateThreadPage = () => {
     setChildDebates(data.childDebates);
   };
 
+  const refreshProgress = async (id: string) => {
+    const { data } = await debateService.getProgress(id);
+    setProgress(data.progress);
+  };
+
+  const refreshStanceState = async (id: string) => {
+    const [summaryResponse, myStanceResponse] = await Promise.all([
+      debateService.getStanceSummary(id),
+      user ? debateService.getMyStance(id) : Promise.resolve(null),
+    ]);
+    setStanceSummary(summaryResponse.data.summary);
+    setMyStance(myStanceResponse?.data.stance?.stance ?? null);
+  };
+
   useEffect(() => {
     if (!debateId) return;
 
@@ -367,12 +416,14 @@ const DebateThreadPage = () => {
           fetchMessages(debateId),
           refreshConsensuses(debateId),
           refreshChildDebates(debateId),
+          refreshProgress(debateId),
+          refreshStanceState(debateId),
         ]);
       });
     };
 
     void loadThread();
-  }, [debateId, fetchDebate, fetchMessages, executeAsync]);
+  }, [debateId, fetchDebate, fetchMessages, executeAsync, user]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => inputRef.current?.focus(), 250);
@@ -421,9 +472,10 @@ const DebateThreadPage = () => {
     () =>
       messages
         .filter((item) => item.status !== "HIDDEN")
+        .filter((item) => stanceFilter === "ALL" || item.stance === stanceFilter)
         .slice()
         .reverse(),
-    [messages],
+    [messages, stanceFilter],
   );
 
   const consensusesBySource = useMemo(() => {
@@ -968,16 +1020,55 @@ const DebateThreadPage = () => {
     setExpandedReplyGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
   };
 
+  const toggleConsensusStack = (sourceType: SelectionSource, sourceId: string) => {
+    const stackKey = getInlineStackKey(sourceType, sourceId);
+    setExpandedConsensusStacks((prev) => ({ ...prev, [stackKey]: !prev[stackKey] }));
+  };
+
+  const toggleChildDebateStack = (sourceType: SelectionSource, sourceId: string) => {
+    const stackKey = getInlineStackKey(sourceType, sourceId);
+    setExpandedChildDebateStacks((prev) => ({ ...prev, [stackKey]: !prev[stackKey] }));
+  };
+
+  const handleStanceChange = async (nextStance: DebateStance) => {
+    if (!debateId || isDebateReadOnly || isSubmitting) return;
+    if (myStance && myStance !== nextStance) {
+      const confirmed = window.confirm(
+        "입장을 변경하시겠습니까? 이후 작성하는 의견에는 새 입장이 표시됩니다. 기존 글의 입장은 변경되지 않습니다.",
+      );
+      if (!confirmed) return;
+    }
+
+    setSubmitError("");
+    setIsSubmitting(true);
+    try {
+      const { data } = await debateService.updateStance(debateId, nextStance);
+      setMyStance(data.stance?.stance ?? nextStance);
+      if (data.summary) setStanceSummary(data.summary);
+      setActionMessage(`${STANCE_LABEL[nextStance]} 입장으로 설정했습니다.`);
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedMessage = message.trim();
     if (!debateId || !trimmedMessage || isSubmitting) return;
-    if (isDebateReadOnly) {
+    if (isComposerDisabled) {
       setSubmitError(
-        currentDebate?.status === "ARCHIVED"
+        isConsensusBlocked
+          ? "진행 중인 합의 또는 하위 토론이 있어 새 의견을 작성할 수 없습니다."
+          : currentDebate?.status === "ARCHIVED"
           ? "아카이브된 토론은 읽기 전용입니다."
           : "종료된 토론에서는 새 내용을 작성할 수 없습니다.",
       );
+      return;
+    }
+    if (isProsConsDebate && !myStance) {
+      setSubmitError("찬반 토론에서는 입장을 선택해야 의견을 작성할 수 있습니다.");
       return;
     }
 
@@ -1022,7 +1113,10 @@ const DebateThreadPage = () => {
         }
         setReplyTarget(null);
       } else {
-        await createMessage(debateId, message, { definitionReferences });
+        await createMessage(debateId, message, {
+          definitionReferences,
+          stance: myStance ?? undefined,
+        });
       }
       setMessage("");
       setPendingDefinitionReferences([]);
@@ -1221,6 +1315,11 @@ const DebateThreadPage = () => {
       clearSelectionMenu();
       return;
     }
+    if (isConsensusBlocked) {
+      setSubmitError("진행 중인 합의 또는 하위 토론이 있어 새 선택 액션을 사용할 수 없습니다.");
+      clearSelectionMenu();
+      return;
+    }
 
     if (action === "consensus") {
       setSubmitError("");
@@ -1288,6 +1387,13 @@ const DebateThreadPage = () => {
         title: consensusDraft.title.trim(),
         content: consensusDraft.content.trim(),
       });
+      setExpandedConsensusStacks((prev) => ({
+        ...prev,
+        [getInlineStackKey(
+          consensusDraft.selection.sourceType,
+          consensusDraft.selection.sourceId,
+        )]: true,
+      }));
       await refreshConsensuses(debateId);
       setConsensusDraft(null);
       setSubmitError("");
@@ -1323,6 +1429,13 @@ const DebateThreadPage = () => {
         description: childDebateDraft.description.trim(),
         debateType: childDebateDraft.debateType,
       });
+      setExpandedChildDebateStacks((prev) => ({
+        ...prev,
+        [getInlineStackKey(
+          childDebateDraft.selection.sourceType,
+          childDebateDraft.selection.sourceId,
+        )]: true,
+      }));
       await refreshChildDebates(debateId);
       setChildDebateDraft(null);
       setActionMessage("하위 토론을 만들었습니다.");
@@ -1581,74 +1694,87 @@ const DebateThreadPage = () => {
       [];
     if (sourceConsensuses.length === 0) return null;
 
+    const stackKey = getInlineStackKey(sourceType, sourceId);
+    const isExpanded = Boolean(expandedConsensusStacks[stackKey]);
+
     return (
       <InlineConsensusStack>
-        {sourceConsensuses.map((consensus) => {
-          const canVote =
-            currentDebate?.status === "OPEN" && consensus.status === "OPEN";
+        <InlineStackToggleButton
+          type="button"
+          aria-expanded={isExpanded}
+          onClick={() => toggleConsensusStack(sourceType, sourceId)}
+        >
+          {isExpanded
+            ? "합의안 숨기기"
+            : `합의안 ${sourceConsensuses.length}개 보기`}
+        </InlineStackToggleButton>
+        {isExpanded &&
+          sourceConsensuses.map((consensus) => {
+            const canVote =
+              currentDebate?.status === "OPEN" && consensus.status === "OPEN";
 
-          return (
-            <InlineConsensusCard key={consensus.id}>
-              <ConsensusMetaRow>
-                <ConsensusBadge>
-                  {CONSENSUS_STATUS_LABEL[consensus.status] ??
-                    consensus.status}
-                </ConsensusBadge>
-                <ConsensusTerm>{consensus.term}</ConsensusTerm>
-              </ConsensusMetaRow>
-              {consensus.selectionTarget?.selectedText && (
-                <ConsensusQuote>
-                  “{consensus.selectionTarget.selectedText}”
-                </ConsensusQuote>
-              )}
-              <ConsensusTitle>{consensus.title}</ConsensusTitle>
-              <ConsensusContent>{consensus.content}</ConsensusContent>
-              <ConsensusCountRow>
-                <span>찬성 {consensus.approveCount ?? 0}</span>
-                <span>반대 {consensus.rejectCount ?? 0}</span>
-                <span>의견 {consensus.commentCount ?? 0}</span>
-              </ConsensusCountRow>
-              <ConsensusActionRow>
-                {canVote && (
-                  <>
-                    <ConsensusAction
-                      type="button"
-                      onClick={() => {
-                        setVoteComment("");
-                        setSelectedConsensus(consensus);
-                        void handleVoteConsensus(consensus.id, "APPROVE", "");
-                      }}
-                    >
-                      찬성
-                    </ConsensusAction>
-                    <ConsensusAction
-                      type="button"
-                      onClick={() => {
-                        setVoteComment("");
-                        setSelectedConsensus(consensus);
-                        void handleVoteConsensus(consensus.id, "REJECT", "");
-                      }}
-                    >
-                      반대
-                    </ConsensusAction>
-                    <ConsensusAction
-                      type="button"
-                      onClick={() => void openConsensusDetail(consensus)}
-                    >
-                      의견
-                    </ConsensusAction>
-                  </>
+            return (
+              <InlineConsensusCard key={consensus.id}>
+                <ConsensusMetaRow>
+                  <ConsensusBadge>
+                    {CONSENSUS_STATUS_LABEL[consensus.status] ??
+                      consensus.status}
+                  </ConsensusBadge>
+                  <ConsensusTerm>{consensus.term}</ConsensusTerm>
+                </ConsensusMetaRow>
+                {consensus.selectionTarget?.selectedText && (
+                  <ConsensusQuote>
+                    “{consensus.selectionTarget.selectedText}”
+                  </ConsensusQuote>
                 )}
-                <ConsensusAction
-                  type="button"
-                  onClick={() => void openConsensusDetail(consensus)}
-                >
-                  상세
-                </ConsensusAction>
-              </ConsensusActionRow>
-            </InlineConsensusCard>
-          );
-        })}
+                <ConsensusTitle>{consensus.title}</ConsensusTitle>
+                <ConsensusContent>{consensus.content}</ConsensusContent>
+                <ConsensusCountRow>
+                  <span>찬성 {consensus.approveCount ?? 0}</span>
+                  <span>반대 {consensus.rejectCount ?? 0}</span>
+                  <span>의견 {consensus.commentCount ?? 0}</span>
+                </ConsensusCountRow>
+                <ConsensusActionRow>
+                  {canVote && (
+                    <>
+                      <ConsensusAction
+                        type="button"
+                        onClick={() => {
+                          setVoteComment("");
+                          setSelectedConsensus(consensus);
+                          void handleVoteConsensus(consensus.id, "APPROVE", "");
+                        }}
+                      >
+                        찬성
+                      </ConsensusAction>
+                      <ConsensusAction
+                        type="button"
+                        onClick={() => {
+                          setVoteComment("");
+                          setSelectedConsensus(consensus);
+                          void handleVoteConsensus(consensus.id, "REJECT", "");
+                        }}
+                      >
+                        반대
+                      </ConsensusAction>
+                      <ConsensusAction
+                        type="button"
+                        onClick={() => void openConsensusDetail(consensus)}
+                      >
+                        의견
+                      </ConsensusAction>
+                    </>
+                  )}
+                  <ConsensusAction
+                    type="button"
+                    onClick={() => void openConsensusDetail(consensus)}
+                  >
+                    상세
+                  </ConsensusAction>
+                </ConsensusActionRow>
+              </InlineConsensusCard>
+            );
+          })}
       </InlineConsensusStack>
     );
   };
@@ -1662,25 +1788,41 @@ const DebateThreadPage = () => {
       [];
     if (sourceChildDebates.length === 0) return null;
 
+    const stackKey = getInlineStackKey(sourceType, sourceId);
+    const isExpanded = Boolean(expandedChildDebateStacks[stackKey]);
+
     return (
       <InlineChildDebateStack>
-        <InlineChildDebateTitle>연결된 하위 토론</InlineChildDebateTitle>
-        {sourceChildDebates.map((childDebate) => (
-          <InlineChildDebateCard key={childDebate.id}>
-            <ChildDebateTitleText>{childDebate.title}</ChildDebateTitleText>
-            {childDebate.sourceSelectionTarget?.selectedText && (
-              <ChildDebateQuote>
-                {childDebate.sourceSelectionTarget.selectedText}
-              </ChildDebateQuote>
-            )}
-            <ChildDebateAction
-              type="button"
-              onClick={() => navigate(`/debate/${childDebate.id}`)}
-            >
-              이동
-            </ChildDebateAction>
-          </InlineChildDebateCard>
-        ))}
+        <InlineStackToggleButton
+          type="button"
+          aria-expanded={isExpanded}
+          onClick={() => toggleChildDebateStack(sourceType, sourceId)}
+        >
+          {isExpanded
+            ? "하위 토론 숨기기"
+            : `하위 토론 ${sourceChildDebates.length}개 보기`}
+        </InlineStackToggleButton>
+        {isExpanded && (
+          <>
+            <InlineChildDebateTitle>연결된 하위 토론</InlineChildDebateTitle>
+            {sourceChildDebates.map((childDebate) => (
+              <InlineChildDebateCard key={childDebate.id}>
+                <ChildDebateTitleText>{childDebate.title}</ChildDebateTitleText>
+                {childDebate.sourceSelectionTarget?.selectedText && (
+                  <ChildDebateQuote>
+                    {childDebate.sourceSelectionTarget.selectedText}
+                  </ChildDebateQuote>
+                )}
+                <ChildDebateAction
+                  type="button"
+                  onClick={() => navigate(`/debate/${childDebate.id}`)}
+                >
+                  이동
+                </ChildDebateAction>
+              </InlineChildDebateCard>
+            ))}
+          </>
+        )}
       </InlineChildDebateStack>
     );
   };
@@ -1912,16 +2054,38 @@ const DebateThreadPage = () => {
         )}
         {isProsConsDebate && (
           <StancePanel>
-            <StancePanelTitle>입장 표시</StancePanelTitle>
-            {/* TODO: 서버에 찬반 입장 저장 모델이 추가되면 이 선택을 persisted stance로 연결합니다. */}
+            <StancePanelTitle>입장 선택</StancePanelTitle>
+            <StanceHelpText>
+              최종 입장 분포 · 찬성 {stanceSummary.PRO} · 반대 {stanceSummary.CON} · 중립 {stanceSummary.NEUTRAL}
+            </StanceHelpText>
             <StanceButtonRow>
-              <StanceButton type="button">찬성</StanceButton>
-              <StanceButton type="button">반대</StanceButton>
-              <StanceButton type="button">중립</StanceButton>
+              {(["PRO", "CON", "NEUTRAL"] as DebateStance[]).map((stance) => (
+                <StanceButton
+                  key={stance}
+                  type="button"
+                  data-active={myStance === stance}
+                  disabled={isDebateReadOnly || isSubmitting}
+                  onClick={() => void handleStanceChange(stance)}
+                >
+                  {STANCE_LABEL[stance]}
+                </StanceButton>
+              ))}
             </StanceButtonRow>
             <StanceHelpText>
-              입장 표시 기능은 준비 중입니다.
+              글 작성 당시의 입장이 글에 남습니다. 입장을 바꿔도 기존 글은 변경되지 않습니다.
             </StanceHelpText>
+            <StanceFilterRow>
+              {STANCE_FILTERS.map((filter) => (
+                <StanceFilterButton
+                  key={filter}
+                  type="button"
+                  data-active={stanceFilter === filter}
+                  onClick={() => setStanceFilter(filter)}
+                >
+                  {filter === "ALL" ? "전체" : STANCE_LABEL[filter]}
+                </StanceFilterButton>
+              ))}
+            </StanceFilterRow>
           </StancePanel>
         )}
         {currentDebate.status !== "OPEN" && (
@@ -1945,6 +2109,11 @@ const DebateThreadPage = () => {
                   <NumberText>#1</NumberText>
                   <Avatar />
                   <AuthorName>{item.author.nickname}</AuthorName>
+                  {item.stance && (
+                    <PostStanceBadge data-stance={item.stance}>
+                      {STANCE_LABEL[item.stance]}
+                    </PostStanceBadge>
+                  )}
                   {!isDeleted && (
                     <ActionGroup
                       data-card-menu-root
@@ -2675,12 +2844,12 @@ const DebateThreadPage = () => {
             onTouchEnd={handleComposerSelection}
             placeholder="입력창.."
             aria-label="토론 메시지 입력"
-            disabled={isDebateReadOnly}
+            disabled={isComposerDisabled}
           />
           <SendButton
             type="submit"
             aria-label="메시지 전송"
-            disabled={!message.trim() || isSubmitting || isDebateReadOnly}
+            disabled={!message.trim() || isSubmitting || isComposerDisabled}
           >
             <SendIcon />
           </SendButton>
@@ -2891,6 +3060,29 @@ const AuthorName = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+`;
+
+const PostStanceBadge = styled.span`
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: #2d8f73;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 7px;
+
+  &[data-stance="CON"] {
+    background: #fff1f1;
+    color: #d84a4a;
+  }
+
+  &[data-stance="NEUTRAL"] {
+    background: #f0f0f0;
+    color: #777777;
+  }
 `;
 
 const ActionGroup = styled.span`
@@ -3160,6 +3352,16 @@ const StanceButton = styled.button`
   color: #6f6f6f;
   font-size: 12px;
   font-weight: 700;
+
+  &[data-active="true"] {
+    border-color: #2dcd97;
+    background: #2dcd97;
+    color: #ffffff;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+  }
 `;
 
 const StanceHelpText = styled.p`
@@ -3167,6 +3369,27 @@ const StanceHelpText = styled.p`
   color: #9a9a9a;
   font-size: 12px;
   line-height: 1.35;
+`;
+
+const StanceFilterRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+`;
+
+const StanceFilterButton = styled.button`
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: #f0f0f0;
+  color: #7f7f7f;
+  font-size: 11px;
+  font-weight: 700;
+
+  &[data-active="true"] {
+    background: #eefaf6;
+    color: #2d8f73;
+  }
 `;
 
 const ReadOnlyPanel = styled(ConsensusSummaryPanel)`
@@ -3180,6 +3403,16 @@ const InlineConsensusStack = styled.div`
   gap: 4px;
   margin-top: -3px;
   padding-left: clamp(14px, 4vw, 18px);
+`;
+
+const InlineStackToggleButton = styled.button`
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: #2dcd97;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 4px;
 `;
 
 const InlineChildDebateStack = styled(InlineConsensusStack)`

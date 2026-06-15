@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SideDrawer from '../../components/common/SideDrawer';
 import styled from 'styled-components';
@@ -29,16 +29,16 @@ type DebateRoomCard = {
   createdDateLabel: string;
 };
 
-const FILTER_ITEMS = ['찬반토론', '합의토론', '댓글토론'];
+const FILTER_ITEMS = ['찬반토론', '합의토론', '자유토론'];
 const FILTER_TYPE_MAP: Record<string, 'PROS_CONS' | 'CONSENSUS' | 'FREE'> = {
   찬반토론: 'PROS_CONS',
   합의토론: 'CONSENSUS',
-  댓글토론: 'FREE',
+  자유토론: 'FREE',
 };
 const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
-  PROS_CONS: '찬반토론',
-  CONSENSUS: '합의토론',
-  FREE: '댓글토론',
+  PROS_CONS: '찬반',
+  CONSENSUS: '합의',
+  FREE: '자유',
 };
 
 const formatCreatedDate = (createdAt?: string) => {

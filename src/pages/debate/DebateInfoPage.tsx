@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
@@ -8,7 +8,7 @@ import { debateService } from '../../services/debateService';
 import { definitionService } from '../../services/definitionService';
 import { usePageLoading } from '../../hooks/usePageLoading';
 import { useAuthStore } from '../../stores/authStore';
-import type { Debate, Definition, SelectionTarget } from '../../types/debate';
+import type { Debate, DebateProgress, Definition, SelectionTarget, StanceSummary } from '../../types/debate';
 
 const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
   PROS_CONS: '찬반토론',
@@ -20,6 +20,13 @@ const STATUS_LABEL_MAP: Record<Debate['status'], string> = {
   OPEN: '진행중',
   CLOSED: '종료',
   ARCHIVED: '보관',
+};
+
+const EMPTY_STANCE_SUMMARY: StanceSummary = {
+  PRO: 0,
+  CON: 0,
+  NEUTRAL: 0,
+  total: 0,
 };
 
 const formatCreatedDate = (createdAt?: string) => {
@@ -49,6 +56,9 @@ const DebateInfoPage = () => {
   const [parentDebate, setParentDebate] = useState<Debate | null>(null);
   const [parentSelectionTarget, setParentSelectionTarget] =
     useState<SelectionTarget | null>(null);
+  const [progress, setProgress] = useState<DebateProgress | null>(null);
+  const [stanceSummary, setStanceSummary] =
+    useState<StanceSummary>(EMPTY_STANCE_SUMMARY);
   const [actionMessage, setActionMessage] = useState('');
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [resultSummary, setResultSummary] = useState('');
@@ -68,6 +78,8 @@ const DebateInfoPage = () => {
         setChildDebates([]);
         setParentDebate(null);
         setParentSelectionTarget(null);
+        setProgress(null);
+        setStanceSummary(EMPTY_STANCE_SUMMARY);
 
         const [
           detailResponse,
@@ -75,12 +87,16 @@ const DebateInfoPage = () => {
           definitionsResponse,
           childDebatesResponse,
           parentResponse,
+          progressResponse,
+          stanceSummaryResponse,
         ] = await Promise.all([
           debateService.getById(debateId),
           debateService.getMessages(debateId, { page: 1, limit: 50 }),
           definitionService.getByDebate(debateId),
           debateService.getChildDebates(debateId),
           debateService.getParent(debateId),
+          debateService.getProgress(debateId),
+          debateService.getStanceSummary(debateId),
         ]);
 
         const loadedDebate = detailResponse.data.debate;
@@ -102,6 +118,8 @@ const DebateInfoPage = () => {
         setChildDebates(childDebatesResponse.data.childDebates);
         setParentDebate(parentResponse.data.parentDebate);
         setParentSelectionTarget(parentResponse.data.sourceSelectionTarget ?? null);
+        setProgress(progressResponse.data.progress);
+        setStanceSummary(stanceSummaryResponse.data.summary);
       });
     };
 
@@ -229,6 +247,8 @@ const DebateInfoPage = () => {
   const creatorName = debate.creator?.nickname ?? '';
   const createdDateLabel = formatCreatedDate(debate.createdAt);
   const canManageDebate = user?.role === 'ADMIN' || debate.creator?.id === user?.id;
+  const isCloseBlocked =
+    debate.debateType === 'CONSENSUS' && Boolean(progress?.isBlocked);
   return (
     <Wrapper>
       {renderHeader()}
@@ -350,12 +370,29 @@ const DebateInfoPage = () => {
         <ModalBackdrop onClick={() => setIsCloseModalOpen(false)}>
           <CloseModal onClick={(event) => event.stopPropagation()}>
             <ModalTitle>토론 종료</ModalTitle>
-            <ModalText>종료 후에는 새 내용을 작성할 수 없습니다.</ModalText>
-            <ResultTextarea
-              value={resultSummary}
-              onChange={(event) => setResultSummary(event.target.value)}
-              placeholder="결과 요약을 선택 사항으로 남길 수 있습니다."
-            />
+            {isCloseBlocked ? (
+              <ModalText>진행 중인 합의 또는 하위 토론이 있어 지금은 토론을 종료할 수 없습니다.</ModalText>
+            ) : debate.debateType === 'PROS_CONS' ? (
+              <>
+                <ModalText>
+                  최종 입장 분포 · 찬성 {stanceSummary.PRO} · 반대 {stanceSummary.CON} · 중립 {stanceSummary.NEUTRAL}
+                </ModalText>
+                <ResultTextarea
+                  value={resultSummary}
+                  onChange={(event) => setResultSummary(event.target.value)}
+                  placeholder="결과 요약을 입력하세요. 자동 승패는 기록하지 않습니다."
+                />
+              </>
+            ) : (
+              <>
+                <ModalText>종료 후에는 새 내용을 작성할 수 없습니다.</ModalText>
+                <ResultTextarea
+                  value={resultSummary}
+                  onChange={(event) => setResultSummary(event.target.value)}
+                  placeholder="결과 요약을 선택 사항으로 남길 수 있습니다."
+                />
+              </>
+            )}
             <ModalActionRow>
               <ModalSecondaryButton
                 type="button"
@@ -366,7 +403,7 @@ const DebateInfoPage = () => {
               <ModalPrimaryButton
                 type="button"
                 onClick={() => void handleCloseDebate()}
-                disabled={isLifecycleSubmitting}
+                disabled={isLifecycleSubmitting || isCloseBlocked}
               >
                 종료
               </ModalPrimaryButton>

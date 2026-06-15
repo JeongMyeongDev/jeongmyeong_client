@@ -1,4 +1,4 @@
-import { isAxiosError } from 'axios';
+﻿import { isAxiosError } from 'axios';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -22,17 +22,17 @@ const DEBATE_TYPE_OPTIONS: Array<{
   {
     value: 'FREE',
     label: '자유 토론',
-    description: '자유롭게 의견을 주고받는 토론',
+    description: '합의안과 하위 토론이 진행되어도 본 토론 작성을 계속할 수 있습니다.',
   },
   {
     value: 'CONSENSUS',
     label: '합의형 토론',
-    description: '선택한 표현에 대해 합의안을 만들고 기준 정의를 정하는 토론',
+    description: '진행 중인 합의안이나 하위 토론이 있으면 본 토론 작성을 잠시 멈춥니다.',
   },
   {
     value: 'PROS_CONS',
-    label: '찬반형 토론',
-    description: '찬성/반대 입장을 중심으로 논의하는 토론',
+    label: '찬반 토론',
+    description: '찬성, 반대, 중립 입장을 선택하고 의견을 남깁니다.',
   },
 ];
 
