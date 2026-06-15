@@ -202,6 +202,7 @@ const DebateInfoPage = () => {
         <InfoText>토론 방식 : {DEBATE_TYPE_LABEL_MAP[debate.debateType]}</InfoText>
         <InfoText>토론 상태 : 현재 {STATUS_LABEL_MAP[debate.status]}</InfoText>
         {createdDateLabel && <InfoText>{createdDateLabel}</InfoText>}
+        <InfoText>참여 인원 : {debate.participantCount ?? debate.participants?.length ?? 0}명</InfoText>
       </InfoCard>
 
       <ParticipantsCard>

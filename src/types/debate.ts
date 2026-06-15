@@ -20,6 +20,7 @@ export interface Debate {
   status: DebateStatus;
   createdAt?: string;
   archivedAt?: string | null;
+  participantCount?: number;
   tagMaps?: Array<{ tag: DebateTag }>;
   creator?: {
     id: string;
@@ -37,7 +38,6 @@ export interface Debate {
     };
   }>;
   definitions?: DebateDefinition[];
-  participantCount?: number;
 }
 
 export interface DebateDefinition {
