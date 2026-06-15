@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SideDrawer from '../../components/common/SideDrawer';
 import styled from 'styled-components';
@@ -30,16 +30,16 @@ type DebateRoomCard = {
   createdDateLabel: string;
 };
 
-const FILTER_ITEMS = ['찬반토론', '합의토론', '댓글토론'];
+const FILTER_ITEMS = ['찬반토론', '합의토론', '자유토론'];
 const FILTER_TYPE_MAP: Record<string, 'PROS_CONS' | 'CONSENSUS' | 'FREE'> = {
   찬반토론: 'PROS_CONS',
   합의토론: 'CONSENSUS',
-  댓글토론: 'FREE',
+  자유토론: 'FREE',
 };
 const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
-  PROS_CONS: '찬반토론',
-  CONSENSUS: '합의토론',
-  FREE: '댓글토론',
+  PROS_CONS: '찬반',
+  CONSENSUS: '합의',
+  FREE: '자유',
 };
 
 const formatCreatedDate = (createdAt?: string) => {
@@ -178,6 +178,7 @@ const DebatePage = () => {
                 <ChatCircleIconImg src={iconChat} alt="" />
               </CardTop>
               <CardTitle>{card.title}</CardTitle>
+              <TypeBadge>{card.debateTypeLabel}</TypeBadge>
               <CardDesc>{card.description}</CardDesc>
             </Card>
           ))}
@@ -257,7 +258,7 @@ const HeaderRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin: 4px 0 12px;
 `;
 
 const HeaderRight = styled.div`
@@ -377,6 +378,21 @@ const CardTitle = styled.h3`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+`;
+
+const TypeBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  height: 22px;
+  max-width: 100%;
+  margin-bottom: 6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: #2dcd97;
+  font-size: 11px;
+  font-weight: 700;
 `;
 
 const CardDesc = styled.p`

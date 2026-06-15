@@ -38,6 +38,50 @@ declare global {
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
+const getStringField = (value: unknown, field: string) => {
+  if (!value || typeof value !== 'object') return undefined;
+
+  const fieldValue = (value as Record<string, unknown>)[field];
+  return typeof fieldValue === 'string' ? fieldValue : undefined;
+};
+
+const getEmailFromGoogleCredential = (credential: string) => {
+  try {
+    const payload = credential.split('.')[1];
+    if (!payload) return undefined;
+
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      '=',
+    );
+    const parsedPayload = JSON.parse(atob(paddedPayload)) as { email?: unknown };
+
+    return typeof parsedPayload.email === 'string' ? parsedPayload.email : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const getGoogleSignupEmail = (error: unknown, credential: string) => {
+  if (!isAxiosError(error)) return getEmailFromGoogleCredential(credential);
+
+  const responseData = error.response?.data;
+  const responseMessage = getStringField(responseData, 'message');
+  const messageObject =
+    responseData && typeof responseData === 'object'
+      ? (responseData as Record<string, unknown>).message
+      : undefined;
+
+  return (
+    getStringField(responseData, 'email') ??
+    getStringField(responseData, 'data') ??
+    getStringField(messageObject, 'email') ??
+    (responseMessage?.includes('@') ? responseMessage : undefined) ??
+    getEmailFromGoogleCredential(credential)
+  );
+};
+
 const EyeIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -86,8 +130,8 @@ const LoginPage = () => {
         navigate('/', { replace: true });
       } catch (error) {
         if (isAxiosError(error) && error.response?.status === 404) {
-          const googleEmail = error.response.data?.email;
-          if (typeof googleEmail === 'string') {
+          const googleEmail = getGoogleSignupEmail(error, response.credential);
+          if (googleEmail) {
             navigate('/google-signup', {
               state: { idToken: response.credential, email: googleEmail },
               replace: true,

@@ -1,11 +1,13 @@
 export type DebateType = "FREE" | "CONSENSUS" | "PROS_CONS";
 export type DebateStatus = "OPEN" | "CLOSED" | "ARCHIVED";
+export type DebateStance = "PRO" | "CON" | "NEUTRAL";
 export type PostStatus = "VISIBLE" | "HIDDEN" | "DELETED";
 export type SelectionSource = "POST" | "COMMENT";
 export type ConsensusStatus = "OPEN" | "APPROVED" | "REJECTED" | "CLOSED";
 export type ConsensusVoteType = "APPROVE" | "REJECT" | "COMMENT";
 export type DefinitionScope = "IN_DEBATE" | "GLOBAL_REFERENCE";
 export type DefinitionStatus = "ACTIVE" | "ARCHIVED";
+export type DefinitionReferenceType = "DEBATE_STANDARD" | "GLOBAL_REFERENCE";
 
 export interface DebateTag {
   id: string;
@@ -18,9 +20,15 @@ export interface Debate {
   description: string;
   debateType: DebateType;
   status: DebateStatus;
+  parentDebateId?: string | null;
+  sourceSelectionTargetId?: string | null;
+  closedAt?: string | null;
   createdAt?: string;
   archivedAt?: string | null;
-  participantCount?: number;
+
+  resultSummary?: string | null;
+  stanceDistribution?: StanceSummary | null;
+
   tagMaps?: Array<{ tag: DebateTag }>;
   creator?: {
     id: string;
@@ -38,6 +46,9 @@ export interface Debate {
     };
   }>;
   definitions?: DebateDefinition[];
+  participantCount?: number;
+  sourceSelectionTarget?: SelectionTarget;
+
 }
 
 export interface DebateDefinition {
@@ -64,14 +75,42 @@ export interface DebateDefinition {
     nickname: string;
     profileImage?: string | null;
   };
+  terms?: Array<{
+    id: string;
+    normalizedTerm: string;
+    originalTerm: string;
+  }>;
 }
 
 export type Definition = DebateDefinition;
+
+export interface DefinitionReference {
+  id: string;
+  debateId: string;
+  postId?: string | null;
+  commentId?: string | null;
+  definitionId: string;
+  selectedText: string;
+  startOffset: number;
+  endOffset: number;
+  referenceType: DefinitionReferenceType;
+  createdAt?: string;
+  definition: Definition;
+}
+
+export interface DefinitionReferenceInput {
+  definitionId: string;
+  selectedText: string;
+  startOffset: number;
+  endOffset: number;
+  referenceType: DefinitionReferenceType;
+}
 
 export interface DebateMessage {
   id: string;
   debateId: string;
   content: string;
+  stance?: DebateStance | null;
   status: PostStatus;
   createdAt: string;
   updatedAt?: string;
@@ -80,6 +119,7 @@ export interface DebateMessage {
     nickname: string;
     profileImage?: string | null;
   };
+  definitionReferences?: DefinitionReference[];
 }
 
 export interface CreatedPost {
@@ -87,8 +127,10 @@ export interface CreatedPost {
   debateId: string;
   authorId: string;
   content: string;
+  stance?: DebateStance | null;
   status: PostStatus;
   createdAt?: string;
+  definitionReferences?: DefinitionReference[];
 }
 
 export interface UpdatedPost {
@@ -118,6 +160,12 @@ export interface SelectionTarget {
     profileImage?: string | null;
   };
   createdAt?: string;
+}
+
+export interface DebateParentResponse {
+  parentDebate: Debate | null;
+  selectedText: string | null;
+  sourceSelectionTarget?: SelectionTarget | null;
 }
 
 export interface Consensus {
@@ -161,6 +209,32 @@ export interface ConsensusVote {
   };
 }
 
+export interface DebateProgress {
+  isBlocked: boolean;
+  blockingType: "CONSENSUS" | "CHILD_DEBATE" | "BOTH" | null;
+  blockingConsensus?: Pick<Consensus, "id" | "term" | "title" | "status" | "createdAt"> & {
+    selectionTarget?: Pick<SelectionTarget, "id" | "selectedText"> | null;
+  } | null;
+  blockingChildDebate?: Pick<Debate, "id" | "title" | "status" | "createdAt"> & {
+    sourceSelectionTarget?: Pick<SelectionTarget, "id" | "selectedText"> | null;
+  } | null;
+}
+
+export interface DebateUserStance {
+  id: string;
+  debateId: string;
+  userId: string;
+  stance: DebateStance;
+  updatedAt?: string;
+}
+
+export interface StanceSummary {
+  PRO: number;
+  CON: number;
+  NEUTRAL: number;
+  total: number;
+}
+
 export interface CommentSelection {
   selectedText: string;
   startOffset: number;
@@ -184,4 +258,5 @@ export interface Comment {
   _count?: {
     replies: number;
   };
+  definitionReferences?: DefinitionReference[];
 }

@@ -4,7 +4,9 @@ import { debateService } from '../services/debateService';
 import type {
   CreateConsensusRequest,
   CreateDebateRequest,
+  CreatePostRequest,
   CreateSelectionTargetRequest,
+  CloseDebateRequest,
   ListDebatesParams,
 } from '../services/debateService';
 
@@ -37,14 +39,21 @@ export const useDebate = () => {
     return data.debate;
   }, []);
 
-  const createMessage = useCallback(async (id: string, content: string) => {
-    const { data } = await debateService.createPost(id, { content });
+  const createMessage = useCallback(async (id: string, content: string, payload?: Omit<CreatePostRequest, 'content'>) => {
+    const { data } = await debateService.createPost(id, { content, ...payload });
     await fetchMessages(id);
     return data.post;
   }, [fetchMessages]);
 
   const archiveDebate = useCallback(async (id: string) => {
     const { data } = await debateService.archive(id);
+    setCurrentDebate(currentDebate?.id === id ? { ...currentDebate, ...data.debate } : currentDebate);
+    setDebates(debates.map((debate) => (debate.id === id ? { ...debate, ...data.debate } : debate)));
+    return data.debate;
+  }, [currentDebate, debates, setCurrentDebate, setDebates]);
+
+  const closeDebate = useCallback(async (id: string, payload?: CloseDebateRequest) => {
+    const { data } = await debateService.close(id, payload);
     setCurrentDebate(currentDebate?.id === id ? { ...currentDebate, ...data.debate } : currentDebate);
     setDebates(debates.map((debate) => (debate.id === id ? { ...debate, ...data.debate } : debate)));
     return data.debate;
@@ -70,6 +79,7 @@ export const useDebate = () => {
     fetchMessages,
     createDebate,
     createMessage,
+    closeDebate,
     archiveDebate,
     createSelectionTarget,
     createConsensus,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
 import iconAlarm from '../../assets/icon_alarm.svg';
@@ -7,7 +7,8 @@ import { DebateInfoSkeleton } from '../../components/common/PageSkeletons';
 import { debateService } from '../../services/debateService';
 import { definitionService } from '../../services/definitionService';
 import { usePageLoading } from '../../hooks/usePageLoading';
-import type { Debate, Definition } from '../../types/debate';
+import { useAuthStore } from '../../stores/authStore';
+import type { Debate, DebateProgress, Definition, SelectionTarget, StanceSummary } from '../../types/debate';
 
 const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
   PROS_CONS: '찬반토론',
@@ -19,6 +20,13 @@ const STATUS_LABEL_MAP: Record<Debate['status'], string> = {
   OPEN: '진행중',
   CLOSED: '종료',
   ARCHIVED: '보관',
+};
+
+const EMPTY_STANCE_SUMMARY: StanceSummary = {
+  PRO: 0,
+  CON: 0,
+  NEUTRAL: 0,
+  total: 0,
 };
 
 const formatCreatedDate = (createdAt?: string) => {
@@ -39,11 +47,22 @@ const DebateInfoPage = () => {
   const navigate = useNavigate();
   const { id: debateId } = useParams();
   const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
+  const { user } = useAuthStore();
   const [debate, setDebate] = useState<Debate | null>(null);
   const [definitions, setDefinitions] = useState<Definition[]>([]);
   const [participantNames, setParticipantNames] = useState<string[]>([]);
   const [postCount, setPostCount] = useState(0);
+  const [childDebates, setChildDebates] = useState<Debate[]>([]);
+  const [parentDebate, setParentDebate] = useState<Debate | null>(null);
+  const [parentSelectionTarget, setParentSelectionTarget] =
+    useState<SelectionTarget | null>(null);
+  const [progress, setProgress] = useState<DebateProgress | null>(null);
+  const [stanceSummary, setStanceSummary] =
+    useState<StanceSummary>(EMPTY_STANCE_SUMMARY);
   const [actionMessage, setActionMessage] = useState('');
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [resultSummary, setResultSummary] = useState('');
+  const [isLifecycleSubmitting, setIsLifecycleSubmitting] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
 
@@ -56,11 +75,28 @@ const DebateInfoPage = () => {
         setDefinitions([]);
         setParticipantNames([]);
         setPostCount(0);
+        setChildDebates([]);
+        setParentDebate(null);
+        setParentSelectionTarget(null);
+        setProgress(null);
+        setStanceSummary(EMPTY_STANCE_SUMMARY);
 
-        const [detailResponse, postsResponse, definitionsResponse] = await Promise.all([
+        const [
+          detailResponse,
+          postsResponse,
+          definitionsResponse,
+          childDebatesResponse,
+          parentResponse,
+          progressResponse,
+          stanceSummaryResponse,
+        ] = await Promise.all([
           debateService.getById(debateId),
           debateService.getMessages(debateId, { page: 1, limit: 50 }),
           definitionService.getByDebate(debateId),
+          debateService.getChildDebates(debateId),
+          debateService.getParent(debateId),
+          debateService.getProgress(debateId),
+          debateService.getStanceSummary(debateId),
         ]);
 
         const loadedDebate = detailResponse.data.debate;
@@ -73,6 +109,11 @@ const DebateInfoPage = () => {
         setDefinitions(definitionsResponse.data.definitions);
         setParticipantNames(participantNames.slice(0, 6));
         setPostCount(postsResponse.data.totalCount ?? posts.length);
+        setChildDebates(childDebatesResponse.data.childDebates);
+        setParentDebate(parentResponse.data.parentDebate);
+        setParentSelectionTarget(parentResponse.data.sourceSelectionTarget ?? null);
+        setProgress(progressResponse.data.progress);
+        setStanceSummary(stanceSummaryResponse.data.summary);
       });
     };
 
@@ -159,6 +200,44 @@ const DebateInfoPage = () => {
     }
   };
 
+  const refreshDebateInfo = async () => {
+    if (!debateId) return;
+    const { data } = await debateService.getById(debateId);
+    setDebate(data.debate);
+  };
+
+  const handleCloseDebate = async () => {
+    if (!debateId || isLifecycleSubmitting) return;
+    setIsLifecycleSubmitting(true);
+    try {
+      await debateService.close(debateId, {
+        resultSummary: resultSummary.trim() || undefined,
+      });
+      await refreshDebateInfo();
+      setIsCloseModalOpen(false);
+      setResultSummary('');
+      setActionMessage('토론을 종료했습니다.');
+    } catch {
+      setActionMessage('토론 종료에 실패했습니다.');
+    } finally {
+      setIsLifecycleSubmitting(false);
+    }
+  };
+
+  const handleArchiveDebate = async () => {
+    if (!debateId || isLifecycleSubmitting) return;
+    setIsLifecycleSubmitting(true);
+    try {
+      await debateService.archive(debateId);
+      await refreshDebateInfo();
+      setActionMessage('토론을 아카이브했습니다.');
+    } catch {
+      setActionMessage('토론 아카이브에 실패했습니다.');
+    } finally {
+      setIsLifecycleSubmitting(false);
+    }
+  };
+
   if (isLoading && !debate) {
     return (
       <Wrapper>
@@ -180,6 +259,9 @@ const DebateInfoPage = () => {
   const tagName = debate.tagMaps?.[0]?.tag.name;
   const creatorName = debate.creator?.nickname ?? '';
   const createdDateLabel = formatCreatedDate(debate.createdAt);
+  const canManageDebate = user?.role === 'ADMIN' || debate.creator?.id === user?.id;
+  const isCloseBlocked =
+    debate.debateType === 'CONSENSUS' && Boolean(progress?.isBlocked);
   return (
     <Wrapper>
       {renderHeader()}
@@ -190,6 +272,24 @@ const DebateInfoPage = () => {
         참여하기
       </JoinButton>
       {actionMessage && <ActionMessage>{actionMessage}</ActionMessage>}
+      {canManageDebate && (
+        <LifecycleActions>
+          {debate.status === 'OPEN' && (
+            <LifecycleButton type="button" onClick={() => setIsCloseModalOpen(true)}>
+              토론 종료
+            </LifecycleButton>
+          )}
+          {debate.status === 'CLOSED' && (
+            <LifecycleButton
+              type="button"
+              onClick={() => void handleArchiveDebate()}
+              disabled={isLifecycleSubmitting}
+            >
+              아카이브
+            </LifecycleButton>
+          )}
+        </LifecycleActions>
+      )}
 
       <InfoCard>
         {tagName && <Tag>#{tagName}</Tag>}
@@ -204,6 +304,48 @@ const DebateInfoPage = () => {
         {createdDateLabel && <InfoText>{createdDateLabel}</InfoText>}
         <InfoText>참여 인원 : {debate.participantCount ?? debate.participants?.length ?? 0}명</InfoText>
       </InfoCard>
+
+      {(parentDebate || childDebates.length > 0) && (
+        <RelationCard>
+          {parentDebate && (
+            <RelationBlock>
+              <RelationTitle>상위 토론</RelationTitle>
+              {parentSelectionTarget?.selectedText && (
+                <RelationQuote>{parentSelectionTarget.selectedText}</RelationQuote>
+              )}
+              <RelationButton
+                type="button"
+                onClick={() => navigate(`/debate/${parentDebate.id}/info`)}
+              >
+                {parentDebate.title}
+              </RelationButton>
+            </RelationBlock>
+          )}
+          {childDebates.length > 0 && (
+            <RelationBlock>
+              <RelationTitle>하위 토론</RelationTitle>
+              <RelationList>
+                {childDebates.map((childDebate) => (
+                  <RelationItem key={childDebate.id}>
+                    <RelationItemText>
+                      <strong>{childDebate.title}</strong>
+                      {childDebate.sourceSelectionTarget?.selectedText && (
+                        <span>{childDebate.sourceSelectionTarget.selectedText}</span>
+                      )}
+                    </RelationItemText>
+                    <RelationSmallButton
+                      type="button"
+                      onClick={() => navigate(`/debate/${childDebate.id}/info`)}
+                    >
+                      이동
+                    </RelationSmallButton>
+                  </RelationItem>
+                ))}
+              </RelationList>
+            </RelationBlock>
+          )}
+        </RelationCard>
+      )}
 
       <ParticipantsCard>
         <ParticipantsTitle>현재 참여자</ParticipantsTitle>
@@ -237,6 +379,52 @@ const DebateInfoPage = () => {
           <EmptyText>아직 승인된 기준 정의가 없습니다.</EmptyText>
         )}
       </SummaryCard>
+
+      {isCloseModalOpen && (
+        <ModalBackdrop onClick={() => setIsCloseModalOpen(false)}>
+          <CloseModal onClick={(event) => event.stopPropagation()}>
+            <ModalTitle>토론 종료</ModalTitle>
+            {isCloseBlocked ? (
+              <ModalText>진행 중인 합의 또는 하위 토론이 있어 지금은 토론을 종료할 수 없습니다.</ModalText>
+            ) : debate.debateType === 'PROS_CONS' ? (
+              <>
+                <ModalText>
+                  최종 입장 분포 · 찬성 {stanceSummary.PRO} · 반대 {stanceSummary.CON} · 중립 {stanceSummary.NEUTRAL}
+                </ModalText>
+                <ResultTextarea
+                  value={resultSummary}
+                  onChange={(event) => setResultSummary(event.target.value)}
+                  placeholder="결과 요약을 입력하세요. 자동 승패는 기록하지 않습니다."
+                />
+              </>
+            ) : (
+              <>
+                <ModalText>종료 후에는 새 내용을 작성할 수 없습니다.</ModalText>
+                <ResultTextarea
+                  value={resultSummary}
+                  onChange={(event) => setResultSummary(event.target.value)}
+                  placeholder="결과 요약을 선택 사항으로 남길 수 있습니다."
+                />
+              </>
+            )}
+            <ModalActionRow>
+              <ModalSecondaryButton
+                type="button"
+                onClick={() => setIsCloseModalOpen(false)}
+              >
+                취소
+              </ModalSecondaryButton>
+              <ModalPrimaryButton
+                type="button"
+                onClick={() => void handleCloseDebate()}
+                disabled={isLifecycleSubmitting || isCloseBlocked}
+              >
+                종료
+              </ModalPrimaryButton>
+            </ModalActionRow>
+          </CloseModal>
+        </ModalBackdrop>
+      )}
     </Wrapper>
   );
 };
@@ -293,6 +481,27 @@ const ActionMessage = styled.p`
   text-align: center;
   color: #2dcd97;
   font-size: 13px;
+`;
+
+const LifecycleActions = styled.div`
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+`;
+
+const LifecycleButton = styled.button`
+  flex: 1;
+  height: 42px;
+  border: none;
+  border-radius: 999px;
+  background: #2f3238;
+  color: #ffffff;
+  font-size: var(--body-sm);
+  font-weight: 700;
+
+  &:disabled {
+    opacity: 0.55;
+  }
 `;
 
 const Title = styled.h1`
@@ -372,6 +581,105 @@ const InfoText = styled.p`
   margin: 0 0 10px;
   font-size: 15px;
   color: #9a9a9a;
+`;
+
+const RelationCard = styled.section`
+  margin-top: 14px;
+  background: #ffffff;
+  border-radius: var(--card-radius);
+  padding: clamp(12px, 3.3vw, 14px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+`;
+
+const RelationBlock = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const RelationTitle = styled.h2`
+  margin: 0;
+  font-size: var(--body-sm);
+  color: #8f8f8f;
+  font-weight: 700;
+`;
+
+const RelationQuote = styled.p`
+  margin: 0;
+  border-left: 3px solid #2dcd97;
+  padding-left: 10px;
+  color: #9a9a9a;
+  font-size: var(--body-sm);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const RelationButton = styled.button`
+  width: 100%;
+  min-height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #eefaf6;
+  color: #2d8f73;
+  font-size: var(--body-sm);
+  font-weight: 700;
+  text-align: left;
+  padding: 9px 12px;
+`;
+
+const RelationList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const RelationItem = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border-radius: 8px;
+  background: #f7f7f7;
+  padding: 9px 10px;
+`;
+
+const RelationItemText = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  strong,
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    color: #555555;
+    font-size: var(--body-sm);
+  }
+
+  span {
+    color: #9a9a9a;
+    font-size: 12px;
+  }
+`;
+
+const RelationSmallButton = styled.button`
+  min-width: 44px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #2dcd97;
+  font-size: 12px;
+  font-weight: 700;
 `;
 
 const ParticipantsCard = styled.section`
@@ -468,6 +776,80 @@ const DefinitionContent = styled.p`
   white-space: pre-wrap;
   word-break: keep-all;
   overflow-wrap: anywhere;
+`;
+
+const ModalBackdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.28);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+`;
+
+const CloseModal = styled.div`
+  width: 100%;
+  max-width: var(--app-max-width);
+  border-radius: 18px 18px 0 0;
+  background: #ffffff;
+  padding: 18px var(--page-x) max(18px, env(safe-area-inset-bottom));
+`;
+
+const ModalTitle = styled.h2`
+  margin: 0 0 8px;
+  color: #2f3238;
+  font-size: var(--title-sm);
+  font-weight: 700;
+`;
+
+const ModalText = styled.p`
+  margin: 0 0 12px;
+  color: #8f8f8f;
+  font-size: var(--body-sm);
+`;
+
+const ResultTextarea = styled.textarea`
+  width: 100%;
+  min-height: 96px;
+  border: none;
+  border-radius: 8px;
+  background: #f0f0f0;
+  color: #555555;
+  font-size: var(--body-sm);
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+`;
+
+const ModalActionRow = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+`;
+
+const ModalButton = styled.button`
+  height: 38px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 16px;
+  font-size: var(--body-sm);
+  font-weight: 700;
+
+  &:disabled {
+    opacity: 0.55;
+  }
+`;
+
+const ModalSecondaryButton = styled(ModalButton)`
+  background: #f0f0f0;
+  color: #7f7f7f;
+`;
+
+const ModalPrimaryButton = styled(ModalButton)`
+  background: #2dcd97;
+  color: #ffffff;
 `;
 
 export default DebateInfoPage;

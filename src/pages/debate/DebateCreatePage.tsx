@@ -1,9 +1,10 @@
-import { isAxiosError } from 'axios';
+﻿import { isAxiosError } from 'axios';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useDebate } from '../../hooks/useDebate';
 import { useAuthStore } from '../../stores/authStore';
+import type { DebateType } from '../../types/debate';
 
 const TITLE_MAX_LENGTH = 40;
 const DESCRIPTION_MAX_LENGTH = 120;
@@ -12,6 +13,28 @@ const TAG_MAX_COUNT = 5;
 const DEFAULT_DEBATE_TYPE = 'FREE' as const;
 const DRAFT_KEY = 'debate-create:draft';
 const SPECIAL_CHARACTER_PATTERN = /[^\p{L}\p{N}\s]/gu;
+
+const DEBATE_TYPE_OPTIONS: Array<{
+  value: DebateType;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'FREE',
+    label: '자유 토론',
+    description: '합의안과 하위 토론이 진행되어도 본 토론 작성을 계속할 수 있습니다.',
+  },
+  {
+    value: 'CONSENSUS',
+    label: '합의형 토론',
+    description: '진행 중인 합의안이나 하위 토론이 있으면 본 토론 작성을 잠시 멈춥니다.',
+  },
+  {
+    value: 'PROS_CONS',
+    label: '찬반 토론',
+    description: '찬성, 반대, 중립 입장을 선택하고 의견을 남깁니다.',
+  },
+];
 
 const sanitizeDebateText = (value: string, maxLength: number) =>
   value.replace(SPECIAL_CHARACTER_PATTERN, '').slice(0, maxLength);
@@ -36,21 +59,37 @@ const getCommunityTextValidationError = (input: string, fieldName = '내용') =>
 
 const getInitialDraft = () => {
   const rawDraft = localStorage.getItem(DRAFT_KEY);
-  if (!rawDraft) return { title: '', description: '', tags: [] as string[] };
+  if (!rawDraft) {
+    return {
+      title: '',
+      description: '',
+      tags: [] as string[],
+      debateType: DEFAULT_DEBATE_TYPE as DebateType,
+    };
+  }
   try {
     const draft = JSON.parse(rawDraft) as {
       title?: string;
       description?: string;
       tags?: string[];
+      debateType?: DebateType;
     };
     return {
       title: draft.title ?? '',
       description: draft.description ?? '',
       tags: Array.isArray(draft.tags) ? draft.tags : [],
+      debateType: DEBATE_TYPE_OPTIONS.some((option) => option.value === draft.debateType)
+        ? draft.debateType
+        : DEFAULT_DEBATE_TYPE,
     };
   } catch {
     localStorage.removeItem(DRAFT_KEY);
-    return { title: '', description: '', tags: [] as string[] };
+    return {
+      title: '',
+      description: '',
+      tags: [] as string[],
+      debateType: DEFAULT_DEBATE_TYPE as DebateType,
+    };
   }
 };
 
@@ -69,13 +108,16 @@ const DebateCreatePage = () => {
   const [title, setTitle] = useState(draft.title);
   const [description, setDescription] = useState(draft.description);
   const [tags, setTags] = useState<string[]>(draft.tags);
+  const [debateType, setDebateType] = useState<DebateType>(
+    draft.debateType ?? DEFAULT_DEBATE_TYPE,
+  );
   const [tagInput, setTagInput] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, tags }));
-  }, [title, description, tags]);
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, tags, debateType }));
+  }, [title, description, tags, debateType]);
 
   const normalizeTag = (value: string) => value.trim().toLowerCase();
 
@@ -153,7 +195,7 @@ const DebateCreatePage = () => {
       await createDebate({
         title: title.trim(),
         description: description.trim(),
-        debateType: DEFAULT_DEBATE_TYPE,
+        debateType,
         tags: normalizedTags,
         closeConditionType: 'MANUAL',
       });
@@ -198,6 +240,23 @@ const DebateCreatePage = () => {
             maxLength={DESCRIPTION_MAX_LENGTH}
           />
           <CountText>{description.length}/{DESCRIPTION_MAX_LENGTH}</CountText>
+        </SectionCard>
+
+        <SectionCard>
+          <SectionTitle>토론 방식</SectionTitle>
+          <TypeOptionList>
+            {DEBATE_TYPE_OPTIONS.map((option) => (
+              <TypeOptionButton
+                key={option.value}
+                type="button"
+                $active={debateType === option.value}
+                onClick={() => setDebateType(option.value)}
+              >
+                <TypeOptionLabel>{option.label}</TypeOptionLabel>
+                <TypeOptionDescription>{option.description}</TypeOptionDescription>
+              </TypeOptionButton>
+            ))}
+          </TypeOptionList>
         </SectionCard>
 
         <SectionCard>
@@ -337,6 +396,38 @@ const DescriptionInput = styled.textarea`
   &::placeholder {
     color: #b3b3b3;
   }
+`;
+
+const TypeOptionList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const TypeOptionButton = styled.button<{ $active: boolean }>`
+  width: 100%;
+  border: 2px solid ${({ $active }) => ($active ? '#2dcd97' : '#d6d6d6')};
+  border-radius: 12px;
+  background: ${({ $active }) => ($active ? '#e9fbf4' : '#ffffff')};
+  padding: 11px 12px;
+  text-align: left;
+`;
+
+const TypeOptionLabel = styled.span`
+  display: block;
+  color: #2f3238;
+  font-size: var(--body-md);
+  font-weight: 700;
+`;
+
+const TypeOptionDescription = styled.span`
+  display: block;
+  margin-top: 4px;
+  color: #8f8f8f;
+  font-size: var(--body-sm);
+  line-height: 1.35;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
 const CountText = styled.p`

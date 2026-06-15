@@ -1,10 +1,11 @@
-import {
+﻿import {
   Fragment,
   useEffect,
   useMemo,
   useRef,
   useState,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import { isAxiosError } from "axios";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -15,6 +16,7 @@ import { useDebate } from "../../hooks/useDebate";
 import { usePageLoading } from "../../hooks/usePageLoading";
 import { consensusService } from "../../services/consensusService";
 import { debateService } from "../../services/debateService";
+import { definitionService } from "../../services/definitionService";
 import { postService } from "../../services/postService";
 import { useAuthStore } from "../../stores/authStore";
 import ThreadSkeleton from "../../components/common/ThreadSkeleton";
@@ -22,7 +24,16 @@ import type {
   Comment,
   Consensus,
   ConsensusVoteType,
+  Debate,
+  DebateProgress,
+  DebateStance,
+  DebateType,
+  Definition,
+  DefinitionReference,
+  DefinitionReferenceInput,
+  DefinitionReferenceType,
   SelectionSource,
+  StanceSummary,
 } from "../../types/debate";
 
 type ReplyTarget = {
@@ -46,6 +57,22 @@ type PendingSelection = {
   menuY: number;
 };
 
+type ComposerSelection = {
+  selectedText: string;
+  startOffset: number;
+  endOffset: number;
+  menuX: number;
+  menuY: number;
+};
+
+type PendingDefinitionReference = DefinitionReferenceInput & {
+  tempId: string;
+  definition: Definition;
+  replaceReferenceId?: string;
+};
+
+type DefinitionPickerTarget = "COMPOSER" | "EDIT";
+
 type SelectionAction = "consensus" | "child";
 type ConsensusFinalizeAction = "approve" | "reject" | "close";
 
@@ -55,6 +82,37 @@ type ConsensusDraft = {
   title: string;
   content: string;
 };
+
+type ChildDebateDraft = {
+  selection: PendingSelection;
+  title: string;
+  description: string;
+  debateType: DebateType;
+};
+
+type EditTarget =
+  | {
+      type: "POST";
+      postId: string;
+      content: string;
+    }
+  | {
+      type: "COMMENT";
+      postId: string;
+      commentId: string;
+      content: string;
+    };
+
+type DeleteTarget =
+  | {
+      type: "POST";
+      postId: string;
+    }
+  | {
+      type: "COMMENT";
+      postId: string;
+      commentId: string;
+    };
 
 const SELECTION_SOURCE_SELECTOR =
   "[data-selection-source-type][data-selection-source-id]";
@@ -69,12 +127,40 @@ const CONSENSUS_STATUS_LABEL: Record<string, string> = {
 const buildConsensusSourceKey = (sourceType: SelectionSource, sourceId: string) =>
   `${sourceType}:${sourceId}`;
 
+const DEBATE_TYPE_OPTIONS: Array<{ value: DebateType; label: string }> = [
+  { value: "FREE", label: "자유 토론" },
+  { value: "CONSENSUS", label: "합의 토론" },
+  { value: "PROS_CONS", label: "찬반 토론" },
+];
+
+const STANCE_LABEL: Record<DebateStance, string> = {
+  PRO: "찬성",
+  CON: "반대",
+  NEUTRAL: "중립",
+};
+
+const EMPTY_STANCE_SUMMARY: StanceSummary = {
+  PRO: 0,
+  CON: 0,
+  NEUTRAL: 0,
+  total: 0,
+};
+
+const STANCE_FILTERS: Array<"ALL" | DebateStance> = [
+  "ALL",
+  "PRO",
+  "CON",
+  "NEUTRAL",
+];
+
 const getMentionPrefix = (name: string) => {
   const normalizedName = name.replace(/\s+/g, "") || "사용자";
   return `@${normalizedName} `;
 };
 
 const getReplyGroupKey = (postId: string, commentId: string) => `${postId}:${commentId}`;
+const getInlineStackKey = (sourceType: SelectionSource, sourceId: string) =>
+  `${sourceType}:${sourceId}`;
 
 const buildCommentGroups = (comments: Comment[]) => {
   const commentMap = new Map(comments.map((comment) => [comment.id, comment]));
@@ -135,8 +221,42 @@ const getSelectionSourceElement = (node: Node | null) => {
   return element?.closest<HTMLElement>(SELECTION_SOURCE_SELECTOR) ?? null;
 };
 
+const getOffsetInsideElement = (
+  element: HTMLElement,
+  container: Node,
+  offset: number,
+) => {
+  const beforeRange = document.createRange();
+  beforeRange.selectNodeContents(element);
+  beforeRange.setEnd(container, offset);
+  const textOffset = beforeRange.toString().length;
+  beforeRange.detach();
+  return textOffset;
+};
+
 const clampMenuCoordinate = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
+
+const normalizeDefinitionTerm = (value: string) =>
+  value.trim().toLowerCase().replace(/\s+/g, " ");
+
+const definitionMatchesSelectedText = (
+  definition: Definition,
+  selectedText?: string,
+) => {
+  const normalizedSelectedText = normalizeDefinitionTerm(selectedText ?? "");
+  if (!normalizedSelectedText) return false;
+  if (normalizeDefinitionTerm(definition.term) === normalizedSelectedText) {
+    return true;
+  }
+  return (
+    definition.terms?.some(
+      (term) =>
+        normalizeDefinitionTerm(term.originalTerm) === normalizedSelectedText ||
+        normalizeDefinitionTerm(term.normalizedTerm) === normalizedSelectedText,
+    ) ?? false
+  );
+};
 
 const BackIcon = () => (
   <svg
@@ -171,7 +291,11 @@ const DebateThreadPage = () => {
   const location = useLocation();
   const { id: debateId } = useParams();
   const inputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
   const selectionMenuRef = useRef<HTMLDivElement>(null);
+  const composerSelectionMenuRef = useRef<HTMLDivElement>(null);
+  const editSelectionMenuRef = useRef<HTMLDivElement>(null);
+  const selectionDragSourceRef = useRef<HTMLElement | null>(null);
   const { currentDebate, messages, fetchDebate, fetchMessages, createMessage } =
     useDebate();
   const { user } = useAuthStore();
@@ -188,25 +312,98 @@ const DebateThreadPage = () => {
   const [actionMessage, setActionMessage] = useState("");
   const [pendingSelection, setPendingSelection] =
     useState<PendingSelection | null>(null);
+  const [composerSelection, setComposerSelection] =
+    useState<ComposerSelection | null>(null);
+  const [editSelection, setEditSelection] = useState<ComposerSelection | null>(
+    null,
+  );
+  const [pendingDefinitionReferences, setPendingDefinitionReferences] =
+    useState<PendingDefinitionReference[]>([]);
+  const [pendingEditDefinitionReferences, setPendingEditDefinitionReferences] =
+    useState<PendingDefinitionReference[]>([]);
+  const [isDefinitionPickerOpen, setIsDefinitionPickerOpen] = useState(false);
+  const [definitionPickerSelection, setDefinitionPickerSelection] =
+    useState<ComposerSelection | null>(null);
+  const [definitionPickerTarget, setDefinitionPickerTarget] =
+    useState<DefinitionPickerTarget>("COMPOSER");
+  const [definitionPickerTab, setDefinitionPickerTab] =
+    useState<DefinitionReferenceType>("DEBATE_STANDARD");
+  const [debateDefinitions, setDebateDefinitions] = useState<Definition[]>([]);
+  const [globalDefinitions, setGlobalDefinitions] = useState<Definition[]>([]);
+  const [globalDefinitionKeyword, setGlobalDefinitionKeyword] = useState("");
+  const [activeDefinitionReference, setActiveDefinitionReference] =
+    useState<DefinitionReference | null>(null);
   const [consensuses, setConsensuses] = useState<Consensus[]>([]);
   const [consensusDraft, setConsensusDraft] = useState<ConsensusDraft | null>(
     null,
   );
+  const [childDebates, setChildDebates] = useState<Debate[]>([]);
+  const [childDebateDraft, setChildDebateDraft] =
+    useState<ChildDebateDraft | null>(null);
+  const [progress, setProgress] = useState<DebateProgress | null>(null);
+  const [myStance, setMyStance] = useState<DebateStance | null>(null);
+  const [stanceSummary, setStanceSummary] =
+    useState<StanceSummary>(EMPTY_STANCE_SUMMARY);
+  const [stanceFilter, setStanceFilter] = useState<"ALL" | DebateStance>("ALL");
   const [selectedConsensus, setSelectedConsensus] = useState<Consensus | null>(
     null,
   );
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editScrollTop, setEditScrollTop] = useState(0);
+  const [existingEditDefinitionReferences, setExistingEditDefinitionReferences] =
+    useState<DefinitionReference[]>([]);
+  const [
+    removedEditDefinitionReferenceIds,
+    setRemovedEditDefinitionReferenceIds,
+  ] = useState<string[]>([]);
+  const [replacingEditDefinitionReference, setReplacingEditDefinitionReference] =
+    useState<DefinitionReference | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [voteComment, setVoteComment] = useState("");
   const [activeCardMenuKey, setActiveCardMenuKey] = useState<string | null>(
     null,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedReplyGroups, setExpandedReplyGroups] = useState<Record<string, boolean>>({});
+  const [expandedConsensusStacks, setExpandedConsensusStacks] = useState<Record<string, boolean>>({});
+  const [expandedChildDebateStacks, setExpandedChildDebateStacks] = useState<Record<string, boolean>>({});
   const canFinalizeConsensus =
     user?.role === "ADMIN" || currentDebate?.creator?.id === user?.id;
+  const isDebateReadOnly =
+    currentDebate?.status === "CLOSED" || currentDebate?.status === "ARCHIVED";
+  const isConsensusBlocked =
+    currentDebate?.debateType === "CONSENSUS" && Boolean(progress?.isBlocked);
+  const isComposerDisabled = isDebateReadOnly || isConsensusBlocked;
+  const readOnlyMessage =
+    currentDebate?.status === "ARCHIVED"
+      ? "아카이브된 토론입니다."
+      : currentDebate?.status === "CLOSED"
+        ? "종료된 토론입니다."
+        : "";
 
   const refreshConsensuses = async (id: string) => {
     const { data } = await debateService.getConsensuses(id);
     setConsensuses(data.consensuses);
+  };
+
+  const refreshChildDebates = async (id: string) => {
+    const { data } = await debateService.getChildDebates(id);
+    setChildDebates(data.childDebates);
+  };
+
+  const refreshProgress = async (id: string) => {
+    const { data } = await debateService.getProgress(id);
+    setProgress(data.progress);
+  };
+
+  const refreshStanceState = async (id: string) => {
+    const [summaryResponse, myStanceResponse] = await Promise.all([
+      debateService.getStanceSummary(id),
+      user ? debateService.getMyStance(id) : Promise.resolve(null),
+    ]);
+    setStanceSummary(summaryResponse.data.summary);
+    setMyStance(myStanceResponse?.data.stance?.stance ?? null);
   };
 
   useEffect(() => {
@@ -218,12 +415,15 @@ const DebateThreadPage = () => {
           fetchDebate(debateId),
           fetchMessages(debateId),
           refreshConsensuses(debateId),
+          refreshChildDebates(debateId),
+          refreshProgress(debateId),
+          refreshStanceState(debateId),
         ]);
       });
     };
 
     void loadThread();
-  }, [debateId, fetchDebate, fetchMessages, executeAsync]);
+  }, [debateId, fetchDebate, fetchMessages, executeAsync, user]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => inputRef.current?.focus(), 250);
@@ -235,13 +435,47 @@ const DebateThreadPage = () => {
     localStorage.setItem(draftKey, message);
   }, [draftKey, message]);
 
+  useEffect(() => {
+    if (!actionMessage) return;
+    const timer = window.setTimeout(() => setActionMessage(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [actionMessage]);
+
+  useEffect(() => {
+    if (!isDefinitionPickerOpen || !debateId) return;
+
+    let isCurrent = true;
+    void definitionService.getByDebate(debateId).then(({ data }) => {
+      if (isCurrent) setDebateDefinitions(data.definitions);
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [debateId, isDefinitionPickerOpen]);
+
+  useEffect(() => {
+    if (!isDefinitionPickerOpen) return;
+
+    const keyword =
+      globalDefinitionKeyword.trim() || definitionPickerSelection?.selectedText || "";
+    const timer = window.setTimeout(() => {
+      void definitionService.search(keyword).then(({ data }) => {
+        setGlobalDefinitions(data.definitions);
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [definitionPickerSelection?.selectedText, globalDefinitionKeyword, isDefinitionPickerOpen]);
+
   const threadMessages = useMemo(
     () =>
       messages
         .filter((item) => item.status !== "HIDDEN")
+        .filter((item) => stanceFilter === "ALL" || item.stance === stanceFilter)
         .slice()
         .reverse(),
-    [messages],
+    [messages, stanceFilter],
   );
 
   const consensusesBySource = useMemo(() => {
@@ -260,12 +494,47 @@ const DebateThreadPage = () => {
     return map;
   }, [consensuses]);
 
+  const childDebatesBySource = useMemo(() => {
+    const map = new Map<string, Debate[]>();
+
+    childDebates.forEach((childDebate) => {
+      const target = childDebate.sourceSelectionTarget;
+      if (!target?.sourceType || !target.sourceId) return;
+
+      const key = buildConsensusSourceKey(target.sourceType, target.sourceId);
+      const sourceChildDebates = map.get(key) ?? [];
+      sourceChildDebates.push(childDebate);
+      map.set(key, sourceChildDebates);
+    });
+
+    return map;
+  }, [childDebates]);
+
   const openConsensusCount = consensuses.filter(
     (consensus) => consensus.status === "OPEN",
   ).length;
   const approvedConsensusCount = consensuses.filter(
     (consensus) => consensus.status === "APPROVED",
   ).length;
+  const isConsensusDebate = currentDebate?.debateType === "CONSENSUS";
+  const isProsConsDebate = currentDebate?.debateType === "PROS_CONS";
+  const matchingDebateDefinitions = useMemo(
+    () =>
+      debateDefinitions.filter((definition) =>
+        definitionMatchesSelectedText(
+          definition,
+          definitionPickerSelection?.selectedText,
+        ),
+      ),
+    [debateDefinitions, definitionPickerSelection?.selectedText],
+  );
+  const visibleExistingEditDefinitionReferences = useMemo(
+    () =>
+      existingEditDefinitionReferences.filter(
+        (reference) => !removedEditDefinitionReferenceIds.includes(reference.id),
+      ),
+    [existingEditDefinitionReferences, removedEditDefinitionReferenceIds],
+  );
 
   useEffect(() => {
     if (threadMessages.length === 0) {
@@ -304,6 +573,7 @@ const DebateThreadPage = () => {
     const intervalId = window.setInterval(() => {
       void fetchMessages(debateId);
       void refreshConsensuses(debateId);
+      void refreshChildDebates(debateId);
       const postIds = threadMessages.map((item) => item.id);
       void Promise.all(
         postIds.map(async (postId) => {
@@ -330,6 +600,34 @@ const DebateThreadPage = () => {
     window.getSelection()?.removeAllRanges();
   };
 
+  const clearComposerSelectionMenu = () => {
+    setComposerSelection(null);
+    const input = inputRef.current;
+    if (input) input.setSelectionRange(input.selectionEnd ?? 0, input.selectionEnd ?? 0);
+  };
+
+  const handleComposerMessageChange = (nextMessage: string) => {
+    setMessage(nextMessage);
+    setPendingDefinitionReferences((prev) =>
+      prev.filter(
+        (reference) =>
+          nextMessage.slice(reference.startOffset, reference.endOffset) ===
+          reference.selectedText,
+      ),
+    );
+  };
+
+  const handleEditContentChange = (nextContent: string) => {
+    setEditContent(nextContent);
+    setPendingEditDefinitionReferences((prev) =>
+      prev.filter(
+        (reference) =>
+          nextContent.slice(reference.startOffset, reference.endOffset) ===
+          reference.selectedText,
+      ),
+    );
+  };
+
   useEffect(() => {
     const timer = window.setTimeout(() => setPendingSelection(null), 0);
     return () => window.clearTimeout(timer);
@@ -337,12 +635,39 @@ const DebateThreadPage = () => {
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
+      selectionDragSourceRef.current = getSelectionSourceElement(
+        event.target as Node,
+      );
+
       if (
         pendingSelection &&
         !selectionMenuRef.current?.contains(event.target as Node)
       ) {
         setPendingSelection(null);
       }
+      if (
+        composerSelection &&
+        !composerSelectionMenuRef.current?.contains(event.target as Node) &&
+        event.target !== inputRef.current
+      ) {
+        setComposerSelection(null);
+      }
+      if (
+        editSelection &&
+        !editSelectionMenuRef.current?.contains(event.target as Node) &&
+        event.target !== editInputRef.current
+      ) {
+        setEditSelection(null);
+      }
+    };
+
+    const handlePointerUp = () => {
+      handleTextSelection();
+      handleComposerSelection();
+      handleEditSelection();
+      window.setTimeout(() => {
+        selectionDragSourceRef.current = null;
+      }, 0);
     };
 
     const handleSelectionChange = () => {
@@ -363,13 +688,17 @@ const DebateThreadPage = () => {
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("pointerdown", handleCardMenuPointerDown);
+    document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("touchend", handlePointerUp);
     document.addEventListener("selectionchange", handleSelectionChange);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("pointerdown", handleCardMenuPointerDown);
+      document.removeEventListener("pointerup", handlePointerUp);
+      document.removeEventListener("touchend", handlePointerUp);
       document.removeEventListener("selectionchange", handleSelectionChange);
     };
-  }, [activeCardMenuKey, pendingSelection]);
+  }, [activeCardMenuKey, composerSelection, editSelection, pendingSelection]);
 
   const handleTextSelection = () => {
     window.setTimeout(() => {
@@ -382,9 +711,11 @@ const DebateThreadPage = () => {
 
       const anchorSource = getSelectionSourceElement(selection.anchorNode);
       const focusSource = getSelectionSourceElement(selection.focusNode);
-      if (!anchorSource || !focusSource) return;
+      const source =
+        selectionDragSourceRef.current ?? anchorSource ?? focusSource;
+      if (!source) return;
 
-      if (anchorSource !== focusSource) {
+      if (anchorSource !== focusSource && !selectionDragSourceRef.current) {
         setPendingSelection(null);
         setActionMessage("하나의 의견 또는 댓글 안에서만 선택할 수 있습니다.");
         selection.removeAllRanges();
@@ -402,8 +733,9 @@ const DebateThreadPage = () => {
 
       const range = selection.getRangeAt(0);
       if (
-        !anchorSource.contains(range.startContainer) ||
-        !anchorSource.contains(range.endContainer)
+        !selectionDragSourceRef.current &&
+        (!source.contains(range.startContainer) ||
+          !source.contains(range.endContainer))
       ) {
         setPendingSelection(null);
         setActionMessage("하나의 의견 또는 댓글 안에서만 선택할 수 있습니다.");
@@ -411,14 +743,25 @@ const DebateThreadPage = () => {
         return;
       }
 
-      const beforeRange = range.cloneRange();
-      beforeRange.selectNodeContents(anchorSource);
-      beforeRange.setEnd(range.startContainer, range.startOffset);
-
-      const startOffset = beforeRange.toString().length;
-      const endOffset = startOffset + selectedText.length;
+      const sourceText = source.textContent ?? "";
+      const startOffset = source.contains(range.startContainer)
+        ? getOffsetInsideElement(source, range.startContainer, range.startOffset)
+        : 0;
+      const endOffset = source.contains(range.endContainer)
+        ? getOffsetInsideElement(source, range.endContainer, range.endOffset)
+        : sourceText.length;
+      const normalizedStartOffset = Math.min(startOffset, endOffset);
+      const normalizedEndOffset = Math.max(startOffset, endOffset);
+      const sourceSelectedText = sourceText.slice(
+        normalizedStartOffset,
+        normalizedEndOffset,
+      );
+      if (!sourceSelectedText.trim()) {
+        setPendingSelection(null);
+        return;
+      }
       const rect = range.getBoundingClientRect();
-      const sourceRect = anchorSource.getBoundingClientRect();
+      const sourceRect = source.getBoundingClientRect();
       const menuX = clampMenuCoordinate(
         rect.width
           ? rect.left + rect.width / 2
@@ -434,15 +777,202 @@ const DebateThreadPage = () => {
 
       setActionMessage("");
       setPendingSelection({
-        sourceType: anchorSource.dataset.selectionSourceType as SelectionSource,
-        sourceId: anchorSource.dataset.selectionSourceId ?? "",
-        selectedText,
-        startOffset,
-        endOffset,
+        sourceType: source.dataset.selectionSourceType as SelectionSource,
+        sourceId: source.dataset.selectionSourceId ?? "",
+        selectedText: sourceSelectedText,
+        startOffset: normalizedStartOffset,
+        endOffset: normalizedEndOffset,
         menuX,
         menuY,
       });
     }, 0);
+  };
+
+  const handleComposerSelection = () => {
+    window.setTimeout(() => {
+      const input = inputRef.current;
+      if (!input) return;
+      if (document.activeElement !== input) return;
+
+      const startOffset = input.selectionStart ?? 0;
+      const endOffset = input.selectionEnd ?? 0;
+      const selectedText = input.value.slice(startOffset, endOffset);
+      if (startOffset === endOffset || !selectedText.trim()) {
+        setComposerSelection(null);
+        return;
+      }
+
+      if (currentDebate?.status === "CLOSED") {
+        setActionMessage("종료된 토론에서는 정의를 연결할 수 없습니다.");
+        setComposerSelection(null);
+        return;
+      }
+      if (currentDebate?.status === "ARCHIVED") {
+        setActionMessage("아카이브된 토론은 읽기 전용입니다.");
+        setComposerSelection(null);
+        return;
+      }
+      if (currentDebate?.status !== "OPEN") {
+        setComposerSelection(null);
+        return;
+      }
+
+      const rect = input.getBoundingClientRect();
+      setComposerSelection({
+        selectedText,
+        startOffset,
+        endOffset,
+        menuX: clampMenuCoordinate(rect.left + rect.width / 2, 88, window.innerWidth - 88),
+        menuY: clampMenuCoordinate(rect.top - 10, 72, window.innerHeight - 88),
+      });
+    }, 0);
+  };
+
+  const handleEditSelection = () => {
+    window.setTimeout(() => {
+      const input = editInputRef.current;
+      if (!input || !editTarget) return;
+      if (document.activeElement !== input) return;
+
+      const startOffset = input.selectionStart ?? 0;
+      const endOffset = input.selectionEnd ?? 0;
+      const selectedText = input.value.slice(startOffset, endOffset);
+      if (startOffset === endOffset || !selectedText.trim()) {
+        setEditSelection(null);
+        return;
+      }
+
+      if (currentDebate?.status === "CLOSED") {
+        setActionMessage("醫낅즺???좊줎?먯꽌???뺤쓽瑜??곌껐?????놁뒿?덈떎.");
+        setEditSelection(null);
+        return;
+      }
+      if (currentDebate?.status === "ARCHIVED") {
+        setActionMessage("?꾩뭅?대툕???좊줎? ?쎄린 ?꾩슜?낅땲??");
+        setEditSelection(null);
+        return;
+      }
+      if (currentDebate?.status !== "OPEN") {
+        setEditSelection(null);
+        return;
+      }
+
+      const rect = input.getBoundingClientRect();
+      setEditSelection({
+        selectedText,
+        startOffset,
+        endOffset,
+        menuX: clampMenuCoordinate(
+          rect.left + rect.width / 2,
+          88,
+          window.innerWidth - 88,
+        ),
+        menuY: clampMenuCoordinate(rect.top - 10, 72, window.innerHeight - 88),
+      });
+    }, 0);
+  };
+
+  const removeExistingEditDefinitionReference = (referenceId: string) => {
+    setRemovedEditDefinitionReferenceIds((prev) =>
+      prev.includes(referenceId) ? prev : [...prev, referenceId],
+    );
+    setPendingEditDefinitionReferences((prev) =>
+      prev.filter((reference) => reference.replaceReferenceId !== referenceId),
+    );
+  };
+
+  const changeExistingEditDefinitionReference = (
+    reference: DefinitionReference,
+  ) => {
+    setReplacingEditDefinitionReference(reference);
+    setDefinitionPickerTarget("EDIT");
+    setDefinitionPickerSelection({
+      selectedText: reference.selectedText,
+      startOffset: reference.startOffset,
+      endOffset: reference.endOffset,
+      menuX: window.innerWidth / 2,
+      menuY: Math.max(88, window.innerHeight - 180),
+    });
+    setDefinitionPickerTab(reference.referenceType);
+    setGlobalDefinitionKeyword(reference.selectedText);
+    setIsDefinitionPickerOpen(true);
+    setEditSelection(null);
+  };
+
+  const cancelPendingEditDefinitionReference = (
+    reference: PendingDefinitionReference,
+  ) => {
+    setPendingEditDefinitionReferences((prev) =>
+      prev.filter((item) => item.tempId !== reference.tempId),
+    );
+    if (reference.replaceReferenceId) {
+      setRemovedEditDefinitionReferenceIds((prev) =>
+        prev.filter((id) => id !== reference.replaceReferenceId),
+      );
+    }
+  };
+
+  const openDefinitionPicker = () => {
+    const selection = composerSelection ?? editSelection;
+    if (!selection) return;
+    setDefinitionPickerTab("DEBATE_STANDARD");
+    setDefinitionPickerTarget(editSelection ? "EDIT" : "COMPOSER");
+    setGlobalDefinitionKeyword(selection.selectedText);
+    setDefinitionPickerSelection(selection);
+    setIsDefinitionPickerOpen(true);
+    setComposerSelection(null);
+    setEditSelection(null);
+  };
+
+  const connectDefinition = (
+    definition: Definition,
+    referenceType: DefinitionReferenceType,
+  ) => {
+    const selection = definitionPickerSelection;
+    if (!selection) return;
+
+    const nextReference: PendingDefinitionReference = {
+      tempId: `${definition.id}:${selection.startOffset}:${selection.endOffset}:${Date.now()}`,
+      definitionId: definition.id,
+      selectedText: selection.selectedText,
+      startOffset: selection.startOffset,
+      endOffset: selection.endOffset,
+      referenceType,
+      definition,
+      replaceReferenceId:
+        definitionPickerTarget === "EDIT"
+          ? replacingEditDefinitionReference?.id
+          : undefined,
+    };
+
+    const setReferences =
+      definitionPickerTarget === "EDIT"
+        ? setPendingEditDefinitionReferences
+        : setPendingDefinitionReferences;
+
+    setReferences((prev) => [
+      ...prev.filter(
+        (reference) =>
+          reference.startOffset !== nextReference.startOffset ||
+          reference.endOffset !== nextReference.endOffset,
+      ),
+      nextReference,
+    ]);
+    if (nextReference.replaceReferenceId) {
+      setRemovedEditDefinitionReferenceIds((prev) =>
+        prev.includes(nextReference.replaceReferenceId!)
+          ? prev
+          : [...prev, nextReference.replaceReferenceId!],
+      );
+      setReplacingEditDefinitionReference(null);
+    }
+    setIsDefinitionPickerOpen(false);
+    setDefinitionPickerSelection(null);
+    setActionMessage(
+      referenceType === "GLOBAL_REFERENCE"
+        ? "전체 정의를 참고 정의로 연결했습니다."
+        : "정의가 연결되었습니다.",
+    );
   };
 
   const getMutationErrorMessage = (error: unknown) => {
@@ -490,24 +1020,85 @@ const DebateThreadPage = () => {
     setExpandedReplyGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmedMessage = message.trim();
-    if (!debateId || !trimmedMessage || isSubmitting) return;
+  const toggleConsensusStack = (sourceType: SelectionSource, sourceId: string) => {
+    const stackKey = getInlineStackKey(sourceType, sourceId);
+    setExpandedConsensusStacks((prev) => ({ ...prev, [stackKey]: !prev[stackKey] }));
+  };
+
+  const toggleChildDebateStack = (sourceType: SelectionSource, sourceId: string) => {
+    const stackKey = getInlineStackKey(sourceType, sourceId);
+    setExpandedChildDebateStacks((prev) => ({ ...prev, [stackKey]: !prev[stackKey] }));
+  };
+
+  const handleStanceChange = async (nextStance: DebateStance) => {
+    if (!debateId || isDebateReadOnly || isSubmitting) return;
+    if (myStance && myStance !== nextStance) {
+      const confirmed = window.confirm(
+        "입장을 변경하시겠습니까? 이후 작성하는 의견에는 새 입장이 표시됩니다. 기존 글의 입장은 변경되지 않습니다.",
+      );
+      if (!confirmed) return;
+    }
 
     setSubmitError("");
     setIsSubmitting(true);
     try {
+      const { data } = await debateService.updateStance(debateId, nextStance);
+      setMyStance(data.stance?.stance ?? nextStance);
+      if (data.summary) setStanceSummary(data.summary);
+      setActionMessage(`${STANCE_LABEL[nextStance]} 입장으로 설정했습니다.`);
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedMessage = message.trim();
+    if (!debateId || !trimmedMessage || isSubmitting) return;
+    if (isComposerDisabled) {
+      setSubmitError(
+        isConsensusBlocked
+          ? "진행 중인 합의 또는 하위 토론이 있어 새 의견을 작성할 수 없습니다."
+          : currentDebate?.status === "ARCHIVED"
+          ? "아카이브된 토론은 읽기 전용입니다."
+          : "종료된 토론에서는 새 내용을 작성할 수 없습니다.",
+      );
+      return;
+    }
+    if (isProsConsDebate && !myStance) {
+      setSubmitError("찬반 토론에서는 입장을 선택해야 의견을 작성할 수 있습니다.");
+      return;
+    }
+
+    setSubmitError("");
+    setIsSubmitting(true);
+    try {
+      const definitionReferences = pendingDefinitionReferences.map(
+        ({ tempId: _tempId, definition: _definition, ...reference }) => reference,
+      );
+
       if (replyTarget) {
         const content =
           replyTarget.mention &&
-          !trimmedMessage.startsWith(replyTarget.mention.trim())
-            ? `${replyTarget.mention}${trimmedMessage}`.trim()
-            : trimmedMessage;
+          !message.startsWith(replyTarget.mention)
+            ? `${replyTarget.mention}${message}`
+            : message;
+
+        const referencesForSubmit =
+          content === message
+            ? definitionReferences
+            : definitionReferences.map((reference) => ({
+                ...reference,
+                startOffset: reference.startOffset + replyTarget.mention!.length,
+                endOffset: reference.endOffset + replyTarget.mention!.length,
+              }));
 
         await postService.createComment(replyTarget.postId, {
           content,
           parentCommentId: replyTarget.parentCommentId ?? undefined,
+          definitionReferences: referencesForSubmit,
         });
         const { data } = await postService.getComments(replyTarget.postId);
         setCommentsByPostId((prev) => ({
@@ -522,9 +1113,13 @@ const DebateThreadPage = () => {
         }
         setReplyTarget(null);
       } else {
-        await createMessage(debateId, message.trim());
+        await createMessage(debateId, message, {
+          definitionReferences,
+          stance: myStance ?? undefined,
+        });
       }
       setMessage("");
+      setPendingDefinitionReferences([]);
       if (draftKey) localStorage.removeItem(draftKey);
       inputRef.current?.focus();
     } catch (error) {
@@ -539,50 +1134,161 @@ const DebateThreadPage = () => {
     setCommentsByPostId((prev) => ({ ...prev, [postId]: data.comments }));
   };
 
-  const handleUpdatePost = async (postId: string, content: string) => {
-    const nextContent = window.prompt("수정할 내용을 입력하세요.", content);
-    if (!nextContent?.trim() || !debateId) return;
+  const openPostEditor = (
+    postId: string,
+    content: string,
+    definitionReferences: DefinitionReference[] = [],
+  ) => {
+    setSubmitError("");
+    setActionMessage("");
+    setEditContent(content);
+    setEditScrollTop(0);
+    setExistingEditDefinitionReferences(definitionReferences);
+    setRemovedEditDefinitionReferenceIds([]);
+    setReplacingEditDefinitionReference(null);
+    setPendingEditDefinitionReferences([]);
+    setEditTarget({ type: "POST", postId, content });
+  };
+
+  const openCommentEditor = (postId: string, comment: Comment) => {
+    setSubmitError("");
+    setActionMessage("");
+    setEditContent(comment.content);
+    setEditScrollTop(0);
+    setExistingEditDefinitionReferences(comment.definitionReferences ?? []);
+    setRemovedEditDefinitionReferenceIds([]);
+    setReplacingEditDefinitionReference(null);
+    setPendingEditDefinitionReferences([]);
+    setEditTarget({
+      type: "COMMENT",
+      postId,
+      commentId: comment.id,
+      content: comment.content,
+    });
+  };
+
+  const cancelInlineEdit = () => {
+    setEditTarget(null);
+    setEditContent("");
+    setEditScrollTop(0);
+    setEditSelection(null);
+    setExistingEditDefinitionReferences([]);
+    setRemovedEditDefinitionReferenceIds([]);
+    setReplacingEditDefinitionReference(null);
+    setPendingEditDefinitionReferences([]);
+    setSubmitError("");
+  };
+
+  const handleSubmitEdit = async () => {
+    if (!editTarget || isSubmitting) return;
+    const contentToSave = editContent;
+    if (!contentToSave.trim()) {
+      setSubmitError("수정할 내용을 입력해 주세요.");
+      return;
+    }
+    if (editTarget.type === "POST" && !debateId) return;
+
+    setIsSubmitting(true);
     try {
-      await postService.update(postId, { content: nextContent.trim() });
-      await fetchMessages(debateId);
+      const definitionReferences = pendingEditDefinitionReferences.map(
+        ({
+          tempId: _tempId,
+          definition: _definition,
+          replaceReferenceId: _replaceReferenceId,
+          ...reference
+        }) => reference,
+      );
+      const removedReferenceIds = Array.from(
+        new Set(removedEditDefinitionReferenceIds),
+      );
+
+      await Promise.all(
+        removedReferenceIds.map((referenceId) =>
+          postService.deleteDefinitionReference(referenceId),
+        ),
+      );
+
+      if (editTarget.type === "POST") {
+        const activeDebateId = debateId;
+        if (!activeDebateId) return;
+        await postService.update(editTarget.postId, { content: contentToSave });
+        await Promise.all(
+          definitionReferences.map((reference) =>
+            postService.createDefinitionReference(editTarget.postId, reference),
+          ),
+        );
+        await fetchMessages(activeDebateId);
+      } else {
+        await postService.updateComment(editTarget.commentId, {
+          content: contentToSave,
+        });
+        await Promise.all(
+          definitionReferences.map((reference) =>
+            postService.createCommentDefinitionReference(
+              editTarget.commentId,
+              reference,
+            ),
+          ),
+        );
+        await refreshComments(editTarget.postId);
+      }
+      setEditTarget(null);
+      setEditContent("");
+      setEditScrollTop(0);
+      setEditSelection(null);
+      setExistingEditDefinitionReferences([]);
+      setRemovedEditDefinitionReferenceIds([]);
+      setReplacingEditDefinitionReference(null);
+      setPendingEditDefinitionReferences([]);
+      setSubmitError("");
+      setActionMessage(
+        editTarget.type === "POST"
+          ? "의견을 수정했습니다."
+          : "댓글을 수정했습니다.",
+      );
     } catch (error) {
       setSubmitError(getMutationErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeletePost = async (postId: string) => {
-    if (!window.confirm("이 의견을 삭제할까요?") || !debateId) return;
-    try {
-      await postService.delete(postId);
-      await fetchMessages(debateId);
-    } catch (error) {
-      setSubmitError(getMutationErrorMessage(error));
-    }
+  const openPostDeleteConfirm = (postId: string) => {
+    setSubmitError("");
+    setDeleteTarget({ type: "POST", postId });
   };
 
-  const handleUpdateComment = async (postId: string, comment: Comment) => {
-    const nextContent = window.prompt(
-      "수정할 댓글 내용을 입력하세요.",
-      comment.content,
-    );
-    if (!nextContent?.trim()) return;
-    try {
-      await postService.updateComment(comment.id, {
-        content: nextContent.trim(),
-      });
-      await refreshComments(postId);
-    } catch (error) {
-      setSubmitError(getMutationErrorMessage(error));
-    }
+  const openCommentDeleteConfirm = (postId: string, commentId: string) => {
+    setSubmitError("");
+    setDeleteTarget({ type: "COMMENT", postId, commentId });
   };
 
-  const handleDeleteComment = async (postId: string, commentId: string) => {
-    if (!window.confirm("이 댓글을 삭제할까요?")) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || isSubmitting) return;
+    if (deleteTarget.type === "POST" && !debateId) return;
+
+    setIsSubmitting(true);
     try {
-      await postService.deleteComment(commentId);
-      await refreshComments(postId);
+      if (deleteTarget.type === "POST") {
+        const activeDebateId = debateId;
+        if (!activeDebateId) return;
+        await postService.delete(deleteTarget.postId);
+        await fetchMessages(activeDebateId);
+      } else {
+        await postService.deleteComment(deleteTarget.commentId);
+        await refreshComments(deleteTarget.postId);
+      }
+      setDeleteTarget(null);
+      setSubmitError("");
+      setActionMessage(
+        deleteTarget.type === "POST"
+          ? "의견을 삭제했습니다."
+          : "댓글을 삭제했습니다.",
+      );
     } catch (error) {
       setSubmitError(getMutationErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -609,6 +1315,11 @@ const DebateThreadPage = () => {
       clearSelectionMenu();
       return;
     }
+    if (isConsensusBlocked) {
+      setSubmitError("진행 중인 합의 또는 하위 토론이 있어 새 선택 액션을 사용할 수 없습니다.");
+      clearSelectionMenu();
+      return;
+    }
 
     if (action === "consensus") {
       setSubmitError("");
@@ -623,13 +1334,15 @@ const DebateThreadPage = () => {
       return;
     }
 
-    try {
-      await createSelectionTargetForAction(pendingSelection);
-      setActionMessage("하위 토론 생성은 다음 단계에서 연결됩니다.");
-      clearSelectionMenu();
-    } catch (error) {
-      setSubmitError(getMutationErrorMessage(error));
-    }
+    setSubmitError("");
+    setChildDebateDraft({
+      selection: pendingSelection,
+      title: "",
+      description: "",
+      debateType: "FREE",
+    });
+    setPendingSelection(null);
+    window.getSelection()?.removeAllRanges();
   };
 
   const handleCopySelection = async () => {
@@ -674,10 +1387,58 @@ const DebateThreadPage = () => {
         title: consensusDraft.title.trim(),
         content: consensusDraft.content.trim(),
       });
+      setExpandedConsensusStacks((prev) => ({
+        ...prev,
+        [getInlineStackKey(
+          consensusDraft.selection.sourceType,
+          consensusDraft.selection.sourceId,
+        )]: true,
+      }));
       await refreshConsensuses(debateId);
       setConsensusDraft(null);
       setSubmitError("");
       setActionMessage("합의안을 제안했습니다.");
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitChildDebateDraft = async () => {
+    if (!debateId || !childDebateDraft || isSubmitting) return;
+    if (currentDebate?.status !== "OPEN") {
+      setSubmitError("종료되었거나 보관된 토론에서는 하위 토론을 만들 수 없습니다.");
+      return;
+    }
+    if (!childDebateDraft.title.trim() || !childDebateDraft.description.trim()) {
+      setSubmitError("제목과 설명을 모두 입력해 주세요.");
+      return;
+    }
+
+    setSubmitError("");
+    setIsSubmitting(true);
+    try {
+      const selectionTarget = await createSelectionTargetForAction(
+        childDebateDraft.selection,
+      );
+      if (!selectionTarget) return;
+
+      await debateService.createChildDebate(selectionTarget.id, {
+        title: childDebateDraft.title.trim(),
+        description: childDebateDraft.description.trim(),
+        debateType: childDebateDraft.debateType,
+      });
+      setExpandedChildDebateStacks((prev) => ({
+        ...prev,
+        [getInlineStackKey(
+          childDebateDraft.selection.sourceType,
+          childDebateDraft.selection.sourceId,
+        )]: true,
+      }));
+      await refreshChildDebates(debateId);
+      setChildDebateDraft(null);
+      setActionMessage("하위 토론을 만들었습니다.");
     } catch (error) {
       setSubmitError(getMutationErrorMessage(error));
     } finally {
@@ -810,10 +1571,97 @@ const DebateThreadPage = () => {
   const title = currentDebate?.title;
   const description = currentDebate?.description ?? "설명이 존재하지 않습니다.";
 
+  const getDefinitionReferenceLabel = (referenceType: DefinitionReferenceType) =>
+    referenceType === "DEBATE_STANDARD" ? "기준 정의" : "참고 정의";
+
+  const renderReferencedContent = (
+    content: string,
+    references: DefinitionReference[] = [],
+  ) => {
+    const validReferences = references
+      .filter(
+        (reference) =>
+          content.slice(reference.startOffset, reference.endOffset) ===
+          reference.selectedText,
+      )
+      .sort((a, b) => a.startOffset - b.startOffset);
+
+    if (validReferences.length === 0) return content;
+
+    const nodes: ReactNode[] = [];
+    let cursor = 0;
+
+    validReferences.forEach((reference) => {
+      if (reference.startOffset < cursor) return;
+      if (cursor < reference.startOffset) {
+        nodes.push(content.slice(cursor, reference.startOffset));
+      }
+      nodes.push(
+        <DefinitionReferenceMark
+          key={reference.id}
+          type="button"
+          data-reference-type={reference.referenceType}
+          onClick={(event) => {
+            event.stopPropagation();
+            setActiveDefinitionReference(reference);
+          }}
+        >
+          {reference.selectedText}
+        </DefinitionReferenceMark>,
+      );
+      cursor = reference.endOffset;
+    });
+
+    if (cursor < content.length) nodes.push(content.slice(cursor));
+    return nodes;
+  };
+
+  const renderEditHighlightedContent = () => {
+    const references = [
+      ...visibleExistingEditDefinitionReferences,
+      ...pendingEditDefinitionReferences.map((reference) => ({
+        id: reference.tempId,
+        selectedText: reference.selectedText,
+        startOffset: reference.startOffset,
+        endOffset: reference.endOffset,
+        referenceType: reference.referenceType,
+      })),
+    ]
+      .filter(
+        (reference) =>
+          editContent.slice(reference.startOffset, reference.endOffset) ===
+          reference.selectedText,
+      )
+      .sort((a, b) => a.startOffset - b.startOffset);
+
+    const nodes: ReactNode[] = [];
+    let cursor = 0;
+
+    references.forEach((reference) => {
+      if (reference.startOffset < cursor) return;
+      if (cursor < reference.startOffset) {
+        nodes.push(editContent.slice(cursor, reference.startOffset));
+      }
+      nodes.push(
+        <InlineEditHighlightMark
+          key={reference.id}
+          data-reference-type={reference.referenceType}
+        >
+          {reference.selectedText}
+        </InlineEditHighlightMark>,
+      );
+      cursor = reference.endOffset;
+    });
+
+    if (cursor < editContent.length) nodes.push(editContent.slice(cursor));
+    return nodes.length > 0 ? nodes : editContent;
+  };
+
   const renderMessageText = (
     content: string,
     sourceType?: SelectionSource,
     sourceId?: string,
+    definitionReferences?: DefinitionReference[],
   ) => {
     const mentionMatch = content.match(/^(@[^\s]+)(\s+)([\s\S]*)$/);
 
@@ -822,7 +1670,9 @@ const DebateThreadPage = () => {
         data-selection-source-type={sourceType}
         data-selection-source-id={sourceId}
       >
-        {mentionMatch ? (
+        {definitionReferences?.length ? (
+          renderReferencedContent(content, definitionReferences)
+        ) : mentionMatch ? (
           <>
             <MentionText>{mentionMatch[1]}</MentionText>
             {mentionMatch[2]}
@@ -844,75 +1694,136 @@ const DebateThreadPage = () => {
       [];
     if (sourceConsensuses.length === 0) return null;
 
+    const stackKey = getInlineStackKey(sourceType, sourceId);
+    const isExpanded = Boolean(expandedConsensusStacks[stackKey]);
+
     return (
       <InlineConsensusStack>
-        {sourceConsensuses.map((consensus) => {
-          const canVote =
-            currentDebate?.status === "OPEN" && consensus.status === "OPEN";
+        <InlineStackToggleButton
+          type="button"
+          aria-expanded={isExpanded}
+          onClick={() => toggleConsensusStack(sourceType, sourceId)}
+        >
+          {isExpanded
+            ? "합의안 숨기기"
+            : `합의안 ${sourceConsensuses.length}개 보기`}
+        </InlineStackToggleButton>
+        {isExpanded &&
+          sourceConsensuses.map((consensus) => {
+            const canVote =
+              currentDebate?.status === "OPEN" && consensus.status === "OPEN";
 
-          return (
-            <InlineConsensusCard key={consensus.id}>
-              <ConsensusMetaRow>
-                <ConsensusBadge>
-                  {CONSENSUS_STATUS_LABEL[consensus.status] ??
-                    consensus.status}
-                </ConsensusBadge>
-                <ConsensusTerm>{consensus.term}</ConsensusTerm>
-              </ConsensusMetaRow>
-              {consensus.selectionTarget?.selectedText && (
-                <ConsensusQuote>
-                  “{consensus.selectionTarget.selectedText}”
-                </ConsensusQuote>
-              )}
-              <ConsensusTitle>{consensus.title}</ConsensusTitle>
-              <ConsensusContent>{consensus.content}</ConsensusContent>
-              <ConsensusCountRow>
-                <span>찬성 {consensus.approveCount ?? 0}</span>
-                <span>반대 {consensus.rejectCount ?? 0}</span>
-                <span>의견 {consensus.commentCount ?? 0}</span>
-              </ConsensusCountRow>
-              <ConsensusActionRow>
-                {canVote && (
-                  <>
-                    <ConsensusAction
-                      type="button"
-                      onClick={() => {
-                        setVoteComment("");
-                        setSelectedConsensus(consensus);
-                        void handleVoteConsensus(consensus.id, "APPROVE", "");
-                      }}
-                    >
-                      찬성
-                    </ConsensusAction>
-                    <ConsensusAction
-                      type="button"
-                      onClick={() => {
-                        setVoteComment("");
-                        setSelectedConsensus(consensus);
-                        void handleVoteConsensus(consensus.id, "REJECT", "");
-                      }}
-                    >
-                      반대
-                    </ConsensusAction>
-                    <ConsensusAction
-                      type="button"
-                      onClick={() => void openConsensusDetail(consensus)}
-                    >
-                      의견
-                    </ConsensusAction>
-                  </>
+            return (
+              <InlineConsensusCard key={consensus.id}>
+                <ConsensusMetaRow>
+                  <ConsensusBadge>
+                    {CONSENSUS_STATUS_LABEL[consensus.status] ??
+                      consensus.status}
+                  </ConsensusBadge>
+                  <ConsensusTerm>{consensus.term}</ConsensusTerm>
+                </ConsensusMetaRow>
+                {consensus.selectionTarget?.selectedText && (
+                  <ConsensusQuote>
+                    “{consensus.selectionTarget.selectedText}”
+                  </ConsensusQuote>
                 )}
-                <ConsensusAction
-                  type="button"
-                  onClick={() => void openConsensusDetail(consensus)}
-                >
-                  상세
-                </ConsensusAction>
-              </ConsensusActionRow>
-            </InlineConsensusCard>
-          );
-        })}
+                <ConsensusTitle>{consensus.title}</ConsensusTitle>
+                <ConsensusContent>{consensus.content}</ConsensusContent>
+                <ConsensusCountRow>
+                  <span>찬성 {consensus.approveCount ?? 0}</span>
+                  <span>반대 {consensus.rejectCount ?? 0}</span>
+                  <span>의견 {consensus.commentCount ?? 0}</span>
+                </ConsensusCountRow>
+                <ConsensusActionRow>
+                  {canVote && (
+                    <>
+                      <ConsensusAction
+                        type="button"
+                        onClick={() => {
+                          setVoteComment("");
+                          setSelectedConsensus(consensus);
+                          void handleVoteConsensus(consensus.id, "APPROVE", "");
+                        }}
+                      >
+                        찬성
+                      </ConsensusAction>
+                      <ConsensusAction
+                        type="button"
+                        onClick={() => {
+                          setVoteComment("");
+                          setSelectedConsensus(consensus);
+                          void handleVoteConsensus(consensus.id, "REJECT", "");
+                        }}
+                      >
+                        반대
+                      </ConsensusAction>
+                      <ConsensusAction
+                        type="button"
+                        onClick={() => void openConsensusDetail(consensus)}
+                      >
+                        의견
+                      </ConsensusAction>
+                    </>
+                  )}
+                  <ConsensusAction
+                    type="button"
+                    onClick={() => void openConsensusDetail(consensus)}
+                  >
+                    상세
+                  </ConsensusAction>
+                </ConsensusActionRow>
+              </InlineConsensusCard>
+            );
+          })}
       </InlineConsensusStack>
+    );
+  };
+
+  const renderInlineChildDebateStack = (
+    sourceType: SelectionSource,
+    sourceId: string,
+  ) => {
+    const sourceChildDebates =
+      childDebatesBySource.get(buildConsensusSourceKey(sourceType, sourceId)) ??
+      [];
+    if (sourceChildDebates.length === 0) return null;
+
+    const stackKey = getInlineStackKey(sourceType, sourceId);
+    const isExpanded = Boolean(expandedChildDebateStacks[stackKey]);
+
+    return (
+      <InlineChildDebateStack>
+        <InlineStackToggleButton
+          type="button"
+          aria-expanded={isExpanded}
+          onClick={() => toggleChildDebateStack(sourceType, sourceId)}
+        >
+          {isExpanded
+            ? "하위 토론 숨기기"
+            : `하위 토론 ${sourceChildDebates.length}개 보기`}
+        </InlineStackToggleButton>
+        {isExpanded && (
+          <>
+            <InlineChildDebateTitle>연결된 하위 토론</InlineChildDebateTitle>
+            {sourceChildDebates.map((childDebate) => (
+              <InlineChildDebateCard key={childDebate.id}>
+                <ChildDebateTitleText>{childDebate.title}</ChildDebateTitleText>
+                {childDebate.sourceSelectionTarget?.selectedText && (
+                  <ChildDebateQuote>
+                    {childDebate.sourceSelectionTarget.selectedText}
+                  </ChildDebateQuote>
+                )}
+                <ChildDebateAction
+                  type="button"
+                  onClick={() => navigate(`/debate/${childDebate.id}`)}
+                >
+                  이동
+                </ChildDebateAction>
+              </InlineChildDebateCard>
+            ))}
+          </>
+        )}
+      </InlineChildDebateStack>
     );
   };
 
@@ -920,6 +1831,8 @@ const DebateThreadPage = () => {
     const isDeleted = comment.status === "DELETED";
     const menuKey = `comment:${comment.id}`;
     const canManage = comment.author?.id === user?.id;
+    const isEditing =
+      editTarget?.type === "COMMENT" && editTarget.commentId === comment.id;
 
     return (
       <Fragment key={comment.id}>
@@ -951,22 +1864,22 @@ const DebateThreadPage = () => {
                     {canManage && (
                       <>
                         <CardMenuButton
-                          type="button"
-                          onClick={() => {
-                            setActiveCardMenuKey(null);
-                            void handleUpdateComment(postId, comment);
-                          }}
-                        >
-                          수정
+                        type="button"
+                        onClick={() => {
+                          setActiveCardMenuKey(null);
+                          openCommentEditor(postId, comment);
+                        }}
+                      >
+                        수정
                         </CardMenuButton>
                         <CardMenuButton
-                          type="button"
-                          onClick={() => {
-                            setActiveCardMenuKey(null);
-                            void handleDeleteComment(postId, comment.id);
-                          }}
-                        >
-                          삭제
+                        type="button"
+                        onClick={() => {
+                          setActiveCardMenuKey(null);
+                          openCommentDeleteConfirm(postId, comment.id);
+                        }}
+                      >
+                        삭제
                         </CardMenuButton>
                       </>
                     )}
@@ -987,13 +1900,104 @@ const DebateThreadPage = () => {
               </ActionGroup>
             )}
           </MetaRow>
-          {renderMessageText(
-            isDeleted ? "삭제된 댓글입니다." : comment.content,
-            isDeleted ? undefined : "COMMENT",
-            isDeleted ? undefined : comment.id,
+          {isEditing ? (
+            <InlineEditBox>
+              {submitError && <InlineEditError>{submitError}</InlineEditError>}
+              <InlineEditTextareaWrap>
+                <InlineEditHighlightLayer aria-hidden>
+                  <InlineEditHighlightText
+                    style={{ transform: `translateY(-${editScrollTop}px)` }}
+                  >
+                    {renderEditHighlightedContent()}
+                  </InlineEditHighlightText>
+                </InlineEditHighlightLayer>
+                <InlineEditTextarea
+                  ref={editInputRef}
+                  value={editContent}
+                  onChange={(event) => handleEditContentChange(event.target.value)}
+                  onScroll={(event) =>
+                    setEditScrollTop(event.currentTarget.scrollTop)
+                  }
+                  onMouseUp={handleEditSelection}
+                  onKeyUp={handleEditSelection}
+                  onTouchEnd={handleEditSelection}
+                  autoFocus
+                />
+              </InlineEditTextareaWrap>
+              {(visibleExistingEditDefinitionReferences.length > 0 ||
+                pendingEditDefinitionReferences.length > 0) && (
+                <EditReferencePreview>
+                  {visibleExistingEditDefinitionReferences.map((reference) => (
+                    <EditReferenceChip key={reference.id}>
+                      <span>{reference.selectedText}</span>
+                      <small>
+                        {getDefinitionReferenceLabel(reference.referenceType)} ·{" "}
+                        {reference.definition.term}
+                      </small>
+                      <ReferenceButtonGroup>
+                        <ReferenceRemoveButton
+                          type="button"
+                          onClick={() =>
+                            changeExistingEditDefinitionReference(reference)
+                          }
+                        >
+                          변경
+                        </ReferenceRemoveButton>
+                        <ReferenceRemoveButton
+                          type="button"
+                          onClick={() =>
+                            removeExistingEditDefinitionReference(reference.id)
+                          }
+                        >
+                          삭제
+                        </ReferenceRemoveButton>
+                      </ReferenceButtonGroup>
+                    </EditReferenceChip>
+                  ))}
+                  {pendingEditDefinitionReferences.map((reference) => (
+                    <EditReferenceChip key={reference.tempId}>
+                      <span>{reference.selectedText}</span>
+                      <small>
+                        {getDefinitionReferenceLabel(reference.referenceType)} ·{" "}
+                        {reference.definition.term}
+                      </small>
+                      <ReferenceRemoveButton
+                        type="button"
+                        aria-label="정의 연결 취소"
+                        onClick={() =>
+                          cancelPendingEditDefinitionReference(reference)
+                        }
+                      >
+                        취소
+                      </ReferenceRemoveButton>
+                    </EditReferenceChip>
+                  ))}
+                </EditReferencePreview>
+              )}
+              <InlineEditActions>
+                <InlineEditCancelButton type="button" onClick={cancelInlineEdit}>
+                  취소
+                </InlineEditCancelButton>
+                <InlineEditSaveButton
+                  type="button"
+                  onClick={() => void handleSubmitEdit()}
+                  disabled={isSubmitting || !editContent.trim()}
+                >
+                  저장
+                </InlineEditSaveButton>
+              </InlineEditActions>
+            </InlineEditBox>
+          ) : (
+            renderMessageText(
+              isDeleted ? "삭제된 댓글입니다." : comment.content,
+              isDeleted ? undefined : "COMMENT",
+              isDeleted ? undefined : comment.id,
+              isDeleted ? undefined : comment.definitionReferences,
+            )
           )}
         </MessageCard>
         {!isDeleted && renderInlineConsensusStack("COMMENT", comment.id)}
+        {!isDeleted && renderInlineChildDebateStack("COMMENT", comment.id)}
       </Fragment>
     );
   };
@@ -1042,11 +2046,52 @@ const DebateThreadPage = () => {
         {!error && threadMessages.length === 0 && (
           <EmptyCard>아직 의견이 없습니다. 첫 의견을 남겨보세요.</EmptyCard>
         )}
-        {consensuses.length > 0 && (
+        {isConsensusDebate && (
           <ConsensusSummaryPanel>
             진행 중 합의안 {openConsensusCount}개 · 승인된 기준 정의{" "}
             {approvedConsensusCount}개
           </ConsensusSummaryPanel>
+        )}
+        {isProsConsDebate && (
+          <StancePanel>
+            <StancePanelTitle>입장 선택</StancePanelTitle>
+            <StanceHelpText>
+              최종 입장 분포 · 찬성 {stanceSummary.PRO} · 반대 {stanceSummary.CON} · 중립 {stanceSummary.NEUTRAL}
+            </StanceHelpText>
+            <StanceButtonRow>
+              {(["PRO", "CON", "NEUTRAL"] as DebateStance[]).map((stance) => (
+                <StanceButton
+                  key={stance}
+                  type="button"
+                  data-active={myStance === stance}
+                  disabled={isDebateReadOnly || isSubmitting}
+                  onClick={() => void handleStanceChange(stance)}
+                >
+                  {STANCE_LABEL[stance]}
+                </StanceButton>
+              ))}
+            </StanceButtonRow>
+            <StanceHelpText>
+              글 작성 당시의 입장이 글에 남습니다. 입장을 바꿔도 기존 글은 변경되지 않습니다.
+            </StanceHelpText>
+            <StanceFilterRow>
+              {STANCE_FILTERS.map((filter) => (
+                <StanceFilterButton
+                  key={filter}
+                  type="button"
+                  data-active={stanceFilter === filter}
+                  onClick={() => setStanceFilter(filter)}
+                >
+                  {filter === "ALL" ? "전체" : STANCE_LABEL[filter]}
+                </StanceFilterButton>
+              ))}
+            </StanceFilterRow>
+          </StancePanel>
+        )}
+        {currentDebate.status !== "OPEN" && (
+          <ReadOnlyPanel>
+            종료되었거나 보관된 토론입니다. 하위 토론 생성은 사용할 수 없습니다.
+          </ReadOnlyPanel>
         )}
         {threadMessages.map((item) => {
           const comments = commentsByPostId[item.id] ?? [];
@@ -1054,6 +2099,8 @@ const DebateThreadPage = () => {
           const isDeleted = item.status === "DELETED";
           const menuKey = `post:${item.id}`;
           const canManage = item.author.id === user?.id;
+          const isEditing =
+            editTarget?.type === "POST" && editTarget.postId === item.id;
 
           return (
             <MessageGroup key={item.id}>
@@ -1062,6 +2109,11 @@ const DebateThreadPage = () => {
                   <NumberText>#1</NumberText>
                   <Avatar />
                   <AuthorName>{item.author.nickname}</AuthorName>
+                  {item.stance && (
+                    <PostStanceBadge data-stance={item.stance}>
+                      {STANCE_LABEL[item.stance]}
+                    </PostStanceBadge>
+                  )}
                   {!isDeleted && (
                     <ActionGroup
                       data-card-menu-root
@@ -1090,7 +2142,11 @@ const DebateThreadPage = () => {
                                 type="button"
                                 onClick={() => {
                                   setActiveCardMenuKey(null);
-                                  void handleUpdatePost(item.id, item.content);
+                                  openPostEditor(
+                                    item.id,
+                                    item.content,
+                                    item.definitionReferences,
+                                  );
                                 }}
                               >
                                 수정
@@ -1099,7 +2155,7 @@ const DebateThreadPage = () => {
                                 type="button"
                                 onClick={() => {
                                   setActiveCardMenuKey(null);
-                                  void handleDeletePost(item.id);
+                                  openPostDeleteConfirm(item.id);
                                 }}
                               >
                                 삭제
@@ -1123,13 +2179,111 @@ const DebateThreadPage = () => {
                     </ActionGroup>
                   )}
                 </MetaRow>
-                {renderMessageText(
-                  isDeleted ? "삭제된 의견입니다." : item.content,
-                  isDeleted ? undefined : "POST",
-                  isDeleted ? undefined : item.id,
+                {isEditing ? (
+                  <InlineEditBox>
+                    {submitError && (
+                      <InlineEditError>{submitError}</InlineEditError>
+                    )}
+                    <InlineEditTextareaWrap>
+                      <InlineEditHighlightLayer aria-hidden>
+                        <InlineEditHighlightText
+                          style={{ transform: `translateY(-${editScrollTop}px)` }}
+                        >
+                          {renderEditHighlightedContent()}
+                        </InlineEditHighlightText>
+                      </InlineEditHighlightLayer>
+                      <InlineEditTextarea
+                        ref={editInputRef}
+                        value={editContent}
+                        onChange={(event) =>
+                          handleEditContentChange(event.target.value)
+                        }
+                        onScroll={(event) =>
+                          setEditScrollTop(event.currentTarget.scrollTop)
+                        }
+                        onMouseUp={handleEditSelection}
+                        onKeyUp={handleEditSelection}
+                        onTouchEnd={handleEditSelection}
+                        autoFocus
+                      />
+                    </InlineEditTextareaWrap>
+                    {(visibleExistingEditDefinitionReferences.length > 0 ||
+                      pendingEditDefinitionReferences.length > 0) && (
+                      <EditReferencePreview>
+                        {visibleExistingEditDefinitionReferences.map((reference) => (
+                          <EditReferenceChip key={reference.id}>
+                            <span>{reference.selectedText}</span>
+                            <small>
+                              {getDefinitionReferenceLabel(reference.referenceType)} ·{" "}
+                              {reference.definition.term}
+                            </small>
+                            <ReferenceButtonGroup>
+                              <ReferenceRemoveButton
+                                type="button"
+                                onClick={() =>
+                                  changeExistingEditDefinitionReference(reference)
+                                }
+                              >
+                                변경
+                              </ReferenceRemoveButton>
+                              <ReferenceRemoveButton
+                                type="button"
+                                onClick={() =>
+                                  removeExistingEditDefinitionReference(reference.id)
+                                }
+                              >
+                                삭제
+                              </ReferenceRemoveButton>
+                            </ReferenceButtonGroup>
+                          </EditReferenceChip>
+                        ))}
+                        {pendingEditDefinitionReferences.map((reference) => (
+                          <EditReferenceChip key={reference.tempId}>
+                            <span>{reference.selectedText}</span>
+                            <small>
+                              {getDefinitionReferenceLabel(reference.referenceType)} ·{" "}
+                              {reference.definition.term}
+                            </small>
+                            <ReferenceRemoveButton
+                              type="button"
+                              aria-label="정의 연결 취소"
+                              onClick={() =>
+                                cancelPendingEditDefinitionReference(reference)
+                              }
+                            >
+                              취소
+                            </ReferenceRemoveButton>
+                          </EditReferenceChip>
+                        ))}
+                      </EditReferencePreview>
+                    )}
+                    <InlineEditActions>
+                      <InlineEditCancelButton
+                        type="button"
+                        onClick={cancelInlineEdit}
+                      >
+                        취소
+                      </InlineEditCancelButton>
+                      <InlineEditSaveButton
+                        type="button"
+                        onClick={() => void handleSubmitEdit()}
+                        disabled={isSubmitting || !editContent.trim()}
+                      >
+                        저장
+                      </InlineEditSaveButton>
+                    </InlineEditActions>
+                  </InlineEditBox>
+                ) : (
+                  renderMessageText(
+                    isDeleted ? "삭제된 의견입니다." : item.content,
+                    isDeleted ? undefined : "POST",
+                    isDeleted ? undefined : item.id,
+                    isDeleted ? undefined : item.definitionReferences,
+                  )
                 )}
               </MessageCard>
               {!isDeleted && renderInlineConsensusStack("POST", item.id)}
+              {!isDeleted && renderInlineChildDebateStack("POST", item.id)}
 
               {commentGroups.length > 0 && (
                 <CommentList>
@@ -1171,16 +2325,190 @@ const DebateThreadPage = () => {
           >
             합의안
           </SelectionMenuButton>
-          <SelectionMenuButton
-            type="button"
-            onClick={() => void handleSelectionAction("child")}
-          >
-            하위 토론
-          </SelectionMenuButton>
+          {currentDebate?.status === "OPEN" && (
+            <SelectionMenuButton
+              type="button"
+              onClick={() => void handleSelectionAction("child")}
+            >
+              하위 토론
+            </SelectionMenuButton>
+          )}
           <SelectionMenuButton type="button" onClick={handleCopySelection}>
             복사
           </SelectionMenuButton>
         </SelectionMenu>
+      )}
+
+      {composerSelection && (
+        <SelectionMenu
+          ref={composerSelectionMenuRef}
+          style={{
+            left: composerSelection.menuX,
+            top: composerSelection.menuY,
+          }}
+        >
+          <SelectionMenuButton type="button" onClick={openDefinitionPicker}>
+            정의 연결
+          </SelectionMenuButton>
+          <SelectionMenuButton type="button" onClick={clearComposerSelectionMenu}>
+            취소
+          </SelectionMenuButton>
+        </SelectionMenu>
+      )}
+
+      {editSelection && (
+        <SelectionMenu
+          ref={editSelectionMenuRef}
+          style={{
+            left: editSelection.menuX,
+            top: editSelection.menuY,
+          }}
+        >
+          <SelectionMenuButton type="button" onClick={openDefinitionPicker}>
+            정의 연결
+          </SelectionMenuButton>
+          <SelectionMenuButton type="button" onClick={() => setEditSelection(null)}>
+            취소
+          </SelectionMenuButton>
+        </SelectionMenu>
+      )}
+
+      {isDefinitionPickerOpen && definitionPickerSelection && (
+        <SheetBackdrop
+          onClick={() => {
+            setIsDefinitionPickerOpen(false);
+            setDefinitionPickerSelection(null);
+            setReplacingEditDefinitionReference(null);
+          }}
+        >
+          <BottomSheet onClick={(event) => event.stopPropagation()}>
+            <SheetTitle>연결할 정의를 선택해 주세요</SheetTitle>
+            <SheetQuote>{definitionPickerSelection.selectedText}</SheetQuote>
+            <PickerTabs>
+              <PickerTabButton
+                type="button"
+                data-active={definitionPickerTab === "DEBATE_STANDARD"}
+                onClick={() => setDefinitionPickerTab("DEBATE_STANDARD")}
+              >
+                이 토론 기준 정의
+              </PickerTabButton>
+              <PickerTabButton
+                type="button"
+                data-active={definitionPickerTab === "GLOBAL_REFERENCE"}
+                onClick={() => setDefinitionPickerTab("GLOBAL_REFERENCE")}
+              >
+                전체 정의 검색
+              </PickerTabButton>
+            </PickerTabs>
+            {definitionPickerTab === "DEBATE_STANDARD" ? (
+              <DefinitionResultList>
+                {matchingDebateDefinitions.length === 0 && (
+                  <EmptyResultText>연결할 기준 정의가 없습니다.</EmptyResultText>
+                )}
+                {matchingDebateDefinitions.map((definition) => (
+                  <DefinitionResultCard key={definition.id}>
+                    <DefinitionResultTitle>{definition.term}</DefinitionResultTitle>
+                    <DefinitionResultContent>{definition.content}</DefinitionResultContent>
+                    <DefinitionResultMeta>기준 정의</DefinitionResultMeta>
+                    <SheetPrimaryButton
+                      type="button"
+                      onClick={() => connectDefinition(definition, "DEBATE_STANDARD")}
+                    >
+                      연결
+                    </SheetPrimaryButton>
+                  </DefinitionResultCard>
+                ))}
+              </DefinitionResultList>
+            ) : (
+              <>
+                <SheetInput
+                  value={globalDefinitionKeyword}
+                  onChange={(event) =>
+                    setGlobalDefinitionKeyword(event.target.value)
+                  }
+                  placeholder="전체 정의 검색"
+                />
+                <DefinitionResultList>
+                  {globalDefinitions.length === 0 && (
+                    <EmptyResultText>검색된 정의가 없습니다.</EmptyResultText>
+                  )}
+                  {globalDefinitions.map((definition) => (
+                    <DefinitionResultCard key={definition.id}>
+                      <DefinitionResultTitle>{definition.term}</DefinitionResultTitle>
+                      <DefinitionResultContent>{definition.content}</DefinitionResultContent>
+                      <DefinitionResultMeta>
+                        참고 정의
+                        {definition.sourceDebate?.title
+                          ? ` · ${definition.sourceDebate.title}`
+                          : ""}
+                      </DefinitionResultMeta>
+                      <SheetPrimaryButton
+                        type="button"
+                        onClick={() => connectDefinition(definition, "GLOBAL_REFERENCE")}
+                      >
+                        연결
+                      </SheetPrimaryButton>
+                    </DefinitionResultCard>
+                  ))}
+                </DefinitionResultList>
+                <DefinitionPolicyText>
+                  글로벌 정의는 현재 토론의 기준 정의로 자동 등록되지 않습니다.
+                </DefinitionPolicyText>
+              </>
+            )}
+            <SheetActionRow>
+              <SheetSecondaryButton
+                type="button"
+                onClick={() => {
+                  setIsDefinitionPickerOpen(false);
+                  setDefinitionPickerSelection(null);
+                  setReplacingEditDefinitionReference(null);
+                }}
+              >
+                취소
+              </SheetSecondaryButton>
+            </SheetActionRow>
+          </BottomSheet>
+        </SheetBackdrop>
+      )}
+
+      {deleteTarget && (
+        <SheetBackdrop
+          onClick={() => {
+            setDeleteTarget(null);
+            setSubmitError("");
+          }}
+        >
+          <BottomSheet onClick={(event) => event.stopPropagation()}>
+            <SheetTitle>
+              {deleteTarget.type === "POST" ? "의견 삭제" : "댓글 삭제"}
+            </SheetTitle>
+            {submitError && <SheetError>{submitError}</SheetError>}
+            <DeleteConfirmText>
+              {deleteTarget.type === "POST"
+                ? "이 의견을 삭제할까요?"
+                : "이 댓글을 삭제할까요?"}
+            </DeleteConfirmText>
+            <SheetActionRow>
+              <SheetSecondaryButton
+                type="button"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setSubmitError("");
+                }}
+              >
+                취소
+              </SheetSecondaryButton>
+              <DangerButton
+                type="button"
+                onClick={() => void handleConfirmDelete()}
+                disabled={isSubmitting}
+              >
+                삭제
+              </DangerButton>
+            </SheetActionRow>
+          </BottomSheet>
+        </SheetBackdrop>
       )}
 
       {consensusDraft && (
@@ -1237,6 +2565,74 @@ const DebateThreadPage = () => {
                 disabled={isSubmitting}
               >
                 제안
+              </SheetPrimaryButton>
+            </SheetActionRow>
+          </BottomSheet>
+        </SheetBackdrop>
+      )}
+
+      {childDebateDraft && (
+        <SheetBackdrop onClick={() => setChildDebateDraft(null)}>
+          <BottomSheet onClick={(event) => event.stopPropagation()}>
+            <SheetTitle>하위 토론 만들기</SheetTitle>
+            {submitError && <SheetError>{submitError}</SheetError>}
+            <SheetQuote>{childDebateDraft.selection.selectedText}</SheetQuote>
+            <SheetField>
+              <SheetLabel>제목</SheetLabel>
+              <SheetInput
+                value={childDebateDraft.title}
+                onChange={(event) =>
+                  setChildDebateDraft((prev) =>
+                    prev ? { ...prev, title: event.target.value } : prev,
+                  )
+                }
+                placeholder="하위 토론 제목"
+              />
+            </SheetField>
+            <SheetField>
+              <SheetLabel>설명</SheetLabel>
+              <SheetTextarea
+                value={childDebateDraft.description}
+                onChange={(event) =>
+                  setChildDebateDraft((prev) =>
+                    prev ? { ...prev, description: event.target.value } : prev,
+                  )
+                }
+                placeholder="토론에서 다룰 쟁점을 적어주세요."
+              />
+            </SheetField>
+            <SheetField>
+              <SheetLabel>토론 방식</SheetLabel>
+              <SheetSelect
+                value={childDebateDraft.debateType}
+                onChange={(event) =>
+                  setChildDebateDraft((prev) =>
+                    prev
+                      ? { ...prev, debateType: event.target.value as DebateType }
+                      : prev,
+                  )
+                }
+              >
+                {DEBATE_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </SheetSelect>
+            </SheetField>
+            <SheetActionRow>
+              <SheetSecondaryButton
+                type="button"
+                onClick={() => setChildDebateDraft(null)}
+              >
+                취소
+              </SheetSecondaryButton>
+              <SheetPrimaryButton
+                type="button"
+                onClick={() => void handleSubmitChildDebateDraft()}
+                disabled={isSubmitting}
+              >
+                만들기
               </SheetPrimaryButton>
             </SheetActionRow>
           </BottomSheet>
@@ -1371,13 +2767,58 @@ const DebateThreadPage = () => {
           </BottomSheet>
         </SheetBackdrop>
       )}
+
+      {activeDefinitionReference && (
+        <SheetBackdrop onClick={() => setActiveDefinitionReference(null)}>
+          <BottomSheet onClick={(event) => event.stopPropagation()}>
+            <SheetTitle>{activeDefinitionReference.definition.term}</SheetTitle>
+            <ConsensusBadge>
+              {getDefinitionReferenceLabel(activeDefinitionReference.referenceType)}
+            </ConsensusBadge>
+            <DetailContent>{activeDefinitionReference.definition.content}</DetailContent>
+            {activeDefinitionReference.definition.sourceDebate && (
+              <SourceLinkButton
+                type="button"
+                onClick={() => {
+                  const sourceDebateId =
+                    activeDefinitionReference.definition.sourceDebate?.id;
+                  setActiveDefinitionReference(null);
+                  if (sourceDebateId) navigate(`/debate/${sourceDebateId}`);
+                }}
+              >
+                출처 토론 · {activeDefinitionReference.definition.sourceDebate.title}
+              </SourceLinkButton>
+            )}
+            {activeDefinitionReference.definition.sourceConsensus && (
+              <DefinitionPolicyText>
+                출처 합의안 · {activeDefinitionReference.definition.sourceConsensus.title}
+              </DefinitionPolicyText>
+            )}
+            <SheetActionRow>
+              <SheetSecondaryButton
+                type="button"
+                onClick={() => setActiveDefinitionReference(null)}
+              >
+                닫기
+              </SheetSecondaryButton>
+            </SheetActionRow>
+          </BottomSheet>
+        </SheetBackdrop>
+      )}
           </>
         )
       )}
 
       <ComposerWrap>
+        {readOnlyMessage && (
+          <ReadOnlyComposerNotice>{readOnlyMessage}</ReadOnlyComposerNotice>
+        )}
         {submitError && <SubmitError>{submitError}</SubmitError>}
-        {actionMessage && <ActionNotice>{actionMessage}</ActionNotice>}
+        {actionMessage && (
+          <ComposerToastLayer>
+            <ActionNotice>{actionMessage}</ActionNotice>
+          </ComposerToastLayer>
+        )}
         {replyTarget && (
           <ReplyBanner>
             <span>
@@ -1397,18 +2838,46 @@ const DebateThreadPage = () => {
           <MessageInput
             ref={inputRef}
             value={message}
-            onChange={(event) => setMessage(event.target.value)}
+            onChange={(event) => handleComposerMessageChange(event.target.value)}
+            onMouseUp={handleComposerSelection}
+            onKeyUp={handleComposerSelection}
+            onTouchEnd={handleComposerSelection}
             placeholder="입력창.."
             aria-label="토론 메시지 입력"
+            disabled={isComposerDisabled}
           />
           <SendButton
             type="submit"
             aria-label="메시지 전송"
-            disabled={!message.trim() || isSubmitting}
+            disabled={!message.trim() || isSubmitting || isComposerDisabled}
           >
             <SendIcon />
           </SendButton>
         </Composer>
+        {pendingDefinitionReferences.length > 0 && (
+          <ComposerReferencePreview>
+            {pendingDefinitionReferences.map((reference) => (
+              <ComposerReferenceChip key={reference.tempId}>
+                <span>{reference.selectedText}</span>
+                <small>
+                  {getDefinitionReferenceLabel(reference.referenceType)} ·{" "}
+                  {reference.definition.term}
+                </small>
+                <ReferenceRemoveButton
+                  type="button"
+                  aria-label="정의 연결 취소"
+                  onClick={() =>
+                    setPendingDefinitionReferences((prev) =>
+                      prev.filter((item) => item.tempId !== reference.tempId),
+                    )
+                  }
+                >
+                  취소
+                </ReferenceRemoveButton>
+              </ComposerReferenceChip>
+            ))}
+          </ComposerReferencePreview>
+        )}
       </ComposerWrap>
     </Wrapper>
   );
@@ -1593,6 +3062,29 @@ const AuthorName = styled.span`
   white-space: nowrap;
 `;
 
+const PostStanceBadge = styled.span`
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: #2d8f73;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 7px;
+
+  &[data-stance="CON"] {
+    background: #fff1f1;
+    color: #d84a4a;
+  }
+
+  &[data-stance="NEUTRAL"] {
+    background: #f0f0f0;
+    color: #777777;
+  }
+`;
+
 const ActionGroup = styled.span`
   margin-left: auto;
   display: inline-flex;
@@ -1659,6 +3151,161 @@ const MessageText = styled.p`
   user-select: text;
 `;
 
+const DefinitionReferenceMark = styled.button`
+  display: inline;
+  border: none;
+  border-bottom: 1px solid #2dcd97;
+  background: rgba(45, 205, 151, 0.08);
+  color: #4f7569;
+  font: inherit;
+  line-height: inherit;
+  padding: 0 2px;
+  cursor: pointer;
+
+  &[data-reference-type="GLOBAL_REFERENCE"] {
+    border-bottom-style: dashed;
+    background: rgba(76, 126, 230, 0.08);
+    color: #526a9d;
+  }
+`;
+
+const InlineEditBox = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+`;
+
+const InlineEditTextareaWrap = styled.div`
+  position: relative;
+  width: 100%;
+  min-height: 72px;
+  border-radius: 8px;
+  background: #f0f0f0;
+  overflow: hidden;
+`;
+
+const InlineEditHighlightLayer = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+`;
+
+const InlineEditHighlightText = styled.div`
+  min-height: 72px;
+  color: #555555;
+  font-size: var(--body-sm);
+  line-height: 1.45;
+  padding: 9px 10px;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const InlineEditHighlightMark = styled.span`
+  border-bottom: 1px solid #2dcd97;
+  background: rgba(45, 205, 151, 0.16);
+  color: #3f6f62;
+
+  &[data-reference-type="GLOBAL_REFERENCE"] {
+    border-bottom-style: dashed;
+    background: rgba(76, 126, 230, 0.14);
+    color: #526a9d;
+  }
+`;
+
+const InlineEditTextarea = styled.textarea`
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 72px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: transparent;
+  caret-color: #555555;
+  font-size: var(--body-sm);
+  line-height: 1.45;
+  padding: 9px 10px;
+  resize: vertical;
+  outline: none;
+  overflow-wrap: anywhere;
+`;
+
+const InlineEditActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+`;
+
+const EditReferencePreview = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const EditReferenceChip = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 8px;
+  align-items: center;
+  border-radius: 8px;
+  background: #f7f7f7;
+  padding: 6px 8px;
+
+  span,
+  small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: #555555;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  small {
+    color: #8f8f8f;
+    font-size: 11px;
+  }
+`;
+
+const InlineEditButton = styled.button`
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
+
+  &:disabled {
+    opacity: 0.55;
+  }
+`;
+
+const InlineEditCancelButton = styled(InlineEditButton)`
+  background: #f0f0f0;
+  color: #7f7f7f;
+`;
+
+const InlineEditSaveButton = styled(InlineEditButton)`
+  background: #2dcd97;
+  color: #ffffff;
+`;
+
+const InlineEditError = styled.p`
+  margin: 0;
+  color: #f04444;
+  font-size: 12px;
+  line-height: 1.35;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
 const ReplyAction = styled.button`
   border: none;
   background: transparent;
@@ -1678,12 +3325,149 @@ const ConsensusSummaryPanel = styled.div`
   padding: 10px 12px;
 `;
 
+const StancePanel = styled(ConsensusSummaryPanel)`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #ffffff;
+  color: #555555;
+`;
+
+const StancePanelTitle = styled.strong`
+  font-size: 12px;
+  color: #555555;
+`;
+
+const StanceButtonRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+`;
+
+const StanceButton = styled.button`
+  height: 32px;
+  border: 1px solid #d8d8d8;
+  border-radius: 999px;
+  background: #f7f7f7;
+  color: #6f6f6f;
+  font-size: 12px;
+  font-weight: 700;
+
+  &[data-active="true"] {
+    border-color: #2dcd97;
+    background: #2dcd97;
+    color: #ffffff;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+  }
+`;
+
+const StanceHelpText = styled.p`
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.35;
+`;
+
+const StanceFilterRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+`;
+
+const StanceFilterButton = styled.button`
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: #f0f0f0;
+  color: #7f7f7f;
+  font-size: 11px;
+  font-weight: 700;
+
+  &[data-active="true"] {
+    background: #eefaf6;
+    color: #2d8f73;
+  }
+`;
+
+const ReadOnlyPanel = styled(ConsensusSummaryPanel)`
+  background: #f1f1f1;
+  color: #888888;
+`;
+
 const InlineConsensusStack = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-top: -3px;
   padding-left: clamp(14px, 4vw, 18px);
+`;
+
+const InlineStackToggleButton = styled.button`
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: #2dcd97;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 4px;
+`;
+
+const InlineChildDebateStack = styled(InlineConsensusStack)`
+  gap: 6px;
+`;
+
+const InlineChildDebateTitle = styled.span`
+  color: #7f7f7f;
+  font-size: 12px;
+  font-weight: 700;
+`;
+
+const InlineChildDebateCard = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  border-radius: 8px;
+  background: #ffffff;
+  border-left: 3px solid #2dcd97;
+  padding: 9px 10px;
+`;
+
+const ChildDebateTitleText = styled.strong`
+  min-width: 0;
+  color: #555555;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const ChildDebateQuote = styled.p`
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+`;
+
+const ChildDebateAction = styled.button`
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 48px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: #2dcd97;
+  font-size: 12px;
+  font-weight: 700;
 `;
 
 const ConsensusMetaRow = styled.div`
@@ -1914,6 +3698,105 @@ const SheetInput = styled.input`
   outline: none;
 `;
 
+const SheetSelect = styled.select`
+  width: 100%;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #f0f0f0;
+  color: #555555;
+  font-size: 14px;
+  padding: 0 12px;
+  outline: none;
+`;
+
+const PickerTabs = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 0 0 12px;
+`;
+
+const PickerTabButton = styled.button`
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: #f0f0f0;
+  color: #7f7f7f;
+  font-size: 12px;
+  font-weight: 700;
+
+  &[data-active="true"] {
+    background: #2dcd97;
+    color: #ffffff;
+  }
+`;
+
+const DefinitionResultList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+`;
+
+const DefinitionResultCard = styled.div`
+  border-radius: 8px;
+  background: #f7f7f7;
+  padding: 10px;
+`;
+
+const DefinitionResultTitle = styled.h3`
+  margin: 0 0 4px;
+  color: #555555;
+  font-size: 14px;
+  font-weight: 700;
+`;
+
+const DefinitionResultContent = styled.p`
+  margin: 0;
+  color: #7f7f7f;
+  font-size: 12px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+`;
+
+const DefinitionResultMeta = styled.p`
+  margin: 6px 0 8px;
+  color: #2d8f73;
+  font-size: 11px;
+  font-weight: 700;
+`;
+
+const EmptyResultText = styled.p`
+  margin: 4px 0;
+  color: #a0a0a0;
+  font-size: 12px;
+  text-align: center;
+`;
+
+const DefinitionPolicyText = styled.p`
+  margin: 10px 0 0;
+  color: #8f8f8f;
+  font-size: 12px;
+  line-height: 1.4;
+`;
+
+const SourceLinkButton = styled.button`
+  width: 100%;
+  min-height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: #eefaf6;
+  color: #2d8f73;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 10px;
+  text-align: left;
+`;
+
 const SheetTextarea = styled.textarea`
   width: 100%;
   min-height: 96px;
@@ -1953,6 +3836,22 @@ const SheetPrimaryButton = styled(SheetSecondaryButton)`
   &:disabled {
     opacity: 0.6;
   }
+`;
+
+const DangerButton = styled(SheetSecondaryButton)`
+  background: #f04444;
+  color: #ffffff;
+
+  &:disabled {
+    opacity: 0.6;
+  }
+`;
+
+const DeleteConfirmText = styled.p`
+  margin: 0;
+  color: #555555;
+  font-size: var(--body-sm);
+  line-height: 1.5;
 `;
 
 const DetailTerm = styled.p`
@@ -2047,6 +3946,7 @@ const ComposerWrap = styled.div`
   padding: clamp(8px, 2.3vw, 10px) var(--page-x)
     max(clamp(8px, 2.3vw, 10px), env(safe-area-inset-bottom));
   box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.04);
+  overflow: visible;
 `;
 
 const Composer = styled.form`
@@ -2099,6 +3999,111 @@ const SendButton = styled.button`
   }
 `;
 
+const ComposerReferencePreview = styled.div`
+  display: flex;
+  position: absolute;
+  left: var(--page-x);
+  right: var(--page-x);
+  bottom: calc(100% + 8px);
+  flex-direction: row;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+`;
+
+const ComposerToastLayer = styled.div`
+  position: absolute;
+  left: var(--page-x);
+  right: var(--page-x);
+  bottom: calc(100% + 8px);
+  z-index: 2;
+  pointer-events: none;
+  animation: toast-lifecycle 2600ms ease forwards;
+
+  @keyframes toast-lifecycle {
+    0% {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    8%,
+    84% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+
+  & ~ ${ComposerReferencePreview} {
+    bottom: calc(100% + 48px);
+  }
+`;
+
+const ComposerReferenceChip = styled.div`
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) auto;
+  gap: 0 8px;
+  align-items: center;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  padding: 6px 8px;
+  min-width: min(260px, 82vw);
+  max-width: min(320px, 88vw);
+
+  span,
+  small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: #555555;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  small {
+    color: #8f8f8f;
+    font-size: 11px;
+  }
+`;
+
+const ReferenceRemoveButton = styled.button`
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: #eeeeee;
+  color: #7f7f7f;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 10px;
+`;
+
+const ReferenceButtonGroup = styled.div`
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  display: inline-flex;
+  gap: 4px;
+
+  ${ReferenceRemoveButton} {
+    grid-row: auto;
+    grid-column: auto;
+    padding: 0 8px;
+  }
+`;
+
 const SubmitError = styled.p`
   margin: 0 0 8px;
   text-align: center;
@@ -2106,8 +4111,19 @@ const SubmitError = styled.p`
   font-size: 12px;
 `;
 
-const ActionNotice = styled.p`
+const ReadOnlyComposerNotice = styled.p`
   margin: 0 0 8px;
+  text-align: center;
+  color: #8f8f8f;
+  font-size: 13px;
+`;
+
+const ActionNotice = styled.p`
+  margin: 0;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  padding: 8px 10px;
   text-align: center;
   color: #2dcd97;
   font-size: 12px;
