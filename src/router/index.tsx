@@ -19,6 +19,7 @@ import MessagePage from '../pages/message/MessagePage';
 import ProfilePage from '../pages/profile/ProfilePage';
 import NotificationPage from '../pages/notification/NotificationPage';
 import MyDebatesPage from '../pages/myDebates/MyDebatesPage';
+import AdminReportsPage from '../pages/admin/AdminReportsPage';
 
 const router = createBrowserRouter([
   {
@@ -50,6 +51,7 @@ const router = createBrowserRouter([
           { path: 'profile', element: <ProfilePage /> },
           { path: 'notifications', element: <NotificationPage /> },
           { path: 'my-debates', element: <MyDebatesPage /> },
+          { path: 'admin/reports', element: <AdminReportsPage /> },
         ],
       },
     ],

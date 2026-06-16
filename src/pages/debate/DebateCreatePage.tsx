@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useDebate } from '../../hooks/useDebate';
 import { useAuthStore } from '../../stores/authStore';
+import { useModerationStore } from '../../stores/moderationStore';
 import type { DebateType } from '../../types/debate';
 
 const TITLE_MAX_LENGTH = 40;
@@ -104,6 +105,7 @@ const DebateCreatePage = () => {
   const navigate = useNavigate();
   const { createDebate } = useDebate();
   const { isAuthenticated } = useAuthStore();
+  const { canCreateDebate, isSuspended } = useModerationStore();
   const [draft] = useState(getInitialDraft);
   const [title, setTitle] = useState(draft.title);
   const [description, setDescription] = useState(draft.description);
@@ -162,6 +164,16 @@ const DebateCreatePage = () => {
 
     if (!isAuthenticated) {
       navigate('/login');
+      return;
+    }
+
+    if (isSuspended()) {
+      setError('정지된 계정입니다. 제재 내역을 확인해 주세요.');
+      return;
+    }
+
+    if (!canCreateDebate()) {
+      setError('제재로 인해 현재 토론을 생성할 수 없습니다.');
       return;
     }
 

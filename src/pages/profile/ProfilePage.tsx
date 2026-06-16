@@ -119,6 +119,11 @@ const ProfilePage = () => {
     [],
   );
 
+  const adminRows = useMemo<MenuRow[]>(
+    () => [{ label: '신고 관리', action: () => navigate('/admin/reports') }],
+    [navigate],
+  );
+
   const handleLogout = async () => {
     if (isLogoutLoading || isDeleteLoading) return;
 
@@ -207,6 +212,14 @@ const ProfilePage = () => {
             <ProfileMenuRow key={row.label} label={row.label} onClick={row.action} />
           ))}
         </ProfileSection>
+
+        {user.role === 'ADMIN' && (
+          <ProfileSection title="관리자">
+            {adminRows.map((row) => (
+              <ProfileMenuRow key={row.label} label={row.label} onClick={row.action} />
+            ))}
+          </ProfileSection>
+        )}
 
         <AccountManagementSection
           isLogoutLoading={isLogoutLoading}

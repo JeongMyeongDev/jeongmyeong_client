@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import BottomNav from './components/layout/BottomNav';
+import SanctionNotice from './components/moderation/SanctionNotice';
 
 const App = () => {
   const location = useLocation();
@@ -13,6 +14,7 @@ const App = () => {
 
   return (
     <Layout>
+      <SanctionNotice />
       <Content $withBottomNav={!hideBottomNav}>
         <Outlet />
       </Content>

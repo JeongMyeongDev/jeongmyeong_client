@@ -20,6 +20,8 @@ import { definitionService } from "../../services/definitionService";
 import { postService } from "../../services/postService";
 import { useAuthStore } from "../../stores/authStore";
 import ThreadSkeleton from "../../components/common/ThreadSkeleton";
+import ReportModal from "../../components/moderation/ReportModal";
+import { useModerationStore } from "../../stores/moderationStore";
 import type {
   Comment,
   Consensus,
@@ -35,6 +37,7 @@ import type {
   SelectionSource,
   StanceSummary,
 } from "../../types/debate";
+import type { ReportTargetType } from "../../types/moderation";
 
 type ReplyTarget = {
   postId: string;
@@ -113,6 +116,11 @@ type DeleteTarget =
       postId: string;
       commentId: string;
     };
+
+type ReportTarget = {
+  targetType: ReportTargetType;
+  targetId: string;
+};
 
 const SELECTION_SOURCE_SELECTOR =
   "[data-selection-source-type][data-selection-source-id]";
@@ -299,6 +307,7 @@ const DebateThreadPage = () => {
   const { currentDebate, messages, fetchDebate, fetchMessages, createMessage } =
     useDebate();
   const { user } = useAuthStore();
+  const { canWrite, canCreateDebate, isSuspended } = useModerationStore();
   const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
   const draftKey = debateId ? `debate-thread:${debateId}:composer` : "";
   const [message, setMessage] = useState(() =>
@@ -360,6 +369,7 @@ const DebateThreadPage = () => {
   const [replacingEditDefinitionReference, setReplacingEditDefinitionReference] =
     useState<DefinitionReference | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [voteComment, setVoteComment] = useState("");
   const [activeCardMenuKey, setActiveCardMenuKey] = useState<string | null>(
     null,
@@ -374,9 +384,15 @@ const DebateThreadPage = () => {
     currentDebate?.status === "CLOSED" || currentDebate?.status === "ARCHIVED";
   const isConsensusBlocked =
     currentDebate?.debateType === "CONSENSUS" && Boolean(progress?.isBlocked);
-  const isComposerDisabled = isDebateReadOnly || isConsensusBlocked;
+  const isSanctionWriteBlocked = !canWrite();
+  const isComposerDisabled =
+    isDebateReadOnly || isConsensusBlocked || isSanctionWriteBlocked;
   const readOnlyMessage =
-    currentDebate?.status === "ARCHIVED"
+    isSuspended()
+      ? "정지된 계정입니다. 제재 내역을 확인해 주세요."
+      : isSanctionWriteBlocked
+      ? "제재로 인해 현재 작성할 수 없습니다."
+      : currentDebate?.status === "ARCHIVED"
       ? "아카이브된 토론입니다."
       : currentDebate?.status === "CLOSED"
         ? "종료된 토론입니다."
@@ -1059,7 +1075,11 @@ const DebateThreadPage = () => {
     if (!debateId || !trimmedMessage || isSubmitting) return;
     if (isComposerDisabled) {
       setSubmitError(
-        isConsensusBlocked
+        isSuspended()
+          ? "정지된 계정입니다. 제재 내역을 확인해 주세요."
+          : isSanctionWriteBlocked
+          ? "제재로 인해 현재 작성할 수 없습니다."
+          : isConsensusBlocked
           ? "진행 중인 합의 또는 하위 토론이 있어 새 의견을 작성할 수 없습니다."
           : currentDebate?.status === "ARCHIVED"
           ? "아카이브된 토론은 읽기 전용입니다."
@@ -1322,6 +1342,11 @@ const DebateThreadPage = () => {
     }
 
     if (action === "consensus") {
+      if (!canWrite()) {
+        setSubmitError("제재로 인해 현재 작성할 수 없습니다.");
+        clearSelectionMenu();
+        return;
+      }
       setSubmitError("");
       setConsensusDraft({
         selection: pendingSelection,
@@ -1334,6 +1359,11 @@ const DebateThreadPage = () => {
       return;
     }
 
+    if (!canCreateDebate()) {
+      setSubmitError("제재로 인해 현재 토론을 생성할 수 없습니다.");
+      clearSelectionMenu();
+      return;
+    }
     setSubmitError("");
     setChildDebateDraft({
       selection: pendingSelection,
@@ -1358,6 +1388,10 @@ const DebateThreadPage = () => {
 
   const handleSubmitConsensusDraft = async () => {
     if (!debateId || !consensusDraft || isSubmitting) return;
+    if (!canWrite()) {
+      setSubmitError("제재로 인해 현재 작성할 수 없습니다.");
+      return;
+    }
     if (currentDebate?.status !== "OPEN") {
       setSubmitError(
         "종료되었거나 보관된 토론에서는 합의안을 제안할 수 없습니다.",
@@ -1407,6 +1441,10 @@ const DebateThreadPage = () => {
 
   const handleSubmitChildDebateDraft = async () => {
     if (!debateId || !childDebateDraft || isSubmitting) return;
+    if (!canCreateDebate()) {
+      setSubmitError("제재로 인해 현재 토론을 생성할 수 없습니다.");
+      return;
+    }
     if (currentDebate?.status !== "OPEN") {
       setSubmitError("종료되었거나 보관된 토론에서는 하위 토론을 만들 수 없습니다.");
       return;
@@ -1463,6 +1501,10 @@ const DebateThreadPage = () => {
     voteType: ConsensusVoteType,
     commentOverride?: string,
   ) => {
+    if (!canWrite()) {
+      setSubmitError("제재로 인해 현재 작성할 수 없습니다.");
+      return;
+    }
     if (!debateId || currentDebate?.status !== "OPEN") {
       setSubmitError(
         "종료되었거나 보관된 토론에서는 합의안에 투표할 수 없습니다.",
@@ -1895,6 +1937,27 @@ const DebateThreadPage = () => {
                     >
                       선택
                     </CardMenuButton>
+                    <CardMenuButton
+                      type="button"
+                      onClick={() => {
+                        setActiveCardMenuKey(null);
+                        setReportTarget({ targetType: "COMMENT", targetId: comment.id });
+                      }}
+                    >
+                      신고
+                    </CardMenuButton>
+                    <CardMenuButton
+                      type="button"
+                      onClick={() => {
+                        setActiveCardMenuKey(null);
+                        const authorId = comment.authorId ?? comment.author?.id;
+                        if (authorId) {
+                          setReportTarget({ targetType: "USER", targetId: authorId });
+                        }
+                      }}
+                    >
+                      작성자 신고
+                    </CardMenuButton>
                   </CardMenu>
                 )}
               </ActionGroup>
@@ -2032,6 +2095,14 @@ const DebateThreadPage = () => {
           <InfoIcon src={iconShowInfo} alt="" />
         </IconButton>
       </Header>
+      <DebateReportButton
+        type="button"
+        onClick={() =>
+          debateId && setReportTarget({ targetType: "DEBATE", targetId: debateId })
+        }
+      >
+        토론 신고
+      </DebateReportButton>
 
       <ThreadArea
         onMouseUp={handleTextSelection}
@@ -2168,6 +2239,24 @@ const DebateThreadPage = () => {
                             }
                           >
                             선택
+                          </CardMenuButton>
+                          <CardMenuButton
+                            type="button"
+                            onClick={() => {
+                              setActiveCardMenuKey(null);
+                              setReportTarget({ targetType: "POST", targetId: item.id });
+                            }}
+                          >
+                            신고
+                          </CardMenuButton>
+                          <CardMenuButton
+                            type="button"
+                            onClick={() => {
+                              setActiveCardMenuKey(null);
+                              setReportTarget({ targetType: "USER", targetId: item.author.id });
+                            }}
+                          >
+                            작성자 신고
                           </CardMenuButton>
                         </CardMenu>
                       )}
@@ -2754,6 +2843,17 @@ const DebateThreadPage = () => {
             <SheetActionRow>
               <SheetSecondaryButton
                 type="button"
+                onClick={() =>
+                  setReportTarget({
+                    targetType: "CONSENSUS",
+                    targetId: selectedConsensus.id,
+                  })
+                }
+              >
+                신고
+              </SheetSecondaryButton>
+              <SheetSecondaryButton
+                type="button"
                 onClick={() => setSelectedConsensus(null)}
               >
                 닫기
@@ -2761,6 +2861,15 @@ const DebateThreadPage = () => {
             </SheetActionRow>
           </BottomSheet>
         </SheetBackdrop>
+      )}
+
+      {reportTarget && (
+        <ReportModal
+          targetType={reportTarget.targetType}
+          targetId={reportTarget.targetId}
+          onClose={() => setReportTarget(null)}
+          onSubmitted={(message) => setActionMessage(message)}
+        />
       )}
 
       {activeDefinitionReference && (
@@ -2941,6 +3050,19 @@ const Description = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+`;
+
+const DebateReportButton = styled.button`
+  display: block;
+  margin: -4px var(--page-x) 8px auto;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: #f0f0f0;
+  color: #8f8f8f;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
 `;
 
 const ThreadArea = styled.section`
