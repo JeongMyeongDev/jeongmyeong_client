@@ -14,17 +14,6 @@ interface LoginRequest {
   password: string;
 }
 
-interface GoogleLoginRequest {
-  idToken: string;
-}
-
-interface GoogleSignupRequest {
-  idToken: string;
-  nickname: string;
-  password: string;
-  passwordConfirm: string;
-}
-
 interface VerifyEmailRequest {
   token: string;
 }
@@ -56,8 +45,6 @@ interface MessageResponse {
 export const authService = {
   signup: (data: SignupRequest) => api.post<ApiResponse<{ user: User }>>('/auth/signup', data),
   login: (data: LoginRequest) => api.post<ApiResponse<AuthResponse>>('/auth/login', data),
-  googleLogin: (data: GoogleLoginRequest) => api.post<ApiResponse<AuthResponse>>('/auth/google', data),
-  googleSignup: (data: GoogleSignupRequest) => api.post<ApiResponse<AuthResponse>>('/auth/google/signup', data),
   verifyEmail: (data: VerifyEmailRequest) => api.post<ApiResponse<MessageResponse>>('/auth/verify-email', data),
   resendVerification: (data: { email: string }) =>
     api.post<ApiResponse<MessageResponse>>('/auth/verification/resend', data),
