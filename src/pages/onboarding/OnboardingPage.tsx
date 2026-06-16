@@ -117,6 +117,10 @@ const OnboardingPage = () => {
     setStepIndex((value) => Math.min(value + 1, MISSIONS.length - 1));
   };
 
+  const skipStep = () => {
+    setStepIndex((value) => Math.min(value + 1, MISSIONS.length - 1));
+  };
+
   const finishOnboarding = async () => {
     if (isSubmitting) return;
 
@@ -344,9 +348,6 @@ const OnboardingPage = () => {
               <PrimaryButton type="button" onClick={finishOnboarding} disabled={isSubmitting}>
                 {isSubmitting ? '완료 중...' : '정명 시작하기'}
               </PrimaryButton>
-              <SecondaryButton type="button" onClick={finishOnboarding} disabled={isSubmitting}>
-                건너뛰기
-              </SecondaryButton>
             </FinishActions>
           </>
         );
@@ -360,6 +361,9 @@ const OnboardingPage = () => {
       <MissionPanel>{renderMission()}</MissionPanel>
       {currentMission.key !== 'finish' && (
         <Footer>
+          <SkipButton type="button" onClick={skipStep}>
+            건너뛰기
+          </SkipButton>
           <NextButton type="button" onClick={goNext} disabled={!canGoNext}>
             다음
           </NextButton>
@@ -653,6 +657,13 @@ const Footer = styled.footer`
   position: sticky;
   bottom: max(14px, env(safe-area-inset-bottom));
   margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+`;
+
+const SkipButton = styled(SecondaryButton)`
+  width: 100%;
 `;
 
 const NextButton = styled(PrimaryButton)`

@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import type { User } from '../../types/user';
+import { getDisplayNickname, getNicknameInitial, isDeletedUserNickname } from '../../utils/userDisplay';
 
 interface ProfileHeaderCardProps {
   user: User;
@@ -14,15 +15,18 @@ const STATUS_LABEL: Record<NonNullable<User['status']>, string> = {
 
 const ProfileHeaderCard = ({ user, onEditClick }: ProfileHeaderCardProps) => {
   const visibleStatus = user.status && user.status !== 'ACTIVE' ? user.status : null;
+  const displayNickname = getDisplayNickname(user.nickname);
+  const nicknameInitial = getNicknameInitial(user.nickname);
+  const profileImage = isDeletedUserNickname(user.nickname) ? null : user.profileImage;
 
   return (
     <HeaderCard>
       <ProfileRow>
         <Avatar aria-label="프로필 이미지">
-          {user.profileImage ? <AvatarImage src={user.profileImage} alt="" /> : <AvatarInitial>{user.nickname[0]}</AvatarInitial>}
+          {profileImage ? <AvatarImage src={profileImage} alt="" /> : <AvatarInitial>{nicknameInitial}</AvatarInitial>}
         </Avatar>
         <InfoWrap>
-          <Name>{user.nickname}</Name>
+          <Name>{displayNickname}</Name>
           <Email>{user.email}</Email>
           <BadgeRow>
             {user.role && <RoleBadge>{user.role}</RoleBadge>}

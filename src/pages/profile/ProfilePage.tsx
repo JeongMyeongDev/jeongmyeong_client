@@ -29,6 +29,7 @@ const ProfilePage = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isLogoutLoading, setIsLogoutLoading] = useState(false);
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -119,7 +120,7 @@ const ProfilePage = () => {
   );
 
   const handleLogout = async () => {
-    if (isLogoutLoading) return;
+    if (isLogoutLoading || isDeleteLoading) return;
 
     setIsLogoutLoading(true);
     try {
@@ -135,6 +136,28 @@ const ProfilePage = () => {
       clearAuth();
       setIsLogoutLoading(false);
       navigate('/login');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (isLogoutLoading || isDeleteLoading) return;
+
+    const confirmed = window.confirm(
+      '정말 회원 탈퇴하시겠어요? 탈퇴 후에는 현재 계정으로 다시 로그인할 수 없습니다.',
+    );
+    if (!confirmed) return;
+
+    setIsDeleteLoading(true);
+    try {
+      await userService.deleteMe();
+      localStorage.removeItem('accessToken');
+      clearAuth();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      const message = isAxiosError(error) ? error.response?.data?.message : null;
+      showToast(typeof message === 'string' ? message : '회원 탈퇴 처리에 실패했습니다.');
+    } finally {
+      setIsDeleteLoading(false);
     }
   };
 
@@ -185,7 +208,12 @@ const ProfilePage = () => {
           ))}
         </ProfileSection>
 
-        <AccountManagementSection isLogoutLoading={isLogoutLoading} onLogout={() => void handleLogout()} />
+        <AccountManagementSection
+          isLogoutLoading={isLogoutLoading}
+          isDeleteLoading={isDeleteLoading}
+          onLogout={() => void handleLogout()}
+          onDeleteAccount={() => void handleDeleteAccount()}
+        />
       </ContentStack>
 
       {toastMessage && <Toast>{toastMessage}</Toast>}

@@ -9,6 +9,7 @@ export interface UpdateMeRequest {
 
 export const userService = {
   updateMe: (data: UpdateMeRequest) => api.patch<ApiResponse<{ user: User }>>('/users/me', data),
+  deleteMe: () => api.delete<ApiResponse<{ message: string }>>('/users/me'),
   getPublicProfile: (userId: string) => api.get<ApiResponse<{ user: User }>>(`/users/${userId}`),
   getMySettings: () => api.get<ApiResponse<{ notificationsEnabled: boolean }>>('/users/me/settings'),
   updateMySettings: (data: { notificationsEnabled: boolean }) =>
