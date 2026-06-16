@@ -46,6 +46,8 @@ const ACTION_OPTIONS: Array<{ value: ContentAction; label: string }> = [
   { value: 'RESTORE', label: '복구' },
 ];
 
+const CONTENT_ACTION_TARGETS: ReportTargetType[] = ['POST', 'COMMENT'];
+
 const getErrorMessage = (error: unknown) => {
   if (isAxiosError(error)) {
     const message = error.response?.data?.message;
@@ -75,6 +77,11 @@ const AdminReportsPage = () => {
     if (selectedReport.targetType === 'USER') return selectedReport.targetId;
     return selectedReport.sanctions?.[0]?.userId ?? null;
   }, [selectedReport]);
+
+  const canApplyContentAction = selectedReport
+    ? CONTENT_ACTION_TARGETS.includes(selectedReport.targetType)
+    : false;
+  const contentActionOptions = canApplyContentAction ? ACTION_OPTIONS : ACTION_OPTIONS.slice(0, 1);
 
   const loadReports = async () => {
     setIsLoading(true);
@@ -110,6 +117,12 @@ const AdminReportsPage = () => {
       setSanctions(data.sanctions);
     });
   }, [selectedTargetUserId]);
+
+  useEffect(() => {
+    if (!canApplyContentAction) {
+      setContentAction('NONE');
+    }
+  }, [canApplyContentAction]);
 
   const selectReport = async (report: Report) => {
     setError('');
@@ -151,9 +164,10 @@ const AdminReportsPage = () => {
 
   const handleApplyAction = async () => {
     if (!selectedReport) return;
+    const safeContentAction = canApplyContentAction ? contentAction : 'NONE';
     try {
       const { data } = await moderationService.applyReportAction(selectedReport.id, {
-        contentAction,
+        contentAction: safeContentAction,
         resolutionNote,
         sanctionType: sanctionType || undefined,
         sanctionReason: sanctionType ? sanctionReason : undefined,
@@ -243,9 +257,16 @@ const AdminReportsPage = () => {
                 </SecondaryButton>
               </ActionRow>
               <SectionTitle>처리</SectionTitle>
-              <Select value={contentAction} onChange={(event) => setContentAction(event.target.value as ContentAction)}>
-                {ACTION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              <Select
+                value={canApplyContentAction ? contentAction : 'NONE'}
+                onChange={(event) => setContentAction(event.target.value as ContentAction)}
+                disabled={!canApplyContentAction}
+              >
+                {contentActionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </Select>
+              {!canApplyContentAction && (
+                <HelperText>이 대상은 콘텐츠 숨김/삭제 조치 대상이 아닙니다.</HelperText>
+              )}
               <Select value={sanctionType} onChange={(event) => setSanctionType(event.target.value as '' | SanctionType)}>
                 {SANCTION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </Select>
@@ -493,6 +514,11 @@ const ErrorText = styled(Notice)`
 const SuccessText = styled(Notice)`
   color: #2d8f73;
   margin-bottom: 8px;
+`;
+
+const HelperText = styled(Notice)`
+  margin-top: 6px;
+  color: #8f8f8f;
 `;
 
 export default AdminReportsPage;

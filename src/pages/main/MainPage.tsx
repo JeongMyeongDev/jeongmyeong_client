@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import SideDrawer from '../../components/common/SideDrawer';
@@ -55,8 +55,10 @@ type ModalDebateItem = {
   creatorName: string;
   debateTypeLabel: string;
   participants: number;
-  tag: string;
+  tags: string[];
   createdDateLabel: string;
+  isBookmarked: boolean;
+  isSubscribed: boolean;
 };
 
 type DebateListItem = Pick<Debate, 'id' | 'title' | 'description' | 'status'> & {
@@ -69,7 +71,7 @@ type FeaturedItem = {
   author: string;
   participants: number;
   status: string;
-  tag: string;
+  tags: string[];
   modalData: ModalDebateItem;
 };
 
@@ -86,7 +88,7 @@ const STATUS_LABEL: Record<string, string> = {
 const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
   PROS_CONS: '찬반토론',
   CONSENSUS: '합의토론',
-  FREE: '댓글토론',
+  FREE: '자유토론',
 };
 
 const formatCreatedDate = (createdAt?: string) => {
@@ -99,6 +101,14 @@ const formatCreatedDate = (createdAt?: string) => {
 const getDebateParticipantCount = (debate: Debate) =>
   debate.participantCount ?? debate.participants?.length ?? 0;
 
+const getDebateTagLabels = (debate: Debate) => {
+  const tags = debate.tagMaps
+    ?.map((tagMap) => tagMap.tag.name.trim())
+    .filter(Boolean)
+    .map((tag) => `#${tag}`);
+  return tags?.length ? tags : ['#기타'];
+};
+
 const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
   id: debate.id,
   title: debate.title,
@@ -106,8 +116,10 @@ const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
   creatorName: debate.creator?.nickname ?? '사용자 이름',
   debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
   participants: getDebateParticipantCount(debate),
-  tag: `#${debate.tagMaps?.[0]?.tag.name ?? '기술'}`,
+  tags: getDebateTagLabels(debate),
   createdDateLabel: formatCreatedDate(debate.createdAt),
+  isBookmarked: Boolean(debate.isBookmarked),
+  isSubscribed: Boolean(debate.isSubscribed),
 });
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -137,7 +149,11 @@ const FeaturedCard = ({
     </FMeta>
     <FTags>
       <StatusBadge status={item.status} />
-      <TagPill>{item.tag}</TagPill>
+      <FTagList>
+        {item.tags.map((tag) => (
+          <TagPill key={tag}>{tag}</TagPill>
+        ))}
+      </FTagList>
     </FTags>
   </FCard>
 );
@@ -168,26 +184,38 @@ const MainPage = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeDot, setActiveDot] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState('');
   const [selectedCard, setSelectedCard] = useState<ModalDebateItem | null>(null);
   const [joinError, setJoinError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [isActionProcessing, setIsActionProcessing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollLeftRef = useRef(0);
   const scrollStopTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchKeyword(searchKeyword.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchKeyword]);
+
+  useEffect(() => {
     const loadDebates = async () => {
       await executeAsync(async () => {
         await fetchDebates({
+          keyword: debouncedSearchKeyword || undefined,
+          tag: activeCategory === '전체' ? undefined : activeCategory,
           status: 'OPEN',
           sort: 'updatedAt',
           direction: 'desc',
-          limit: 20,
+          limit: 30,
         });
       });
     };
     void loadDebates();
-  }, [fetchDebates, executeAsync]);
+  }, [activeCategory, debouncedSearchKeyword, fetchDebates, executeAsync]);
 
   const handleScroll = () => {
     if (!scrollRef.current) return;
@@ -210,17 +238,25 @@ const MainPage = () => {
     }, 120);
   };
 
+  const openDebateModal = async (item: ModalDebateItem) => {
+    setJoinError('');
+    setActionMessage('');
+    setSelectedCard(item);
+    try {
+      const { data } = await debateService.getById(item.id);
+      setSelectedCard((current) =>
+        current?.id === item.id ? mapDebateToModalItem(data.debate) : current,
+      );
+    } catch {
+      setJoinError('요청 처리에 실패했습니다.');
+    }
+  };
+
   const openFeaturedModal = (item: ModalDebateItem) => {
     if (scrollRef.current && Math.abs(scrollRef.current.scrollLeft - lastScrollLeftRef.current) > 2) {
       return;
     }
-    setJoinError('');
-    setSelectedCard(item);
-  };
-
-  const openDebateModal = (item: ModalDebateItem) => {
-    setJoinError('');
-    setSelectedCard(item);
+    void openDebateModal(item);
   };
 
   const handleJoinDebate = async (debateId: string) => {
@@ -239,25 +275,55 @@ const MainPage = () => {
     }
   };
 
-  const filteredDebates = useMemo(() => {
-    let result = debates;
-    if (activeCategory !== '전체') {
-      result = result.filter((debate) =>
-        debate.tagMaps?.some((tagMap) => tagMap.tag.name === activeCategory),
+  const handleBookmarkToggle = async () => {
+    if (!selectedCard || isActionProcessing) return;
+    const wasBookmarked = selectedCard.isBookmarked;
+    setJoinError('');
+    setActionMessage('');
+    setIsActionProcessing(true);
+    setSelectedCard({ ...selectedCard, isBookmarked: !wasBookmarked });
+    try {
+      if (wasBookmarked) {
+        await debateService.unbookmark(selectedCard.id);
+        setActionMessage('저장을 해제했습니다.');
+      } else {
+        await debateService.bookmark(selectedCard.id);
+        setActionMessage('토론을 저장했습니다.');
+      }
+    } catch {
+      setSelectedCard((current) =>
+        current?.id === selectedCard.id ? { ...current, isBookmarked: wasBookmarked } : current,
       );
+      setJoinError('요청 처리에 실패했습니다.');
+    } finally {
+      setIsActionProcessing(false);
     }
-    const normalizedKeyword = searchKeyword.trim().toLowerCase();
-    if (!normalizedKeyword) return result;
-    return result.filter((debate) => {
-      const searchableText = [
-        debate.title,
-        debate.description,
-        debate.creator?.nickname ?? '',
-        debate.tagMaps?.map((tagMap) => tagMap.tag.name).join(' ') ?? '',
-      ].join(' ').toLowerCase();
-      return searchableText.includes(normalizedKeyword);
-    });
-  }, [debates, searchKeyword, activeCategory]);
+  };
+
+  const handleSubscriptionToggle = async () => {
+    if (!selectedCard || isActionProcessing) return;
+    const wasSubscribed = selectedCard.isSubscribed;
+    setJoinError('');
+    setActionMessage('');
+    setIsActionProcessing(true);
+    setSelectedCard({ ...selectedCard, isSubscribed: !wasSubscribed });
+    try {
+      if (wasSubscribed) {
+        await debateService.unsubscribe(selectedCard.id);
+        setActionMessage('알림을 해제했습니다.');
+      } else {
+        await debateService.subscribe(selectedCard.id);
+        setActionMessage('알림을 설정했습니다.');
+      }
+    } catch {
+      setSelectedCard((current) =>
+        current?.id === selectedCard.id ? { ...current, isSubscribed: wasSubscribed } : current,
+      );
+      setJoinError('요청 처리에 실패했습니다.');
+    } finally {
+      setIsActionProcessing(false);
+    }
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => setActiveDot(0), 0);
@@ -265,9 +331,9 @@ const MainPage = () => {
       scrollRef.current.scrollTo({ left: 0, behavior: 'auto' });
     }
     return () => window.clearTimeout(timer);
-  }, [searchKeyword]);
+  }, [activeCategory, debouncedSearchKeyword]);
 
-  const debateItems: DebateListItem[] = filteredDebates.map((debate) => ({
+  const debateItems: DebateListItem[] = debates.map((debate) => ({
     id: debate.id,
     title: debate.title,
     description: debate.description,
@@ -275,14 +341,14 @@ const MainPage = () => {
     modalData: mapDebateToModalItem(debate),
   }));
 
-  const featuredItems: FeaturedItem[] = filteredDebates.slice(0, 5).map((debate) => ({
+  const featuredItems: FeaturedItem[] = debates.slice(0, 5).map((debate) => ({
     id: debate.id,
     title: debate.title,
     description: debate.description,
     author: debate.creator?.nickname ?? '사용자',
     participants: getDebateParticipantCount(debate),
     status: debate.status === 'OPEN' ? 'OPEN' : 'WAITING',
-    tag: `#${debate.tagMaps?.[0]?.tag.name ?? activeCategory}`,
+    tags: getDebateTagLabels(debate),
     modalData: mapDebateToModalItem(debate),
   }));
 
@@ -317,8 +383,8 @@ const MainPage = () => {
 
       {/* 뜨는 토론 */}
       <Section>
-        <SectionTitle>뜨는 토론</SectionTitle>
-        <SectionSub>지금 사람들이 많이 보고 있는 토론들이에요.</SectionSub>
+        <SectionTitle>최근 활발한 토론</SectionTitle>
+        <SectionSub>최근 업데이트된 진행 중 토론들이에요.</SectionSub>
         <CarouselWrapper
           ref={scrollRef}
           onScroll={handleScroll}
@@ -373,7 +439,7 @@ const MainPage = () => {
         >
           {!loadError && debateItems.length === 0 && <ListError>표시할 토론이 없습니다.</ListError>}
           {debateItems.map((item) => (
-            <DebateCard key={item.id} item={item} onClick={() => openDebateModal(item.modalData)} />
+            <DebateCard key={item.id} item={item} onClick={() => void openDebateModal(item.modalData)} />
           ))}
         </LoadingContent>
       </DebateList>
@@ -399,7 +465,11 @@ const MainPage = () => {
 
             <ModalTitle>{selectedCard.title}</ModalTitle>
             <ModalDesc>{selectedCard.description}</ModalDesc>
-            <ModalTag>{selectedCard.tag}</ModalTag>
+            <ModalTagList>
+              {selectedCard.tags.map((tag) => (
+                <ModalTag key={tag}>{tag}</ModalTag>
+              ))}
+            </ModalTagList>
 
             <ModalAuthorRow>
               <ModalAvatar />
@@ -409,13 +479,26 @@ const MainPage = () => {
             <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
             <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
             <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
+            {actionMessage && <ModalSuccess>{actionMessage}</ModalSuccess>}
             {joinError && <ModalError>{joinError}</ModalError>}
 
             <ModalActionRow>
-              <ModalActionIconButton type="button" aria-label="저장">
+              <ModalActionIconButton
+                type="button"
+                aria-label="저장"
+                $active={selectedCard.isBookmarked}
+                disabled={isActionProcessing}
+                onClick={() => void handleBookmarkToggle()}
+              >
                 <ModalActionIcon src={iconStar} alt="" />
               </ModalActionIconButton>
-              <ModalActionIconButton type="button" aria-label="알림">
+              <ModalActionIconButton
+                type="button"
+                aria-label="알림"
+                $active={selectedCard.isSubscribed}
+                disabled={isActionProcessing}
+                onClick={() => void handleSubscriptionToggle()}
+              >
                 <ModalAlarmIcon src={iconAlarm2} alt="" />
               </ModalActionIconButton>
               <JoinButton
@@ -638,6 +721,16 @@ const FTags = styled.div`
   min-width: 0;
 `;
 
+const FTagList = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+`;
+
 const Badge = styled.span<{ $active: boolean }>`
   height: clamp(32px, 8.8vw, 38px);
   display: inline-flex;
@@ -663,9 +756,9 @@ const TagPill = styled.span`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  max-width: min(168px, 46vw);
+  max-width: min(120px, 32vw);
   min-width: 0;
-  padding: 0 clamp(14px, 4.2vw, 18px);
+  padding: 0 clamp(10px, 3.2vw, 14px);
   border-radius: 999px;
   border: 2px solid #a8a8a8;
   font-size: var(--body-md);
@@ -895,6 +988,14 @@ const ModalDesc = styled.p`
   overflow-wrap: anywhere;
 `;
 
+const ModalTagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+`;
+
 const ModalTag = styled.span`
   display: inline-flex;
   height: clamp(38px, 9.8vw, 42px);
@@ -906,7 +1007,6 @@ const ModalTag = styled.span`
   font-size: var(--title-sm);
   font-weight: 600;
   padding: 0 clamp(16px, 4.7vw, 20px);
-  margin-bottom: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -940,6 +1040,10 @@ const ModalError = styled.p`
   font-size: var(--body-sm);
 `;
 
+const ModalSuccess = styled(ModalError)`
+  color: #2d8f73;
+`;
+
 const ModalActionRow = styled.div`
   display: flex;
   align-items: center;
@@ -947,15 +1051,17 @@ const ModalActionRow = styled.div`
   margin-top: 26px;
 `;
 
-const ModalActionIconButton = styled.button`
+const ModalActionIconButton = styled.button<{ $active?: boolean }>`
   width: clamp(42px, 11.2vw, 48px);
   height: clamp(42px, 11.2vw, 48px);
   border: none;
-  background: transparent;
+  border-radius: 999px;
+  background: ${({ $active }) => ($active ? '#eefaf6' : 'transparent')};
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  opacity: ${({ disabled }) => (disabled ? 0.6 : 1)};
 `;
 
 const ModalActionIcon = styled.img`
