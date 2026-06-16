@@ -7,6 +7,7 @@ import GoogleSignUpPage from '../pages/auth/GoogleSignUpPage';
 import SignUpPage from '../pages/auth/SignUpPage';
 import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
 import PasswordResetPage from '../pages/auth/PasswordResetPage';
+import SuspendedAccountPage from '../pages/auth/SuspendedAccountPage';
 import MainPage from '../pages/main/MainPage';
 import DebatePage from '../pages/debate/DebatePage';
 import DebateCreatePage from '../pages/debate/DebateCreatePage';
@@ -20,6 +21,7 @@ import ProfilePage from '../pages/profile/ProfilePage';
 import NotificationPage from '../pages/notification/NotificationPage';
 import MyDebatesPage from '../pages/myDebates/MyDebatesPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
+import MySanctionsPage from '../pages/sanctions/MySanctionsPage';
 
 const router = createBrowserRouter([
   {
@@ -30,6 +32,7 @@ const router = createBrowserRouter([
       { path: '/signup', element: <SignUpPage /> },
       { path: '/verify-email', element: <VerifyEmailPage /> },
       { path: '/password-reset', element: <PasswordResetPage /> },
+      { path: '/account-suspended', element: <SuspendedAccountPage /> },
     ],
   },
   {
@@ -51,6 +54,7 @@ const router = createBrowserRouter([
           { path: 'profile', element: <ProfilePage /> },
           { path: 'notifications', element: <NotificationPage /> },
           { path: 'my-debates', element: <MyDebatesPage /> },
+          { path: 'my-sanctions', element: <MySanctionsPage /> },
           { path: 'admin/reports', element: <AdminReportsPage /> },
         ],
       },

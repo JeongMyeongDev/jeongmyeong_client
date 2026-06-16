@@ -35,6 +35,7 @@ import type {
   DefinitionReferenceInput,
   DefinitionReferenceType,
   SelectionSource,
+  SelectionTarget,
   StanceSummary,
 } from "../../types/debate";
 import type { ReportTargetType } from "../../types/moderation";
@@ -91,6 +92,12 @@ type ChildDebateDraft = {
   title: string;
   description: string;
   debateType: DebateType;
+};
+
+type ParentDebateInfo = {
+  parentDebate: Debate | null;
+  selectedText: string | null;
+  sourceSelectionTarget?: SelectionTarget | null;
 };
 
 type EditTarget =
@@ -347,6 +354,8 @@ const DebateThreadPage = () => {
     null,
   );
   const [childDebates, setChildDebates] = useState<Debate[]>([]);
+  const [parentDebateInfo, setParentDebateInfo] =
+    useState<ParentDebateInfo | null>(null);
   const [childDebateDraft, setChildDebateDraft] =
     useState<ChildDebateDraft | null>(null);
   const [progress, setProgress] = useState<DebateProgress | null>(null);
@@ -421,6 +430,15 @@ const DebateThreadPage = () => {
     setChildDebates(data.childDebates);
   };
 
+  const refreshParentDebate = async (id: string) => {
+    const { data } = await debateService.getParent(id);
+    setParentDebateInfo({
+      parentDebate: data.parentDebate,
+      selectedText: data.selectedText,
+      sourceSelectionTarget: data.sourceSelectionTarget,
+    });
+  };
+
   const refreshProgress = async (id: string) => {
     const { data } = await debateService.getProgress(id);
     setProgress(data.progress);
@@ -445,6 +463,7 @@ const DebateThreadPage = () => {
           fetchMessages(debateId),
           refreshConsensuses(debateId),
           refreshChildDebates(debateId),
+          refreshParentDebate(debateId),
           refreshProgress(debateId),
           refreshStanceState(debateId),
         ]);
@@ -547,6 +566,11 @@ const DebateThreadPage = () => {
   ).length;
   const isConsensusDebate = currentDebate?.debateType === "CONSENSUS";
   const isProsConsDebate = currentDebate?.debateType === "PROS_CONS";
+  const parentDebate = parentDebateInfo?.parentDebate ?? null;
+  const parentDebateSelectedText =
+    parentDebateInfo?.selectedText ??
+    parentDebateInfo?.sourceSelectionTarget?.selectedText ??
+    null;
   const matchingDebateDefinitions = useMemo(
     () =>
       debateDefinitions.filter((definition) =>
@@ -2101,7 +2125,16 @@ const DebateThreadPage = () => {
 
   return (
     <Wrapper>
-      <Logo src={logoSymbol} alt="정명" />
+      <Logo
+        src={logoSymbol}
+        alt="정명 홈"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/')}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') navigate('/');
+        }}
+      />
 
       {showLoadingUI ? (
         <ThreadSkeleton />
@@ -2137,6 +2170,28 @@ const DebateThreadPage = () => {
       >
         토론 신고
       </DebateReportButton>
+      {parentDebate && (
+        <ChildDebateNotice>
+          <ChildDebateNoticeBadge>하위 토론</ChildDebateNoticeBadge>
+          <ChildDebateNoticeBody>
+            <ChildDebateNoticeTitle>
+              상위 토론에서 갈라진 토론입니다
+            </ChildDebateNoticeTitle>
+            <ChildDebateNoticeParent>{parentDebate.title}</ChildDebateNoticeParent>
+            {parentDebateSelectedText && (
+              <ChildDebateNoticeQuote>
+                {parentDebateSelectedText}
+              </ChildDebateNoticeQuote>
+            )}
+          </ChildDebateNoticeBody>
+          <ChildDebateNoticeAction
+            type="button"
+            onClick={() => navigate(`/debate/${parentDebate.id}`)}
+          >
+            상위 토론
+          </ChildDebateNoticeAction>
+        </ChildDebateNotice>
+      )}
 
       <ThreadArea
         onMouseUp={handleTextSelection}
@@ -3062,7 +3117,8 @@ const Logo = styled.img`
   width: var(--logo-width);
   height: var(--logo-height);
   display: block;
-  margin: 0 auto clamp(36px, 13.5vw, 58px);
+  margin: var(--page-top) auto clamp(36px, 13.5vw, 58px);
+  cursor: pointer;
 `;
 
 const Header = styled.header`
@@ -3128,6 +3184,83 @@ const DebateReportButton = styled.button`
   font-size: 12px;
   font-weight: 700;
   padding: 0 12px;
+`;
+
+const ChildDebateNotice = styled.section`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: center;
+  margin: 0 var(--page-x) 10px;
+  border-left: 3px solid #2dcd97;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px 12px;
+`;
+
+const ChildDebateNoticeBadge = styled.span`
+  grid-column: 1 / -1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: #2d8f73;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 8px;
+`;
+
+const ChildDebateNoticeBody = styled.div`
+  min-width: 0;
+`;
+
+const ChildDebateNoticeTitle = styled.strong`
+  display: block;
+  color: #555555;
+  font-size: 13px;
+  line-height: 1.35;
+`;
+
+const ChildDebateNoticeParent = styled.p`
+  margin: 3px 0 0;
+  color: #7f7f7f;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const ChildDebateNoticeQuote = styled.blockquote`
+  margin: 6px 0 0;
+  border-left: 2px solid #d8f5ec;
+  padding-left: 7px;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const ChildDebateNoticeAction = styled.button`
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 76px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: #2dcd97;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
+  white-space: nowrap;
 `;
 
 const ThreadArea = styled.section`

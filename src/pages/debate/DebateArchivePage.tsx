@@ -73,7 +73,16 @@ const DebateArchivePage = () => {
   return (
     <Wrapper>
       <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
-      <Logo src={logoSymbol} alt="정명" />
+      <Logo
+        src={logoSymbol}
+        alt="정명 홈"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/')}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') navigate('/');
+        }}
+      />
 
       <HeaderRow>
         <SideButton type="button" aria-label="메뉴" onClick={() => setIsDrawerOpen(true)}>
@@ -148,8 +157,9 @@ const Logo = styled.img`
   width: var(--logo-width);
   height: var(--logo-height);
   display: block;
-  margin: 0 auto;
+  margin: clamp(8px, 2.8vw, 12px) auto 0;
   margin-bottom: clamp(14px, 3.7vw, 16px);
+  cursor: pointer;
 `;
 
 const HeaderRow = styled.div`

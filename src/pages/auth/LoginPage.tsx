@@ -37,6 +37,7 @@ declare global {
 }
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const SUSPENDED_ACCOUNT_MESSAGE = 'This account is suspended. Please check your sanction history.';
 
 const getStringField = (value: unknown, field: string) => {
   if (!value || typeof value !== 'object') return undefined;
@@ -110,6 +111,13 @@ const LoginPage = () => {
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
       const message = error.response?.data?.message;
+      if (
+        error.response?.status === 401 &&
+        typeof message === 'string' &&
+        message.toLowerCase().includes('suspended')
+      ) {
+        return SUSPENDED_ACCOUNT_MESSAGE;
+      }
       if (Array.isArray(message)) return message.join(', ');
       if (typeof message === 'string') return message;
     }
@@ -234,6 +242,11 @@ const LoginPage = () => {
           <InfoText>로그인이 만료되었습니다. 다시 로그인해 주세요.</InfoText>
         )}
         {error && <ErrorText>{error}</ErrorText>}
+        {error === SUSPENDED_ACCOUNT_MESSAGE && (
+          <NoticeLink type="button" onClick={() => navigate('/account-suspended')}>
+            View suspended account notice
+          </NoticeLink>
+        )}
         <LoginButton type="submit" disabled={isSubmitting}>
           {isSubmitting ? '로그인 중...' : '로그인하기'}
         </LoginButton>
@@ -377,6 +390,19 @@ const SignUpLink = styled.button`
   border: none;
   font-size: var(--body-sm);
   color: #888;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+`;
+
+const NoticeLink = styled.button`
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
