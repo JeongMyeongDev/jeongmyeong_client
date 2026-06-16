@@ -19,7 +19,7 @@ export interface CreateDebateRequest {
   title: string;
   description: string;
   debateType: "FREE" | "CONSENSUS" | "PROS_CONS";
-  tags?: string[];
+  tagIds?: string[];
   closeConditionType?: "TIME_LIMIT" | "MANUAL" | "TARGET_REACHED";
   closeAt?: string;
 }
@@ -27,6 +27,7 @@ export interface CreateDebateRequest {
 export interface ListDebatesParams {
   keyword?: string;
   tag?: string;
+  tagIds?: string;
   type?: "FREE" | "CONSENSUS" | "PROS_CONS";
   status?: "OPEN" | "CLOSED" | "ARCHIVED";
   page?: number;
@@ -60,7 +61,7 @@ export interface CreateChildDebateRequest {
   title: string;
   description: string;
   debateType?: "FREE" | "CONSENSUS" | "PROS_CONS";
-  tags?: string[];
+  tagIds?: string[];
 }
 
 export interface CloseDebateRequest {

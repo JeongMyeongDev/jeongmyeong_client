@@ -20,6 +20,7 @@ import { definitionService } from "../../services/definitionService";
 import { postService } from "../../services/postService";
 import { useAuthStore } from "../../stores/authStore";
 import ThreadSkeleton from "../../components/common/ThreadSkeleton";
+import TagPicker from "../../components/tags/TagPicker";
 import ReportModal from "../../components/moderation/ReportModal";
 import { useModerationStore } from "../../stores/moderationStore";
 import type {
@@ -27,6 +28,7 @@ import type {
   Consensus,
   ConsensusVoteType,
   Debate,
+  DebateTag,
   DebateProgress,
   DebateStance,
   DebateType,
@@ -92,6 +94,7 @@ type ChildDebateDraft = {
   title: string;
   description: string;
   debateType: DebateType;
+  tags: DebateTag[];
 };
 
 type ParentDebateInfo = {
@@ -1424,6 +1427,7 @@ const DebateThreadPage = () => {
       title: "",
       description: "",
       debateType: "FREE",
+      tags: [],
     });
     setPendingSelection(null);
     window.getSelection()?.removeAllRanges();
@@ -1520,6 +1524,7 @@ const DebateThreadPage = () => {
         title: childDebateDraft.title.trim(),
         description: childDebateDraft.description.trim(),
         debateType: childDebateDraft.debateType,
+        tagIds: childDebateDraft.tags.map((tag) => tag.id),
       });
       setExpandedChildDebateStacks((prev) => ({
         ...prev,
@@ -2804,6 +2809,16 @@ const DebateThreadPage = () => {
                   </option>
                 ))}
               </SheetSelect>
+            </SheetField>
+            <SheetField>
+              <SheetLabel>태그</SheetLabel>
+              <TagPicker
+                selectedTags={childDebateDraft.tags}
+                onChange={(tags) =>
+                  setChildDebateDraft((prev) => (prev ? { ...prev, tags } : prev))
+                }
+                placeholder="태그를 검색하세요"
+              />
             </SheetField>
             <SheetActionRow>
               <SheetSecondaryButton

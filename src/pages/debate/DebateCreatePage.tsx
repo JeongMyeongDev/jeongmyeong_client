@@ -1,15 +1,15 @@
 ﻿import { isAxiosError } from 'axios';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import TagPicker from '../../components/tags/TagPicker';
 import { useDebate } from '../../hooks/useDebate';
 import { useAuthStore } from '../../stores/authStore';
 import { useModerationStore } from '../../stores/moderationStore';
-import type { DebateType } from '../../types/debate';
+import type { DebateTag, DebateType } from '../../types/debate';
 
 const TITLE_MAX_LENGTH = 40;
 const DESCRIPTION_MAX_LENGTH = 120;
-const TAG_MAX_LENGTH = 12;
 const TAG_MAX_COUNT = 5;
 const DEFAULT_DEBATE_TYPE = 'FREE' as const;
 const DRAFT_KEY = 'debate-create:draft';
@@ -64,7 +64,7 @@ const getInitialDraft = () => {
     return {
       title: '',
       description: '',
-      tags: [] as string[],
+      tags: [] as DebateTag[],
       debateType: DEFAULT_DEBATE_TYPE as DebateType,
     };
   }
@@ -72,13 +72,13 @@ const getInitialDraft = () => {
     const draft = JSON.parse(rawDraft) as {
       title?: string;
       description?: string;
-      tags?: string[];
+      tags?: DebateTag[];
       debateType?: DebateType;
     };
     return {
       title: draft.title ?? '',
       description: draft.description ?? '',
-      tags: Array.isArray(draft.tags) ? draft.tags : [],
+      tags: Array.isArray(draft.tags) ? draft.tags.filter((tag) => tag?.id && tag?.name) : [],
       debateType: DEBATE_TYPE_OPTIONS.some((option) => option.value === draft.debateType)
         ? draft.debateType
         : DEFAULT_DEBATE_TYPE,
@@ -88,7 +88,7 @@ const getInitialDraft = () => {
     return {
       title: '',
       description: '',
-      tags: [] as string[],
+      tags: [] as DebateTag[],
       debateType: DEFAULT_DEBATE_TYPE as DebateType,
     };
   }
@@ -109,43 +109,16 @@ const DebateCreatePage = () => {
   const [draft] = useState(getInitialDraft);
   const [title, setTitle] = useState(draft.title);
   const [description, setDescription] = useState(draft.description);
-  const [tags, setTags] = useState<string[]>(draft.tags);
+  const [tags, setTags] = useState<DebateTag[]>(draft.tags);
   const [debateType, setDebateType] = useState<DebateType>(
     draft.debateType ?? DEFAULT_DEBATE_TYPE,
   );
-  const [tagInput, setTagInput] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, tags, debateType }));
   }, [title, description, tags, debateType]);
-
-  const normalizeTag = (value: string) => value.trim().toLowerCase();
-
-  const addTag = () => {
-    const trimmed = normalizeTag(tagInput);
-    if (!trimmed || tags.includes(trimmed) || tags.length >= TAG_MAX_COUNT) return;
-    const tagError = getCommunityTextValidationError(trimmed, '태그');
-    if (tagError) {
-      setError(tagError);
-      return;
-    }
-    setError('');
-    setTags((prev) => [...prev, trimmed]);
-    setTagInput('');
-  };
-
-  const removeTag = (tag: string) => {
-    setTags((prev) => prev.filter((t) => t !== tag));
-  };
-
-  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTag();
-    }
-  };
 
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
@@ -187,13 +160,19 @@ const DebateCreatePage = () => {
       return;
     }
 
-    const normalizedTags = Array.from(new Set(tags.map(normalizeTag).filter(Boolean)));
+    const selectedTagIds = tags.map((tag) => tag.id);
+    if (selectedTagIds.length === 0) {
+      setError('태그를 하나 이상 선택해 주세요.');
+      return;
+    }
+    if (selectedTagIds.length > TAG_MAX_COUNT) {
+      setError('태그는 최대 5개까지 선택할 수 있습니다.');
+      return;
+    }
+
     const validationError =
       getCommunityTextValidationError(title.trim(), '토론 제목') ||
       getCommunityTextValidationError(description.trim(), '토론 설명') ||
-      normalizedTags
-        .map((tag) => getCommunityTextValidationError(tag, '태그'))
-        .find(Boolean) ||
       '';
 
     if (validationError) {
@@ -208,7 +187,7 @@ const DebateCreatePage = () => {
         title: title.trim(),
         description: description.trim(),
         debateType,
-        tags: normalizedTags,
+        tagIds: selectedTagIds,
         closeConditionType: 'MANUAL',
       });
       localStorage.removeItem(DRAFT_KEY);
@@ -273,33 +252,7 @@ const DebateCreatePage = () => {
 
         <SectionCard>
           <SectionTitle>토론 태그</SectionTitle>
-          <TagInputRow>
-            <TagTextInput
-              value={tagInput}
-              onChange={(e) => setTagInput(sanitizeDebateText(e.target.value, TAG_MAX_LENGTH))}
-              onKeyDown={handleTagKeyDown}
-              placeholder="태그를 입력하세요"
-              disabled={tags.length >= TAG_MAX_COUNT}
-            />
-            <TagAddButton
-              type="button"
-              onClick={addTag}
-              disabled={!tagInput.trim() || tags.length >= TAG_MAX_COUNT}
-            >
-              추가
-            </TagAddButton>
-          </TagInputRow>
-          <TagCountText>{tags.length}/{TAG_MAX_COUNT}</TagCountText>
-          {tags.length > 0 && (
-            <TagList>
-              {tags.map((tag) => (
-                <TagChip key={tag} type="button" onClick={() => removeTag(tag)}>
-                  <span>{tag}</span>
-                  <CloseMark aria-hidden>×</CloseMark>
-                </TagChip>
-              ))}
-            </TagList>
-          )}
+          <TagPicker selectedTags={tags} onChange={setTags} maxSelected={TAG_MAX_COUNT} />
         </SectionCard>
 
         <ActionRow>
@@ -447,81 +400,6 @@ const CountText = styled.p`
   text-align: right;
   font-size: 12px;
   color: #9b9b9b;
-`;
-
-const TagInputRow = styled.div`
-  display: flex;
-  gap: 8px;
-  margin-bottom: 6px;
-`;
-
-const TagTextInput = styled.input`
-  flex: 1;
-  height: clamp(38px, 9.8vw, 42px);
-  border: none;
-  border-bottom: 2px solid #b7b7b7;
-  background: transparent;
-  font-size: clamp(14px, 3.5vw, 15px);
-  color: #2f3238;
-  outline: none;
-  min-width: 0;
-
-  &::placeholder {
-    color: #b3b3b3;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-  }
-`;
-
-const TagAddButton = styled.button`
-  height: clamp(32px, 8.4vw, 36px);
-  padding: 0 clamp(12px, 3.7vw, 16px);
-  border-radius: 999px;
-  border: 2px solid #2dcd97;
-  background: #2dcd97;
-  color: #fff;
-  font-size: var(--body-sm);
-  font-weight: 700;
-  align-self: center;
-  flex-shrink: 0;
-
-  &:disabled {
-    opacity: 0.4;
-  }
-`;
-
-const TagCountText = styled.p`
-  margin: 0 2px 10px;
-  text-align: right;
-  font-size: 12px;
-  color: #9b9b9b;
-`;
-
-const TagList = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-`;
-
-const TagChip = styled.button`
-  height: clamp(32px, 7.9vw, 34px);
-  border-radius: 999px;
-  border: 2px solid #2dcd97;
-  background: #b9f0db;
-  color: #2dcd97;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 clamp(10px, 2.8vw, 12px);
-  font-size: var(--body-sm);
-  font-weight: 600;
-`;
-
-const CloseMark = styled.span`
-  font-size: clamp(14px, 3.7vw, 16px);
-  line-height: 1;
 `;
 
 const ActionRow = styled.div`

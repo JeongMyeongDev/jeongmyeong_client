@@ -4,9 +4,9 @@ import styled from 'styled-components';
 import SideDrawer from '../../components/common/SideDrawer';
 import { LoadingContent } from '../../components/common/LoadingContent';
 import { DebateListItemSkeleton, FeaturedCardSkeleton } from '../../components/common/PageSkeletons';
+import TagPicker from '../../components/tags/TagPicker';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconAlarm2 from '../../assets/icon_alarm2.svg';
-import btnDscionControl from '../../assets/btn_dscion_control.svg';
 import iconChat from '../../assets/icon_chat.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
@@ -16,7 +16,7 @@ import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import { usePageLoading } from '../../hooks/usePageLoading';
 import { debateService } from '../../services/debateService';
-import type { Debate } from '../../types/debate';
+import type { Debate, DebateTag } from '../../types/debate';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -25,8 +25,6 @@ const MenuIcon = () => <img src={iconMenu} width="22" height="22" alt="" />;
 const SearchIcon = () => <img src={iconSearch} width="18" height="18" alt="" />;
 
 const BellIcon = () => <img src={iconAlarm} width="22" height="22" alt="" />;
-
-const FilterIcon = () => <img src={btnDscionControl} width="48" height="34" alt="" />;
 
 const PersonIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -45,8 +43,6 @@ const BackIcon = () => (
 const ModalMenuIcon = () => <img src={iconShowInfo} width="34" height="34" alt="" />;
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
-
-const CATEGORIES = ['전체', '예술', '연애', '요리', '게임', '스포츠', '정치'];
 
 type ModalDebateItem = {
   id: string;
@@ -102,8 +98,8 @@ const getDebateParticipantCount = (debate: Debate) =>
   debate.participantCount ?? debate.participants?.length ?? 0;
 
 const getDebateTagLabels = (debate: Debate) => {
-  const tags = debate.tagMaps
-    ?.map((tagMap) => tagMap.tag.name.trim())
+  const tags = (debate.tags ?? debate.tagMaps?.map((tagMap) => tagMap.tag))
+    ?.map((tag) => tag.name.trim())
     .filter(Boolean)
     .map((tag) => `#${tag}`);
   return tags?.length ? tags : ['#기타'];
@@ -182,6 +178,11 @@ const DebateCard = ({
       </DMetaRow>
       <DTitle>{item.title}</DTitle>
       <DDesc>{item.description}</DDesc>
+      <DTagList>
+        {item.modalData.tags.map((tag) => (
+          <DTagPill key={tag}>{tag}</DTagPill>
+        ))}
+      </DTagList>
     </DLeft>
     <DRight>
       <DCardActionButton type="button" aria-label="토론 미리보기 열기" onClick={onOpenActions}>
@@ -198,11 +199,11 @@ const MainPage = () => {
   const navigate = useNavigate();
   const { debates, fetchDebates } = useDebate();
   const { isLoading, showLoadingUI, error: loadError, executeAsync } = usePageLoading();
-  const [activeCategory, setActiveCategory] = useState('전체');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeDot, setActiveDot] = useState(0);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState('');
+  const [selectedTags, setSelectedTags] = useState<DebateTag[]>([]);
   const [selectedCard, setSelectedCard] = useState<ModalDebateItem | null>(null);
   const [joinError, setJoinError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
@@ -223,7 +224,7 @@ const MainPage = () => {
       await executeAsync(async () => {
         await fetchDebates({
           keyword: debouncedSearchKeyword || undefined,
-          tag: activeCategory === '전체' ? undefined : activeCategory,
+          tagIds: selectedTags.length ? selectedTags.map((tag) => tag.id).join(',') : undefined,
           status: 'OPEN',
           sort: 'updatedAt',
           direction: 'desc',
@@ -232,7 +233,7 @@ const MainPage = () => {
       });
     };
     void loadDebates();
-  }, [activeCategory, debouncedSearchKeyword, fetchDebates, executeAsync]);
+  }, [debouncedSearchKeyword, selectedTags, fetchDebates, executeAsync]);
 
   const handleScroll = () => {
     if (!scrollRef.current) return;
@@ -340,7 +341,7 @@ const MainPage = () => {
       scrollRef.current.scrollTo({ left: 0, behavior: 'auto' });
     }
     return () => window.clearTimeout(timer);
-  }, [activeCategory, debouncedSearchKeyword]);
+  }, [debouncedSearchKeyword, selectedTags]);
 
   const debateItems: DebateListItem[] = debates.map((debate) => ({
     id: debate.id,
@@ -431,23 +432,18 @@ const MainPage = () => {
         </Dots>
       </Section>
 
-      {/* Category Filter */}
-      <CategoryRow>
-        <FilterBtn>
-          <FilterIcon />
-        </FilterBtn>
-        <CategoryScroll>
-          {CATEGORIES.map((cat) => (
-            <CategoryPill
-              key={cat}
-              $active={cat === activeCategory}
-              onClick={() => setActiveCategory(cat)}
-            >
-              {cat}
-            </CategoryPill>
-          ))}
-        </CategoryScroll>
-      </CategoryRow>
+      <TagFilterArea>
+        <TagPicker
+          selectedTags={selectedTags}
+          onChange={setSelectedTags}
+          placeholder="필터할 태그를 검색하세요"
+        />
+        {selectedTags.length > 1 && (
+          <ClearTagButton type="button" onClick={() => setSelectedTags([])}>
+            전체 해제
+          </ClearTagButton>
+        )}
+      </TagFilterArea>
 
       {/* Debate List */}
       <DebateList>
@@ -831,44 +827,23 @@ const Dot = styled.div<{ $active: boolean }>`
   transition: background 0.25s;
 `;
 
-const CategoryRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
+const TagFilterArea = styled.div`
+  position: relative;
   padding: 0 var(--page-x);
-  margin-bottom: 12px;
+  margin: 0 0 12px;
 `;
 
-const FilterBtn = styled.button`
-  background: none;
+const ClearTagButton = styled.button`
+  display: block;
+  margin: 8px 0 0 auto;
+  height: 30px;
   border: none;
-  color: #555;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-`;
-
-const CategoryScroll = styled.div`
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
-`;
-
-const CategoryPill = styled.button<{ $active: boolean }>`
-  flex-shrink: 0;
-  padding: clamp(5px, 1.4vw, 6px) clamp(14px, 3.7vw, 16px);
   border-radius: 999px;
-  border: none;
-  font-size: 13px;
-  font-weight: ${({ $active }) => ($active ? '600' : '400')};
-  background: ${({ $active }) => ($active ? '#4dc891' : '#f3f3f3')};
-  color: ${({ $active }) => ($active ? '#fff' : '#666')};
-  cursor: pointer;
+  background: #f0f0f0;
+  color: #7f7f7f;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
 `;
 
 const DebateList = styled.div`
@@ -992,6 +967,29 @@ const DDesc = styled.p`
   -webkit-line-clamp: 2;
   word-break: keep-all;
   overflow-wrap: anywhere;
+`;
+
+const DTagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+`;
+
+const DTagPill = styled.span`
+  min-width: 0;
+  max-width: 96px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #d5d5d5;
+  color: #8f8f8f;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const ModalOverlay = styled.div`
