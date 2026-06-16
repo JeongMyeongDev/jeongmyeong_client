@@ -3,7 +3,6 @@ import App from '../App';
 import AuthRoute from '../components/common/AuthRoute';
 import ProtectedRoute from '../components/common/ProtectedRoute';
 import LoginPage from '../pages/auth/LoginPage';
-import GoogleSignUpPage from '../pages/auth/GoogleSignUpPage';
 import SignUpPage from '../pages/auth/SignUpPage';
 import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
 import PasswordResetPage from '../pages/auth/PasswordResetPage';
@@ -26,7 +25,6 @@ const router = createBrowserRouter([
     element: <AuthRoute />,
     children: [
       { path: '/login', element: <LoginPage /> },
-      { path: '/google-signup', element: <GoogleSignUpPage /> },
       { path: '/signup', element: <SignUpPage /> },
       { path: '/verify-email', element: <VerifyEmailPage /> },
       { path: '/password-reset', element: <PasswordResetPage /> },

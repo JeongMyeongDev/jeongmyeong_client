@@ -20,8 +20,6 @@ api.interceptors.response.use(
     const isAuthRequest =
       requestUrl.startsWith('/auth/login') ||
       requestUrl.startsWith('/auth/signup') ||
-      requestUrl.startsWith('/auth/google') ||
-      requestUrl.startsWith('/auth/google/signup') ||
       requestUrl.startsWith('/auth/verify-email');
 
     if (error.response?.status === 401 && !isAuthRequest) {

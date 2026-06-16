@@ -23,32 +23,6 @@ export const useAuth = () => {
     return data.user;
   }, [setInitialized, setUser]);
 
-  const googleLogin = useCallback(async (idToken: string) => {
-    const { data } = await authService.googleLogin({ idToken });
-    localStorage.setItem('accessToken', data.accessToken);
-    setUser(data.user);
-    setInitialized();
-    return data.user;
-  }, [setInitialized, setUser]);
-
-  const googleSignup = useCallback(async (
-    idToken: string,
-    nickname: string,
-    password: string,
-    passwordConfirm: string,
-  ) => {
-    const { data } = await authService.googleSignup({
-      idToken,
-      nickname,
-      password,
-      passwordConfirm,
-    });
-    localStorage.setItem('accessToken', data.accessToken);
-    setUser(data.user);
-    setInitialized();
-    return data.user;
-  }, [setInitialized, setUser]);
-
   const completeOnboarding = useCallback(async () => {
     const { data } = await userService.completeOnboarding();
     setUser(data.user);
@@ -66,8 +40,6 @@ export const useAuth = () => {
     isAuthenticated,
     signup,
     login,
-    googleLogin,
-    googleSignup,
     completeOnboarding,
     logout,
   };
