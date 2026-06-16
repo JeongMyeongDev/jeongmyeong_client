@@ -4,7 +4,7 @@ import SideDrawer from '../../components/common/SideDrawer';
 import styled from 'styled-components';
 import { LoadingContent } from '../../components/common/LoadingContent';
 import { DebateRoomCardSkeleton } from '../../components/common/PageSkeletons';
-import btnDscionControl from '../../assets/btn_dscion_control.svg';
+import TagPicker from '../../components/tags/TagPicker';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconAlarm2 from '../../assets/icon_alarm2.svg';
 import iconChat from '../../assets/icon_chat.svg';
@@ -15,7 +15,7 @@ import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import { usePageLoading } from '../../hooks/usePageLoading';
-import type { Debate } from '../../types/debate';
+import type { Debate, DebateTag } from '../../types/debate';
 
 type DebateRoomCard = {
   id: string;
@@ -25,7 +25,7 @@ type DebateRoomCard = {
   creatorName: string;
   debateTypeLabel: string;
   participants: number;
-  tagLabel: string;
+  tagLabels: string[];
   createdDateLabel: string;
 };
 
@@ -51,6 +51,14 @@ const formatCreatedDate = (createdAt?: string) => {
 const getDebateParticipantCount = (debate: Debate) =>
   debate.participantCount ?? debate.participants?.length ?? 0;
 
+const getDebateTagLabels = (debate: Debate) => {
+  const tags = (debate.tags ?? debate.tagMaps?.map((tagMap) => tagMap.tag))
+    ?.map((tag) => tag.name.trim())
+    .filter(Boolean)
+    .map((tag) => `#${tag}`);
+  return tags?.length ? tags : ['#기타'];
+};
+
 const mapToRoomCard = (debate: Debate): DebateRoomCard => ({
   id: debate.id,
   title: debate.title,
@@ -59,11 +67,9 @@ const mapToRoomCard = (debate: Debate): DebateRoomCard => ({
   creatorName: debate.creator?.nickname ?? '사용자 이름',
   debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
   participants: getDebateParticipantCount(debate),
-  tagLabel: `#${debate.tagMaps?.[0]?.tag.name ?? '기술'}`,
+  tagLabels: getDebateTagLabels(debate),
   createdDateLabel: formatCreatedDate(debate.createdAt),
 });
-
-const FilterIcon = () => <img src={btnDscionControl} width="48" height="34" alt="" />;
 
 const BackIcon = () => (
   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#353535" strokeWidth="2.2">
@@ -84,6 +90,7 @@ const DebatePage = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [submittedKeyword, setSubmittedKeyword] = useState('');
+  const [selectedTags, setSelectedTags] = useState<DebateTag[]>([]);
 
   useEffect(() => {
     const loadDebates = async () => {
@@ -91,6 +98,7 @@ const DebatePage = () => {
         await fetchDebates({
           status: 'OPEN',
           type: FILTER_TYPE_MAP[activeFilter],
+          tagIds: selectedTags.length ? selectedTags.map((tag) => tag.id).join(',') : undefined,
           ...(submittedKeyword.trim() ? { keyword: submittedKeyword.trim() } : {}),
           sort: 'updatedAt',
           direction: 'desc',
@@ -99,7 +107,7 @@ const DebatePage = () => {
       });
     };
     void loadDebates();
-  }, [activeFilter, fetchDebates, executeAsync, submittedKeyword]);
+  }, [activeFilter, selectedTags, fetchDebates, executeAsync, submittedKeyword]);
 
   const handleSearchSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -126,7 +134,16 @@ const DebatePage = () => {
   return (
     <Wrapper>
       <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
-      <Logo src={logoSymbol} alt="정명" />
+      <Logo
+        src={logoSymbol}
+        alt="정명 홈"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/')}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') navigate('/');
+        }}
+      />
 
       <HeaderRow>
         <SideButton type="button" aria-label="메뉴" onClick={() => setIsDrawerOpen(true)}>
@@ -158,9 +175,6 @@ const DebatePage = () => {
       )}
 
       <FilterRow>
-        <FilterButton type="button" aria-label="필터">
-          <FilterIcon />
-        </FilterButton>
         {FILTER_ITEMS.map((item) => (
           <FilterChip
             key={item}
@@ -172,6 +186,19 @@ const DebatePage = () => {
           </FilterChip>
         ))}
       </FilterRow>
+
+      <TagFilterArea>
+        <TagPicker
+          selectedTags={selectedTags}
+          onChange={setSelectedTags}
+          placeholder="필터할 태그를 검색하세요"
+        />
+        {selectedTags.length > 1 && (
+          <ClearTagButton type="button" onClick={() => setSelectedTags([])}>
+            전체 해제
+          </ClearTagButton>
+        )}
+      </TagFilterArea>
 
       <ListWrap>
         {loadError && <ErrorText>{loadError}</ErrorText>}
@@ -201,6 +228,11 @@ const DebatePage = () => {
               <CardTitle>{card.title}</CardTitle>
               <TypeBadge>{card.debateTypeLabel}</TypeBadge>
               <CardDesc>{card.description}</CardDesc>
+              <CardTagList>
+                {card.tagLabels.map((tag) => (
+                  <CardTag key={tag}>{tag}</CardTag>
+                ))}
+              </CardTagList>
             </Card>
           ))}
         </LoadingContent>
@@ -227,7 +259,11 @@ const DebatePage = () => {
 
             <ModalTitle>{selectedCard.title}</ModalTitle>
             <ModalDesc>{selectedCard.description}</ModalDesc>
-            <ModalTag>{selectedCard.tagLabel}</ModalTag>
+            <ModalTagList>
+              {selectedCard.tagLabels.map((tag) => (
+                <ModalTag key={tag}>{tag}</ModalTag>
+              ))}
+            </ModalTagList>
 
             <ModalAuthorRow>
               <ModalAvatar />
@@ -272,8 +308,9 @@ const Logo = styled.img`
   width: var(--logo-width);
   height: var(--logo-height);
   display: block;
-  margin: 0 auto;
+  margin: clamp(8px, 2.8vw, 12px) auto 0;
   margin-bottom: clamp(14px, 3.7vw, 16px);
+  cursor: pointer;
 `;
 
 const HeaderRow = styled.div`
@@ -341,18 +378,6 @@ const FilterRow = styled.div`
   margin-bottom: clamp(18px, 5.6vw, 24px);
 `;
 
-const FilterButton = styled.button`
-  width: clamp(42px, 11.2vw, 48px);
-  height: clamp(30px, 7.9vw, 34px);
-  border: none;
-  background: transparent;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-`;
-
 const FilterChip = styled.button<{ $active: boolean }>`
   height: clamp(32px, 8.8vw, 38px);
   padding: 0 clamp(12px, 3.7vw, 16px);
@@ -363,6 +388,24 @@ const FilterChip = styled.button<{ $active: boolean }>`
   font-size: var(--body-sm);
   font-weight: 600;
   white-space: nowrap;
+`;
+
+const TagFilterArea = styled.div`
+  position: relative;
+  margin-bottom: 14px;
+`;
+
+const ClearTagButton = styled.button`
+  display: block;
+  margin: 8px 0 0 auto;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: #ebebeb;
+  color: #7f7f7f;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
 `;
 
 const ListWrap = styled.div`
@@ -467,7 +510,7 @@ const TypeBadge = styled.span`
 `;
 
 const CardDesc = styled.p`
-  margin: 0;
+  margin: 0 0 8px;
   font-size: var(--body-sm);
   color: #8f8f8f;
   overflow: hidden;
@@ -476,6 +519,29 @@ const CardDesc = styled.p`
   -webkit-line-clamp: 2;
   word-break: keep-all;
   overflow-wrap: anywhere;
+`;
+
+const CardTagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+`;
+
+const CardTag = styled.span`
+  min-width: 0;
+  max-width: 96px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #d5d5d5;
+  color: #8f8f8f;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const ModalOverlay = styled.div`
@@ -539,6 +605,14 @@ const ModalDesc = styled.p`
   overflow-wrap: anywhere;
 `;
 
+const ModalTagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+`;
+
 const ModalTag = styled.span`
   display: inline-flex;
   height: clamp(38px, 9.8vw, 42px);
@@ -550,7 +624,6 @@ const ModalTag = styled.span`
   font-size: var(--title-sm);
   font-weight: 600;
   padding: 0 clamp(16px, 4.7vw, 20px);
-  margin-bottom: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

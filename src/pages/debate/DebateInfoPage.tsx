@@ -270,7 +270,7 @@ const DebateInfoPage = () => {
     );
   }
 
-  const tagName = debate.tagMaps?.[0]?.tag.name;
+  const tags = debate.tags ?? debate.tagMaps?.map((tagMap) => tagMap.tag) ?? [];
   const creatorName = debate.creator?.nickname ?? '';
   const createdDateLabel = formatCreatedDate(debate.createdAt);
   const canManageDebate = user?.role === 'ADMIN' || debate.creator?.id === user?.id;
@@ -306,7 +306,13 @@ const DebateInfoPage = () => {
       )}
 
       <InfoCard>
-        {tagName && <Tag>#{tagName}</Tag>}
+        {tags.length > 0 && (
+          <TagList>
+            {tags.map((tag) => (
+              <Tag key={tag.id}>#{tag.name}</Tag>
+            ))}
+          </TagList>
+        )}
         {creatorName && (
           <AuthorRow>
             <Avatar />
@@ -553,6 +559,13 @@ const InfoCard = styled.section`
   padding: clamp(12px, 3.3vw, 14px) clamp(12px, 3.3vw, 14px) clamp(14px, 3.7vw, 16px);
 `;
 
+const TagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+`;
+
 const Tag = styled.span`
   display: inline-flex;
   align-items: center;
@@ -566,7 +579,6 @@ const Tag = styled.span`
   color: #9e9e9e;
   font-size: var(--body-md);
   font-weight: 600;
-  margin-bottom: 18px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

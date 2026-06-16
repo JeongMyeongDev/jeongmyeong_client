@@ -29,6 +29,7 @@ export interface Debate {
   resultSummary?: string | null;
   stanceDistribution?: StanceSummary | null;
 
+  tags?: DebateTag[];
   tagMaps?: Array<{ tag: DebateTag }>;
   creator?: {
     id: string;

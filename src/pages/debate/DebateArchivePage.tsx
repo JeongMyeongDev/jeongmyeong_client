@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import SideDrawer from '../../components/common/SideDrawer';
-import btnDscionControl from '../../assets/btn_dscion_control.svg';
+import TagPicker from '../../components/tags/TagPicker';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconChat from '../../assets/icon_chat.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
-import type { Debate } from '../../types/debate';
+import type { Debate, DebateTag } from '../../types/debate';
 
 type ArchiveFilter = '전체' | '찬반토론' | '합의토론' | '자유토론';
 
@@ -17,6 +17,7 @@ type ArchiveCardItem = {
   id: string;
   title: string;
   description: string;
+  tags: string[];
 };
 
 const FILTER_ITEMS: ArchiveFilter[] = ['전체', '찬반토론', '합의토론', '자유토론'];
@@ -26,13 +27,20 @@ const FILTER_TYPE_MAP: Partial<Record<ArchiveFilter, 'PROS_CONS' | 'CONSENSUS' |
   자유토론: 'FREE',
 };
 
+const getDebateTagLabels = (debate: Debate) => {
+  const tags = (debate.tags ?? debate.tagMaps?.map((tagMap) => tagMap.tag))
+    ?.map((tag) => tag.name.trim())
+    .filter(Boolean)
+    .map((tag) => `#${tag}`);
+  return tags?.length ? tags : ['#기타'];
+};
+
 const mapToArchiveCard = (debate: Debate): ArchiveCardItem => ({
   id: debate.id,
   title: debate.title,
   description: debate.description,
+  tags: getDebateTagLabels(debate),
 });
-
-const FilterIcon = () => <img src={btnDscionControl} width="48" height="34" alt="" />;
 
 const DebateArchivePage = () => {
   const navigate = useNavigate();
@@ -40,6 +48,7 @@ const DebateArchivePage = () => {
   const [activeFilter, setActiveFilter] = useState<ArchiveFilter>('전체');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [submittedKeyword, setSubmittedKeyword] = useState('');
+  const [selectedTags, setSelectedTags] = useState<DebateTag[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [listError, setListError] = useState('');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -51,6 +60,7 @@ const DebateArchivePage = () => {
         await fetchArchivedDebates({
           ...(type ? { type } : {}),
           ...(submittedKeyword.trim() ? { keyword: submittedKeyword.trim() } : {}),
+          tagIds: selectedTags.length ? selectedTags.map((tag) => tag.id).join(',') : undefined,
           sort: 'archivedAt',
           direction: 'desc',
           limit: 20,
@@ -61,7 +71,7 @@ const DebateArchivePage = () => {
       }
     };
     void loadDebates();
-  }, [activeFilter, fetchArchivedDebates, submittedKeyword]);
+  }, [activeFilter, fetchArchivedDebates, selectedTags, submittedKeyword]);
 
   const handleSearchSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -73,7 +83,16 @@ const DebateArchivePage = () => {
   return (
     <Wrapper>
       <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
-      <Logo src={logoSymbol} alt="정명" />
+      <Logo
+        src={logoSymbol}
+        alt="정명"
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate('/')}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') navigate('/');
+        }}
+      />
 
       <HeaderRow>
         <SideButton type="button" aria-label="메뉴" onClick={() => setIsDrawerOpen(true)}>
@@ -105,9 +124,6 @@ const DebateArchivePage = () => {
       )}
 
       <FilterRow>
-        <FilterButton type="button" aria-label="필터">
-          <FilterIcon />
-        </FilterButton>
         {FILTER_ITEMS.map((item) => (
           <FilterChip
             key={item}
@@ -120,6 +136,19 @@ const DebateArchivePage = () => {
         ))}
       </FilterRow>
 
+      <TagFilterArea>
+        <TagPicker
+          selectedTags={selectedTags}
+          onChange={setSelectedTags}
+          placeholder="필터할 태그를 검색하세요"
+        />
+        {selectedTags.length > 1 && (
+          <ClearTagButton type="button" onClick={() => setSelectedTags([])}>
+            전체 해제
+          </ClearTagButton>
+        )}
+      </TagFilterArea>
+
       <ListWrap>
         {listError && <ErrorText>{listError}</ErrorText>}
         {!listError && archiveCards.length === 0 && <ErrorText>보관된 토론이 없습니다.</ErrorText>}
@@ -131,6 +160,11 @@ const DebateArchivePage = () => {
             </CardTop>
             <CardTitle>{card.title}</CardTitle>
             <CardDesc>{card.description}</CardDesc>
+            <CardTagList>
+              {card.tags.map((tag) => (
+                <CardTag key={tag}>{tag}</CardTag>
+              ))}
+            </CardTagList>
           </Card>
         ))}
       </ListWrap>
@@ -148,8 +182,9 @@ const Logo = styled.img`
   width: var(--logo-width);
   height: var(--logo-height);
   display: block;
-  margin: 0 auto;
+  margin: clamp(8px, 2.8vw, 12px) auto 0;
   margin-bottom: clamp(14px, 3.7vw, 16px);
+  cursor: pointer;
 `;
 
 const HeaderRow = styled.div`
@@ -218,18 +253,6 @@ const FilterRow = styled.div`
   overflow-x: auto;
 `;
 
-const FilterButton = styled.button`
-  width: clamp(42px, 11.2vw, 48px);
-  height: clamp(30px, 7.9vw, 34px);
-  border: none;
-  background: transparent;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-`;
-
 const FilterChip = styled.button<{ $active: boolean }>`
   height: clamp(30px, 7.4vw, 32px);
   padding: 0 clamp(12px, 3.3vw, 14px);
@@ -240,6 +263,24 @@ const FilterChip = styled.button<{ $active: boolean }>`
   font-size: var(--body-sm);
   font-weight: ${({ $active }) => ($active ? '600' : '500')};
   white-space: nowrap;
+`;
+
+const TagFilterArea = styled.div`
+  position: relative;
+  margin-bottom: 14px;
+`;
+
+const ClearTagButton = styled.button`
+  display: block;
+  margin: 8px 0 0 auto;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: #ebebeb;
+  color: #7f7f7f;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
 `;
 
 const ListWrap = styled.div`
@@ -299,7 +340,7 @@ const CardTitle = styled.h3`
 `;
 
 const CardDesc = styled.p`
-  margin: 0;
+  margin: 0 0 8px;
   font-size: var(--body-sm);
   color: #8f8f8f;
   overflow: hidden;
@@ -308,6 +349,29 @@ const CardDesc = styled.p`
   -webkit-line-clamp: 2;
   word-break: keep-all;
   overflow-wrap: anywhere;
+`;
+
+const CardTagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+`;
+
+const CardTag = styled.span`
+  min-width: 0;
+  max-width: 96px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #d5d5d5;
+  color: #8f8f8f;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 export default DebateArchivePage;

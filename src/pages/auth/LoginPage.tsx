@@ -5,6 +5,84 @@ import styled from 'styled-components';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useAuth } from '../../hooks/useAuth';
 
+type GoogleCredentialResponse = {
+  credential?: string;
+};
+
+type GoogleAccounts = {
+  id: {
+    initialize: (options: {
+      client_id: string;
+      callback: (response: GoogleCredentialResponse) => void;
+    }) => void;
+    renderButton: (
+      parent: HTMLElement,
+      options: {
+        theme: 'outline' | 'filled_blue' | 'filled_black';
+        size: 'large' | 'medium' | 'small';
+        shape: 'pill' | 'rectangular' | 'circle' | 'square';
+        text: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
+        width: string;
+      },
+    ) => void;
+  };
+};
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: GoogleAccounts;
+    };
+  }
+}
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const SUSPENDED_ACCOUNT_MESSAGE = 'This account is suspended. Please check your sanction history.';
+
+const getStringField = (value: unknown, field: string) => {
+  if (!value || typeof value !== 'object') return undefined;
+
+  const fieldValue = (value as Record<string, unknown>)[field];
+  return typeof fieldValue === 'string' ? fieldValue : undefined;
+};
+
+const getEmailFromGoogleCredential = (credential: string) => {
+  try {
+    const payload = credential.split('.')[1];
+    if (!payload) return undefined;
+
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      '=',
+    );
+    const parsedPayload = JSON.parse(atob(paddedPayload)) as { email?: unknown };
+
+    return typeof parsedPayload.email === 'string' ? parsedPayload.email : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const getGoogleSignupEmail = (error: unknown, credential: string) => {
+  if (!isAxiosError(error)) return getEmailFromGoogleCredential(credential);
+
+  const responseData = error.response?.data;
+  const responseMessage = getStringField(responseData, 'message');
+  const messageObject =
+    responseData && typeof responseData === 'object'
+      ? (responseData as Record<string, unknown>).message
+      : undefined;
+
+  return (
+    getStringField(responseData, 'email') ??
+    getStringField(responseData, 'data') ??
+    getStringField(messageObject, 'email') ??
+    (responseMessage?.includes('@') ? responseMessage : undefined) ??
+    getEmailFromGoogleCredential(credential)
+  );
+};
+
 const EyeIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -32,6 +110,13 @@ const LoginPage = () => {
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
       const message = error.response?.data?.message;
+      if (
+        error.response?.status === 401 &&
+        typeof message === 'string' &&
+        message.toLowerCase().includes('suspended')
+      ) {
+        return SUSPENDED_ACCOUNT_MESSAGE;
+      }
       if (Array.isArray(message)) return message.join(', ');
       if (typeof message === 'string') return message;
     }
@@ -92,6 +177,11 @@ const LoginPage = () => {
           <InfoText>로그인이 만료되었습니다. 다시 로그인해 주세요.</InfoText>
         )}
         {error && <ErrorText>{error}</ErrorText>}
+        {error === SUSPENDED_ACCOUNT_MESSAGE && (
+          <NoticeLink type="button" onClick={() => navigate('/account-suspended')}>
+            View suspended account notice
+          </NoticeLink>
+        )}
         <LoginButton type="submit" disabled={isSubmitting}>
           {isSubmitting ? '로그인 중...' : '로그인하기'}
         </LoginButton>
@@ -221,6 +311,19 @@ const SignUpLink = styled.button`
   border: none;
   font-size: var(--body-sm);
   color: #888;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+`;
+
+const NoticeLink = styled.button`
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;

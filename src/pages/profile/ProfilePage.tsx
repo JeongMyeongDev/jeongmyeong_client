@@ -98,6 +98,7 @@ const ProfilePage = () => {
     () => [
       { label: '내 토론', action: () => navigate('/my-debates') },
       { label: '알림', action: () => navigate('/notifications') },
+      { label: '제재 내역', action: () => navigate('/my-sanctions') },
     ],
     [navigate],
   );
@@ -108,15 +109,6 @@ const ProfilePage = () => {
       { label: '튜토리얼 다시 보기', action: () => showToast('튜토리얼 기능은 준비 중입니다.') },
     ],
     [navigate],
-  );
-
-  const serviceRows = useMemo<MenuRow[]>(
-    () => [
-      { label: '공지사항', action: () => showToast('아직 등록된 공지사항이 없습니다.') },
-      { label: '고객센터', action: () => showToast('고객센터 기능은 준비 중입니다.') },
-      { label: '앱 정보', action: () => showToast('정명 MVP 테스트 버전입니다.') },
-    ],
-    [],
   );
 
   const adminRows = useMemo<MenuRow[]>(
@@ -203,12 +195,6 @@ const ProfilePage = () => {
 
         <ProfileSection title="설정">
           {settingRows.map((row) => (
-            <ProfileMenuRow key={row.label} label={row.label} onClick={row.action} />
-          ))}
-        </ProfileSection>
-
-        <ProfileSection title="서비스">
-          {serviceRows.map((row) => (
             <ProfileMenuRow key={row.label} label={row.label} onClick={row.action} />
           ))}
         </ProfileSection>
