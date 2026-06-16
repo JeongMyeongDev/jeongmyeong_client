@@ -6,6 +6,7 @@ import { useAuthStore } from '../../stores/authStore';
 import type {
   ContentAction,
   Report,
+  ReportReason,
   ReportStatus,
   ReportTargetType,
   Sanction,
@@ -47,6 +48,32 @@ const ACTION_OPTIONS: Array<{ value: ContentAction; label: string }> = [
 ];
 
 const CONTENT_ACTION_TARGETS: ReportTargetType[] = ['POST', 'COMMENT'];
+
+const REASON_LABEL_MAP: Record<ReportReason, string> = {
+  SPAM: '스팸',
+  ABUSE: '욕설/괴롭힘',
+  HATE: '혐오 표현',
+  SEXUAL: '성적 콘텐츠',
+  VIOLENCE: '폭력적 콘텐츠',
+  MISINFORMATION: '허위 정보',
+  OFF_TOPIC: '주제와 무관함',
+  ETC: '기타',
+};
+
+const TARGET_LABEL_MAP: Record<ReportTargetType, string> = {
+  DEBATE: '토론',
+  POST: '의견',
+  COMMENT: '댓글',
+  CONSENSUS: '합의안',
+  USER: '사용자',
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
 
 const getErrorMessage = (error: unknown) => {
   if (isAxiosError(error)) {
@@ -231,7 +258,7 @@ const AdminReportsPage = () => {
               data-active={selectedReport?.id === report.id}
               onClick={() => void selectReport(report)}
             >
-              <strong>{report.targetType} · {report.reason}</strong>
+              <strong>{TARGET_LABEL_MAP[report.targetType]} · {REASON_LABEL_MAP[report.reason]}</strong>
               <span>{report.reporter?.nickname ?? '신고자'} · {report.status}</span>
             </ReportItem>
           ))}
@@ -239,10 +266,37 @@ const AdminReportsPage = () => {
         <Detail>
           {selectedReport ? (
             <>
-              <DetailTitle>{selectedReport.targetType} 신고</DetailTitle>
-              <Meta>상태: {selectedReport.status}</Meta>
-              <Meta>대상 ID: {selectedReport.targetId}</Meta>
-              <Quote>{selectedReport.targetContentSnapshot || selectedReport.detail || '스냅샷 없음'}</Quote>
+              <DetailTitle>{TARGET_LABEL_MAP[selectedReport.targetType]} 신고</DetailTitle>
+              <InfoGrid>
+                <InfoItem>
+                  <InfoLabel>상태</InfoLabel>
+                  <InfoValue>{selectedReport.status}</InfoValue>
+                </InfoItem>
+                <InfoItem>
+                  <InfoLabel>신고 일시</InfoLabel>
+                  <InfoValue>{formatDateTime(selectedReport.createdAt)}</InfoValue>
+                </InfoItem>
+                <InfoItem>
+                  <InfoLabel>신고자</InfoLabel>
+                  <InfoValue>
+                    {selectedReport.reporter?.nickname ?? '신고자'}
+                    {selectedReport.reporter?.email ? ` · ${selectedReport.reporter.email}` : ''}
+                  </InfoValue>
+                </InfoItem>
+                <InfoItem>
+                  <InfoLabel>대상</InfoLabel>
+                  <InfoValue>{TARGET_LABEL_MAP[selectedReport.targetType]} · {selectedReport.targetId}</InfoValue>
+                </InfoItem>
+              </InfoGrid>
+
+              <SectionTitle>신고 사유</SectionTitle>
+              <ReasonBadge>{REASON_LABEL_MAP[selectedReport.reason]}</ReasonBadge>
+
+              <SectionTitle>제보자의 의견</SectionTitle>
+              <Quote>{selectedReport.detail || '제보자가 별도 의견을 작성하지 않았습니다.'}</Quote>
+
+              <SectionTitle>원문</SectionTitle>
+              <Quote>{selectedReport.targetContentSnapshot || '원문 스냅샷이 없습니다.'}</Quote>
               <Textarea
                 value={resolutionNote}
                 onChange={(event) => setResolutionNote(event.target.value)}
@@ -391,10 +445,49 @@ const DetailTitle = styled.h2`
   font-size: 16px;
 `;
 
-const Meta = styled.p`
-  margin: 0 0 5px;
-  color: #8f8f8f;
+const InfoGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 14px;
+
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const InfoItem = styled.div`
+  border-radius: 8px;
+  background: #f7f7f7;
+  padding: 9px 10px;
+`;
+
+const InfoLabel = styled.span`
+  display: block;
+  color: #9a9a9a;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 4px;
+`;
+
+const InfoValue = styled.span`
+  display: block;
+  color: #555555;
   font-size: 12px;
+  line-height: 1.35;
+  word-break: break-all;
+`;
+
+const ReasonBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: #2d8f73;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 12px;
 `;
 
 const Quote = styled.blockquote`

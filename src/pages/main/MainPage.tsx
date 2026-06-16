@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import SideDrawer from '../../components/common/SideDrawer';
@@ -130,11 +130,16 @@ const StatusBadge = ({ status }: { status: string }) => {
 const FeaturedCard = ({
   item,
   onClick,
+  onOpenActions,
 }: {
   item: FeaturedItem;
   onClick: () => void;
+  onOpenActions: (event: MouseEvent<HTMLButtonElement>) => void;
 }) => (
   <FCard data-feature-card="true" onClick={onClick}>
+    <CardActionButton type="button" aria-label="토론 미리보기 열기" onClick={onOpenActions}>
+      ...
+    </CardActionButton>
     <FTitle>{item.title}</FTitle>
     <FDesc>{item.description}</FDesc>
     <FMeta>
@@ -158,7 +163,15 @@ const FeaturedCard = ({
   </FCard>
 );
 
-const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => void }) => (
+const DebateCard = ({
+  item,
+  onClick,
+  onOpenActions,
+}: {
+  item: DebateListItem;
+  onClick: () => void;
+  onOpenActions: (event: MouseEvent<HTMLButtonElement>) => void;
+}) => (
   <DCard onClick={onClick}>
     <DLeft>
       <DMetaRow>
@@ -170,7 +183,12 @@ const DebateCard = ({ item, onClick }: { item: DebateListItem; onClick: () => vo
       <DTitle>{item.title}</DTitle>
       <DDesc>{item.description}</DDesc>
     </DLeft>
-    <DebateIconImg src={iconChat} alt="" />
+    <DRight>
+      <DCardActionButton type="button" aria-label="토론 미리보기 열기" onClick={onOpenActions}>
+        ...
+      </DCardActionButton>
+      <DebateIconImg src={iconChat} alt="" />
+    </DRight>
   </DCard>
 );
 
@@ -188,7 +206,6 @@ const MainPage = () => {
   const [selectedCard, setSelectedCard] = useState<ModalDebateItem | null>(null);
   const [joinError, setJoinError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
-  const [isJoining, setIsJoining] = useState(false);
   const [isActionProcessing, setIsActionProcessing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollLeftRef = useRef(0);
@@ -252,27 +269,19 @@ const MainPage = () => {
     }
   };
 
-  const openFeaturedModal = (item: ModalDebateItem) => {
+  const navigateToFeaturedDebate = (debateId: string) => {
     if (scrollRef.current && Math.abs(scrollRef.current.scrollLeft - lastScrollLeftRef.current) > 2) {
       return;
     }
-    void openDebateModal(item);
+    navigate(`/debate/${debateId}`);
   };
 
-  const handleJoinDebate = async (debateId: string) => {
-    if (isJoining) return;
-
-    setJoinError('');
-    setIsJoining(true);
-    try {
-      await debateService.join(debateId);
-      navigate(`/debate/${debateId}`);
-      setSelectedCard(null);
-    } catch {
-      setJoinError('토론 참여에 실패했습니다. 잠시 후 다시 시도해 주세요.');
-    } finally {
-      setIsJoining(false);
-    }
+  const openActionModalFromButton = (
+    event: MouseEvent<HTMLButtonElement>,
+    item: ModalDebateItem,
+  ) => {
+    event.stopPropagation();
+    void openDebateModal(item);
   };
 
   const handleBookmarkToggle = async () => {
@@ -400,7 +409,18 @@ const MainPage = () => {
             }
           >
             {featuredItems.map((item) => (
-              <FeaturedCard key={item.id} item={item} onClick={() => openFeaturedModal(item.modalData)} />
+              <FeaturedCard
+                key={item.id}
+                item={item}
+                onClick={() => navigateToFeaturedDebate(item.id)}
+                onOpenActions={(event) => {
+                  if (scrollRef.current && Math.abs(scrollRef.current.scrollLeft - lastScrollLeftRef.current) > 2) {
+                    event.stopPropagation();
+                    return;
+                  }
+                  openActionModalFromButton(event, item.modalData);
+                }}
+              />
             ))}
           </LoadingContent>
         </CarouselWrapper>
@@ -439,7 +459,12 @@ const MainPage = () => {
         >
           {!loadError && debateItems.length === 0 && <ListError>표시할 토론이 없습니다.</ListError>}
           {debateItems.map((item) => (
-            <DebateCard key={item.id} item={item} onClick={() => void openDebateModal(item.modalData)} />
+            <DebateCard
+              key={item.id}
+              item={item}
+              onClick={() => navigate(`/debate/${item.id}`)}
+              onOpenActions={(event) => openActionModalFromButton(event, item.modalData)}
+            />
           ))}
         </LoadingContent>
       </DebateList>
@@ -503,10 +528,12 @@ const MainPage = () => {
               </ModalActionIconButton>
               <JoinButton
                 type="button"
-                disabled={isJoining}
-                onClick={() => void handleJoinDebate(selectedCard.id)}
+                onClick={() => {
+                  navigate(`/debate/${selectedCard.id}`);
+                  setSelectedCard(null);
+                }}
               >
-                {isJoining ? '참여 중...' : '참여하기'}
+                토론 보기
               </JoinButton>
             </ModalActionRow>
           </ModalCard>
@@ -643,6 +670,23 @@ const FCard = styled.div`
   overflow: hidden;
   touch-action: pan-x pan-y;
   user-select: none;
+`;
+
+const CardActionButton = styled.button`
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  min-width: 34px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(245, 245, 245, 0.92);
+  color: #8f8f8f;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 10px;
 `;
 
 const FTitle = styled.h3`
@@ -859,6 +903,29 @@ const DebateIconImg = styled.img`
   width: clamp(56px, 15.6vw, 67px);
   height: clamp(56px, 15.6vw, 67px);
   flex-shrink: 0;
+`;
+
+const DRight = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  align-self: stretch;
+  gap: 8px;
+  flex-shrink: 0;
+`;
+
+const DCardActionButton = styled.button`
+  min-width: 34px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: #f3f3f3;
+  color: #8f8f8f;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 10px;
 `;
 
 const DLeft = styled.div`

@@ -49,6 +49,20 @@ export interface Debate {
   participantCount?: number;
   isBookmarked?: boolean;
   isSubscribed?: boolean;
+  isParticipant?: boolean;
+  myParticipant?: {
+    id: string;
+    debateId: string;
+    userId: string;
+    joinedAt?: string;
+    lastReadAt?: string | null;
+    roleInDebate?: "CREATOR" | "PARTICIPANT" | "MODERATOR";
+    user: {
+      id: string;
+      nickname: string;
+      profileImage?: string | null;
+    };
+  } | null;
   sourceSelectionTarget?: SelectionTarget;
 
 }

@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SideDrawer from '../../components/common/SideDrawer';
 import styled from 'styled-components';
@@ -15,7 +15,6 @@ import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useDebate } from '../../hooks/useDebate';
 import { usePageLoading } from '../../hooks/usePageLoading';
-import { debateService } from '../../services/debateService';
 import type { Debate } from '../../types/debate';
 
 type DebateRoomCard = {
@@ -85,8 +84,6 @@ const DebatePage = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [submittedKeyword, setSubmittedKeyword] = useState('');
-  const [joinError, setJoinError] = useState('');
-  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     const loadDebates = async () => {
@@ -115,24 +112,15 @@ const DebatePage = () => {
   );
 
   const openDebateModal = (card: DebateRoomCard) => {
-    setJoinError('');
     setSelectedCard(card);
   };
 
-  const handleJoinDebate = async (debateId: string) => {
-    if (isJoining) return;
-
-    setJoinError('');
-    setIsJoining(true);
-    try {
-      await debateService.join(debateId);
-      navigate(`/debate/${debateId}`);
-      setSelectedCard(null);
-    } catch {
-      setJoinError('토론 참여에 실패했습니다. 잠시 후 다시 시도해 주세요.');
-    } finally {
-      setIsJoining(false);
-    }
+  const openActionModalFromButton = (
+    event: MouseEvent<HTMLButtonElement>,
+    card: DebateRoomCard,
+  ) => {
+    event.stopPropagation();
+    openDebateModal(card);
   };
 
   return (
@@ -194,12 +182,21 @@ const DebatePage = () => {
         >
           {!loadError && cards.length === 0 && <ErrorText>등록된 토론이 없습니다.</ErrorText>}
           {cards.map((card) => (
-            <Card key={card.id} onClick={() => openDebateModal(card)}>
+            <Card key={card.id} onClick={() => navigate(`/debate/${card.id}`)}>
               <CardTop>
                 <StatusBadge $running={card.statusLabel === '진행중'}>
                   {card.statusLabel.replace(/\s+/g, '')}
                 </StatusBadge>
-                <ChatCircleIconImg src={iconChat} alt="" />
+                <CardTopRight>
+                  <CardActionButton
+                    type="button"
+                    aria-label="토론 미리보기 열기"
+                    onClick={(event) => openActionModalFromButton(event, card)}
+                  >
+                    ...
+                  </CardActionButton>
+                  <ChatCircleIconImg src={iconChat} alt="" />
+                </CardTopRight>
               </CardTop>
               <CardTitle>{card.title}</CardTitle>
               <TypeBadge>{card.debateTypeLabel}</TypeBadge>
@@ -240,7 +237,6 @@ const DebatePage = () => {
             <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
             <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
             <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
-            {joinError && <ModalError>{joinError}</ModalError>}
 
             <ModalActionRow>
               <ModalActionIconButton type="button" aria-label="저장">
@@ -251,10 +247,12 @@ const DebatePage = () => {
               </ModalActionIconButton>
               <JoinButton
                 type="button"
-                disabled={isJoining}
-                onClick={() => void handleJoinDebate(selectedCard.id)}
+                onClick={() => {
+                  navigate(`/debate/${selectedCard.id}`);
+                  setSelectedCard(null);
+                }}
               >
-                {isJoining ? '참여 중...' : '참여하기'}
+                토론 보기
               </JoinButton>
             </ModalActionRow>
           </ModalCard>
@@ -398,6 +396,26 @@ const ChatCircleIconImg = styled.img`
   width: clamp(26px, 7vw, 30px);
   height: clamp(26px, 7vw, 30px);
   flex-shrink: 0;
+`;
+
+const CardTopRight = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+`;
+
+const CardActionButton = styled.button`
+  min-width: 34px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: #f3f3f3;
+  color: #8f8f8f;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 10px;
 `;
 
 const StatusBadge = styled.span<{ $running: boolean }>`
@@ -558,12 +576,6 @@ const ModalMeta = styled.p`
   margin: 0 0 10px;
   font-size: 15px;
   color: #9a9a9a;
-`;
-
-const ModalError = styled.p`
-  margin: 0 0 10px;
-  color: #f04444;
-  font-size: var(--body-sm);
 `;
 
 const ModalActionRow = styled.div`

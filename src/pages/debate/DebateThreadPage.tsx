@@ -375,6 +375,7 @@ const DebateThreadPage = () => {
     null,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isJoiningDebate, setIsJoiningDebate] = useState(false);
   const [expandedReplyGroups, setExpandedReplyGroups] = useState<Record<string, boolean>>({});
   const [expandedConsensusStacks, setExpandedConsensusStacks] = useState<Record<string, boolean>>({});
   const [expandedChildDebateStacks, setExpandedChildDebateStacks] = useState<Record<string, boolean>>({});
@@ -385,8 +386,20 @@ const DebateThreadPage = () => {
   const isConsensusBlocked =
     currentDebate?.debateType === "CONSENSUS" && Boolean(progress?.isBlocked);
   const isSanctionWriteBlocked = !canWrite();
+  const isCurrentUserParticipant =
+    Boolean(currentDebate?.isParticipant) ||
+    Boolean(
+      user &&
+        currentDebate?.participants?.some(
+          (participant) => participant.user.id === user.id,
+        ),
+    );
+  const isJoinRequired =
+    currentDebate?.status === "OPEN" && !isCurrentUserParticipant;
+  const shouldShowJoinCta =
+    isJoinRequired && !isConsensusBlocked && !isSanctionWriteBlocked;
   const isComposerDisabled =
-    isDebateReadOnly || isConsensusBlocked || isSanctionWriteBlocked;
+    isDebateReadOnly || isConsensusBlocked || isSanctionWriteBlocked || isJoinRequired;
   const readOnlyMessage =
     isSuspended()
       ? "정지된 계정입니다. 제재 내역을 확인해 주세요."
@@ -1066,6 +1079,23 @@ const DebateThreadPage = () => {
       setSubmitError(getMutationErrorMessage(error));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleJoinDebate = async () => {
+    if (!debateId || isJoiningDebate) return;
+
+    setSubmitError("");
+    setIsJoiningDebate(true);
+    try {
+      await debateService.join(debateId);
+      await fetchDebate(debateId);
+      setActionMessage("토론에 참여했습니다.");
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    } catch (error) {
+      setSubmitError(getMutationErrorMessage(error));
+    } finally {
+      setIsJoiningDebate(false);
     }
   };
 
@@ -1869,7 +1899,11 @@ const DebateThreadPage = () => {
     );
   };
 
-  const renderCommentCard = (comment: Comment, postId: string) => {
+  const renderCommentCard = (
+    comment: Comment,
+    postId: string,
+    displayNumber: string,
+  ) => {
     const isDeleted = comment.status === "DELETED";
     const menuKey = `comment:${comment.id}`;
     const canManage = comment.author?.id === user?.id;
@@ -1880,7 +1914,7 @@ const DebateThreadPage = () => {
       <Fragment key={comment.id}>
         <MessageCard>
           <MetaRow>
-            <NumberText>#1</NumberText>
+            <NumberText>#{displayNumber}</NumberText>
             <Avatar />
             <AuthorName>{comment.author?.nickname ?? "사용자 이름"}</AuthorName>
             {!isDeleted && (
@@ -2130,7 +2164,7 @@ const DebateThreadPage = () => {
                   key={stance}
                   type="button"
                   data-active={myStance === stance}
-                  disabled={isDebateReadOnly || isSubmitting}
+                  disabled={isDebateReadOnly || isJoinRequired || isSubmitting}
                   onClick={() => void handleStanceChange(stance)}
                 >
                   {STANCE_LABEL[stance]}
@@ -2159,7 +2193,8 @@ const DebateThreadPage = () => {
             종료되었거나 보관된 토론입니다. 하위 토론 생성은 사용할 수 없습니다.
           </ReadOnlyPanel>
         )}
-        {threadMessages.map((item) => {
+        {threadMessages.map((item, postIndex) => {
+          const postNumber = postIndex + 1;
           const comments = commentsByPostId[item.id] ?? [];
           const commentGroups = buildCommentGroups(comments);
           const isDeleted = item.status === "DELETED";
@@ -2172,7 +2207,7 @@ const DebateThreadPage = () => {
             <MessageGroup key={item.id}>
               <MessageCard>
                 <MetaRow>
-                  <NumberText>#1</NumberText>
+                  <NumberText>#{postNumber}</NumberText>
                   <Avatar />
                   <AuthorName>{item.author.nickname}</AuthorName>
                   {item.stance && (
@@ -2371,9 +2406,11 @@ const DebateThreadPage = () => {
 
               {commentGroups.length > 0 && (
                 <CommentList>
-                  {commentGroups.map((comment) => (
+                  {commentGroups.map((comment, commentIndex) => {
+                    const commentNumber = `${postNumber}-${commentIndex + 1}`;
+                    return (
                     <CommentGroupItem key={comment.id}>
-                      {renderCommentCard(comment, item.id)}
+                      {renderCommentCard(comment, item.id, commentNumber)}
                       {comment.replies.length > 0 && (
                         <>
                           <ReplyToggleButton type="button" onClick={() => toggleReplyGroup(item.id, comment.id)}>
@@ -2382,12 +2419,21 @@ const DebateThreadPage = () => {
                               : `답글 ${comment.replies.length}개 보기`}
                           </ReplyToggleButton>
                           {expandedReplyGroups[getReplyGroupKey(item.id, comment.id)] && (
-                            <ReplyList>{comment.replies.map((reply) => renderCommentCard(reply, item.id))}</ReplyList>
+                            <ReplyList>
+                              {comment.replies.map((reply, replyIndex) =>
+                                renderCommentCard(
+                                  reply,
+                                  item.id,
+                                  `${commentNumber}-${replyIndex + 1}`,
+                                ),
+                              )}
+                            </ReplyList>
                           )}
                         </>
                       )}
                     </CommentGroupItem>
-                  ))}
+                    );
+                  })}
                 </CommentList>
               )}
             </MessageGroup>
@@ -2923,64 +2969,83 @@ const DebateThreadPage = () => {
             <ActionNotice>{actionMessage}</ActionNotice>
           </ComposerToastLayer>
         )}
-        {replyTarget && (
-          <ReplyBanner>
-            <span>
-              {replyTarget.mention
-                ? `${replyTarget.mention.trim()} 답글 작성 중`
-                : `${replyTarget.authorName} 의견에 댓글 작성 중`}
-            </span>
-            <ReplyCancelButton type="button" onClick={cancelReply}>
-              취소
-            </ReplyCancelButton>
-          </ReplyBanner>
-        )}
-        <Composer onSubmit={handleSubmit}>
-          <HashButton type="button" aria-label="태그">
-            #
-          </HashButton>
-          <MessageInput
-            ref={inputRef}
-            value={message}
-            onChange={(event) => handleComposerMessageChange(event.target.value)}
-            onMouseUp={handleComposerSelection}
-            onKeyUp={handleComposerSelection}
-            onTouchEnd={handleComposerSelection}
-            placeholder="입력창.."
-            aria-label="토론 메시지 입력"
-            disabled={isComposerDisabled}
-          />
-          <SendButton
-            type="submit"
-            aria-label="메시지 전송"
-            disabled={!message.trim() || isSubmitting || isComposerDisabled}
-          >
-            <SendIcon />
-          </SendButton>
-        </Composer>
-        {pendingDefinitionReferences.length > 0 && (
-          <ComposerReferencePreview>
-            {pendingDefinitionReferences.map((reference) => (
-              <ComposerReferenceChip key={reference.tempId}>
-                <span>{reference.selectedText}</span>
-                <small>
-                  {getDefinitionReferenceLabel(reference.referenceType)} ·{" "}
-                  {reference.definition.term}
-                </small>
-                <ReferenceRemoveButton
-                  type="button"
-                  aria-label="정의 연결 취소"
-                  onClick={() =>
-                    setPendingDefinitionReferences((prev) =>
-                      prev.filter((item) => item.tempId !== reference.tempId),
-                    )
-                  }
+        {!readOnlyMessage && shouldShowJoinCta ? (
+          <JoinComposerPanel>
+            <JoinComposerText>
+              이 토론에 참여하면 의견을 남길 수 있습니다.
+            </JoinComposerText>
+            <JoinComposerButton
+              type="button"
+              disabled={isJoiningDebate}
+              onClick={() => void handleJoinDebate()}
+            >
+              {isJoiningDebate ? "참여 중..." : "참여하기"}
+            </JoinComposerButton>
+          </JoinComposerPanel>
+        ) : (
+          !readOnlyMessage && (
+            <>
+              {replyTarget && (
+                <ReplyBanner>
+                  <span>
+                    {replyTarget.mention
+                      ? `${replyTarget.mention.trim()} 답글 작성 중`
+                      : `${replyTarget.authorName} 의견에 댓글 작성 중`}
+                  </span>
+                  <ReplyCancelButton type="button" onClick={cancelReply}>
+                    취소
+                  </ReplyCancelButton>
+                </ReplyBanner>
+              )}
+              <Composer onSubmit={handleSubmit}>
+                <HashButton type="button" aria-label="태그">
+                  #
+                </HashButton>
+                <MessageInput
+                  ref={inputRef}
+                  value={message}
+                  onChange={(event) => handleComposerMessageChange(event.target.value)}
+                  onMouseUp={handleComposerSelection}
+                  onKeyUp={handleComposerSelection}
+                  onTouchEnd={handleComposerSelection}
+                  placeholder="입력창.."
+                  aria-label="토론 메시지 입력"
+                  disabled={isComposerDisabled}
+                />
+                <SendButton
+                  type="submit"
+                  aria-label="메시지 전송"
+                  disabled={!message.trim() || isSubmitting || isComposerDisabled}
                 >
-                  취소
-                </ReferenceRemoveButton>
-              </ComposerReferenceChip>
-            ))}
-          </ComposerReferencePreview>
+                  <SendIcon />
+                </SendButton>
+              </Composer>
+              {pendingDefinitionReferences.length > 0 && (
+                <ComposerReferencePreview>
+                  {pendingDefinitionReferences.map((reference) => (
+                    <ComposerReferenceChip key={reference.tempId}>
+                      <span>{reference.selectedText}</span>
+                      <small>
+                        {getDefinitionReferenceLabel(reference.referenceType)} ·{" "}
+                        {reference.definition.term}
+                      </small>
+                      <ReferenceRemoveButton
+                        type="button"
+                        aria-label="정의 연결 취소"
+                        onClick={() =>
+                          setPendingDefinitionReferences((prev) =>
+                            prev.filter((item) => item.tempId !== reference.tempId),
+                          )
+                        }
+                      >
+                        취소
+                      </ReferenceRemoveButton>
+                    </ComposerReferenceChip>
+                  ))}
+                </ComposerReferencePreview>
+              )}
+            </>
+          )
         )}
       </ComposerWrap>
     </Wrapper>
@@ -4085,6 +4150,39 @@ const SendButton = styled.button`
 
   &:disabled {
     opacity: 0.45;
+  }
+`;
+
+const JoinComposerPanel = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+`;
+
+const JoinComposerText = styled.p`
+  margin: 0;
+  color: #8f8f8f;
+  font-size: 13px;
+  line-height: 1.35;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const JoinComposerButton = styled.button`
+  height: clamp(36px, 9.3vw, 40px);
+  border: none;
+  border-radius: 999px;
+  background: #2dcd97;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 16px;
+  white-space: nowrap;
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
   }
 `;
 
