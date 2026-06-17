@@ -1,53 +1,39 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { isAxiosError } from 'axios';
 import { useAuth } from '../../hooks/useAuth';
 
-type MissionKey =
-  | 'concept'
-  | 'types'
-  | 'selection'
-  | 'consensus'
-  | 'child'
-  | 'lifecycle'
-  | 'finish';
+type PendingSelection = {
+  sourceType: 'POST';
+  sourceId: string;
+  selectedText: string;
+  startOffset: number;
+  endOffset: number;
+  menuX: number;
+  menuY: number;
+  menuPlacement: 'top' | 'bottom';
+};
 
-const MISSIONS: Array<{ key: MissionKey; title: string }> = [
-  { key: 'concept', title: '정명의 토론 방식' },
-  { key: 'types', title: '토론 유형 익히기' },
-  { key: 'selection', title: '문장 선택하기' },
-  { key: 'consensus', title: '합의안 만들기' },
-  { key: 'child', title: '하위 토론 열기' },
-  { key: 'lifecycle', title: '토론 상태 이해하기' },
-  { key: 'finish', title: '시작 준비' },
-];
+type ConsensusDraft = {
+  selection: PendingSelection;
+  term: string;
+  title: string;
+  content: string;
+};
 
-const TYPE_CARDS = [
-  {
-    key: 'FREE',
-    title: '자유토론',
-    text: '비동기 의견과 답글로 자유롭게 흐름을 이어갑니다.',
-  },
-  {
-    key: 'CONSENSUS',
-    title: '합의토론',
-    text: '합의안과 승인된 기준 정의가 토론의 중심이 됩니다.',
-  },
-  {
-    key: 'PROS_CONS',
-    title: '찬반토론',
-    text: '찬성, 반대, 중립 입장을 고르고 근거를 쌓아갑니다.',
-  },
-];
+type SampleConsensus = {
+  title: string;
+  term: string;
+  quote: string;
+  content: string;
+};
 
-const LIFECYCLE_ITEMS = [
-  { key: 'OPEN', title: 'OPEN', text: '작성과 선택 액션을 사용할 수 있습니다.' },
-  { key: 'CLOSED', title: 'CLOSED', text: '종료된 토론은 읽기 전용입니다.' },
-  { key: 'ARCHIVED', title: 'ARCHIVED', text: '보존된 기록이며 계속 읽기 전용입니다.' },
-];
-
-const TARGET_PHRASE = '인공지능의 책임은 개발자에게 있다';
+const SELECTION_SOURCE_SELECTOR = '[data-selection-source-type][data-selection-source-id]';
+const SAMPLE_POST_ID = 'onboarding-sample-post';
+const SAMPLE_POST_TEXT =
+  'AI 기술은 빠르게 확산되고 있습니다. 인공지능의 책임은 개발자에게 있다고 말하기보다는, 설계자부터 배포자까지 사용에 대한 관계를 정리해야 합니다.';
+const INVALID_SELECTION_MESSAGE = '문장 일부를 드래그해 선택해 주세요.';
 
 const getErrorMessage = (error: unknown) => {
   if (isAxiosError(error)) {
@@ -58,61 +44,232 @@ const getErrorMessage = (error: unknown) => {
   return '온보딩 완료 처리에 실패했습니다. 다시 시도해 주세요.';
 };
 
+const getSelectionSourceElement = (node: Node | null) => {
+  if (!node) return null;
+  const element =
+    node instanceof Element
+      ? node
+      : node.parentNode instanceof Element
+        ? node.parentNode
+        : null;
+  return element?.closest<HTMLElement>(SELECTION_SOURCE_SELECTOR) ?? null;
+};
+
+const getOffsetInsideElement = (
+  element: HTMLElement,
+  container: Node,
+  offset: number,
+) => {
+  const beforeRange = document.createRange();
+  beforeRange.selectNodeContents(element);
+  beforeRange.setEnd(container, offset);
+  const textOffset = beforeRange.toString().length;
+  beforeRange.detach();
+  return textOffset;
+};
+
+const clampMenuCoordinate = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const getViewportBox = () => {
+  const viewport = window.visualViewport;
+
+  return {
+    left: viewport?.offsetLeft ?? 0,
+    top: viewport?.offsetTop ?? 0,
+    width: viewport?.width ?? window.innerWidth,
+    height: viewport?.height ?? window.innerHeight,
+  };
+};
+
+const calculateSelectionMenuPosition = (range: Range, source: HTMLElement) => {
+  const rect = range.getBoundingClientRect();
+  const sourceRect = source.getBoundingClientRect();
+  const viewport = getViewportBox();
+  const targetRect = rect.width || rect.height ? rect : sourceRect;
+  const menuWidth = 220;
+  const menuHeight = 46;
+  const margin = 10;
+  const minX = viewport.left + menuWidth / 2 + 8;
+  const maxX = viewport.left + viewport.width - menuWidth / 2 - 8;
+  const x = clampMenuCoordinate(targetRect.left + targetRect.width / 2, minX, maxX);
+  const preferredTop = targetRect.top - margin;
+
+  if (preferredTop > viewport.top + 72) {
+    return {
+      menuX: x,
+      menuY: preferredTop,
+      menuPlacement: 'top',
+    } as const;
+  }
+
+  return {
+    menuX: x,
+    menuY: clampMenuCoordinate(
+      targetRect.bottom + margin + menuHeight,
+      viewport.top + 72,
+      viewport.top + viewport.height - 88,
+    ),
+    menuPlacement: 'bottom',
+  } as const;
+};
+
 const OnboardingPage = () => {
   const navigate = useNavigate();
-  const { completeOnboarding, user } = useAuth();
-  const [stepIndex, setStepIndex] = useState(0);
-  const [conceptTapped, setConceptTapped] = useState(false);
-  const [visitedTypes, setVisitedTypes] = useState<string[]>([]);
-  const [selectionDone, setSelectionDone] = useState(false);
-  const [selectionMenuShown, setSelectionMenuShown] = useState(false);
-  const [consensusTitle, setConsensusTitle] = useState('');
-  const [consensusContent, setConsensusContent] = useState('');
-  const [consensusSubmitted, setConsensusSubmitted] = useState(false);
-  const [childTitle, setChildTitle] = useState('');
-  const [childSubmitted, setChildSubmitted] = useState(false);
-  const [visitedStatuses, setVisitedStatuses] = useState<string[]>([]);
+  const { completeOnboarding } = useAuth();
+  const selectionReadTimerRef = useRef<number | null>(null);
+  const messageTimerRef = useRef<number | null>(null);
+  const selectionMenuRef = useRef<HTMLDivElement>(null);
+  const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
+  const [consensusDraft, setConsensusDraft] = useState<ConsensusDraft | null>(null);
+  const [sampleConsensus, setSampleConsensus] = useState<SampleConsensus | null>(null);
+  const [actionMessage, setActionMessage] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const currentMission = MISSIONS[stepIndex];
-  const progressLabel = `${stepIndex + 1} / ${MISSIONS.length}`;
-
-  const canGoNext = useMemo(() => {
-    switch (currentMission.key) {
-      case 'concept':
-        return conceptTapped;
-      case 'types':
-        return visitedTypes.length === TYPE_CARDS.length;
-      case 'selection':
-        return selectionDone && selectionMenuShown;
-      case 'consensus':
-        return consensusSubmitted;
-      case 'child':
-        return childSubmitted;
-      case 'lifecycle':
-        return visitedStatuses.length === LIFECYCLE_ITEMS.length;
-      case 'finish':
-        return true;
+  const showMessage = (message: string) => {
+    setActionMessage(message);
+    if (messageTimerRef.current) {
+      window.clearTimeout(messageTimerRef.current);
     }
-  }, [
-    childSubmitted,
-    conceptTapped,
-    consensusSubmitted,
-    currentMission.key,
-    selectionDone,
-    selectionMenuShown,
-    visitedStatuses.length,
-    visitedTypes.length,
-  ]);
-
-  const goNext = () => {
-    if (!canGoNext) return;
-    setStepIndex((value) => Math.min(value + 1, MISSIONS.length - 1));
+    messageTimerRef.current = window.setTimeout(() => {
+      setActionMessage('');
+      messageTimerRef.current = null;
+    }, 2600);
   };
 
-  const skipStep = () => {
-    setStepIndex((value) => Math.min(value + 1, MISSIONS.length - 1));
+  const clearSelectionMenu = () => {
+    setPendingSelection(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const extractSelection = () => {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString() ?? '';
+
+    if (!selection || selection.rangeCount === 0 || !selectedText.trim()) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const anchorSource = getSelectionSourceElement(selection.anchorNode);
+    const focusSource = getSelectionSourceElement(selection.focusNode);
+
+    if (!anchorSource || anchorSource !== focusSource) {
+      setPendingSelection(null);
+      selection.removeAllRanges();
+      showMessage(INVALID_SELECTION_MESSAGE);
+      return;
+    }
+
+    if (
+      !anchorSource.contains(range.startContainer) ||
+      !anchorSource.contains(range.endContainer)
+    ) {
+      setPendingSelection(null);
+      selection.removeAllRanges();
+      showMessage(INVALID_SELECTION_MESSAGE);
+      return;
+    }
+
+    const sourceText = anchorSource.textContent ?? '';
+    const startOffset = getOffsetInsideElement(
+      anchorSource,
+      range.startContainer,
+      range.startOffset,
+    );
+    const endOffset = getOffsetInsideElement(
+      anchorSource,
+      range.endContainer,
+      range.endOffset,
+    );
+    const normalizedStartOffset = Math.min(startOffset, endOffset);
+    const normalizedEndOffset = Math.max(startOffset, endOffset);
+    const sourceSelectedText = sourceText
+      .slice(normalizedStartOffset, normalizedEndOffset)
+      .trim();
+
+    if (!sourceSelectedText) {
+      setPendingSelection(null);
+      showMessage(INVALID_SELECTION_MESSAGE);
+      return;
+    }
+
+    const { menuX, menuY, menuPlacement } = calculateSelectionMenuPosition(
+      range,
+      anchorSource,
+    );
+
+    setConsensusDraft(null);
+    setPendingSelection({
+      sourceType: 'POST',
+      sourceId: anchorSource.dataset.selectionSourceId ?? SAMPLE_POST_ID,
+      selectedText: sourceSelectedText,
+      startOffset: normalizedStartOffset,
+      endOffset: normalizedEndOffset,
+      menuX,
+      menuY,
+      menuPlacement,
+    });
+  };
+
+  const scheduleSelectionExtraction = (delay = 80) => {
+    if (selectionReadTimerRef.current) {
+      window.clearTimeout(selectionReadTimerRef.current);
+    }
+
+    selectionReadTimerRef.current = window.setTimeout(() => {
+      selectionReadTimerRef.current = null;
+      extractSelection();
+    }, delay);
+  };
+
+  const openConsensusDraft = () => {
+    if (!pendingSelection) return;
+    setConsensusDraft({
+      selection: pendingSelection,
+      term: pendingSelection.selectedText,
+      title: '',
+      content: '',
+    });
+    setPendingSelection(null);
+  };
+
+  const copySelection = async () => {
+    if (!pendingSelection) return;
+
+    try {
+      await navigator.clipboard.writeText(pendingSelection.selectedText);
+      showMessage('선택한 표현을 복사했습니다.');
+    } catch {
+      showMessage('복사에 실패했습니다. 다시 시도해 주세요.');
+    } finally {
+      clearSelectionMenu();
+    }
+  };
+
+  const explainChildDebate = () => {
+    showMessage(
+      '하위 토론은 실제 토론에서 선택한 표현을 별도 논의로 분리할 때 사용합니다.',
+    );
+  };
+
+  const submitConsensusDraft = () => {
+    if (!consensusDraft) return;
+    const term = consensusDraft.term.trim();
+    const title = consensusDraft.title.trim();
+    const content = consensusDraft.content.trim();
+    if (!term || !title || !content) return;
+
+    setSampleConsensus({
+      title,
+      term,
+      quote: consensusDraft.selection.selectedText,
+      content,
+    });
+    setConsensusDraft(null);
+    window.getSelection()?.removeAllRanges();
+    showMessage('합의안이 토론 흐름에 추가되었습니다.');
   };
 
   const finishOnboarding = async () => {
@@ -121,9 +278,7 @@ const OnboardingPage = () => {
     setError('');
     setIsSubmitting(true);
     try {
-      if (!user?.hasCompletedOnboarding) {
-        await completeOnboarding();
-      }
+      await completeOnboarding();
       navigate('/', { replace: true });
     } catch (error) {
       setError(getErrorMessage(error));
@@ -132,238 +287,206 @@ const OnboardingPage = () => {
     }
   };
 
-  const handleSelectionMouseUp = () => {
-    const selectedText = window.getSelection()?.toString().trim();
-    if (selectedText && TARGET_PHRASE.includes(selectedText)) {
-      setSelectionDone(true);
-      setSelectionMenuShown(true);
-    }
-  };
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        pendingSelection &&
+        selectionMenuRef.current &&
+        !selectionMenuRef.current.contains(event.target as Node)
+      ) {
+        setPendingSelection(null);
+      }
+    };
 
-  const toggleVisited = (value: string, setter: (next: string[]) => void, current: string[]) => {
-    if (current.includes(value)) return;
-    setter([...current, value]);
-  };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [pendingSelection]);
 
-  const autofillConsensus = () => {
-    setConsensusTitle('AI 책임 주체에 대한 합의안');
-    setConsensusContent('AI가 만든 결과의 책임은 설계, 배포, 운영에 관여한 주체가 함께 검토해야 합니다.');
-  };
+  useEffect(() => {
+    return () => {
+      if (selectionReadTimerRef.current) {
+        window.clearTimeout(selectionReadTimerRef.current);
+      }
+      if (messageTimerRef.current) {
+        window.clearTimeout(messageTimerRef.current);
+      }
+    };
+  }, []);
 
-  const autofillChild = () => {
-    setChildTitle('AI 책임은 누가 나누어 져야 할까?');
-  };
-
-  const renderMission = () => {
-    switch (currentMission.key) {
-      case 'concept':
-        return (
-          <>
-            <GuideText>
-              정명에서는 토론 중 중요한 표현을 선택해 합의안이나 하위 토론으로 이어갈 수 있습니다.
-            </GuideText>
-            <FakeDebateCard
-              type="button"
-              $active={conceptTapped}
-              aria-label="예시 토론 카드 선택"
-              onClick={() => setConceptTapped(true)}
-            >
-              <StatusBadge>진행중</StatusBadge>
-              <CardTitle>AI 시대의 책임은 어디에 있을까?</CardTitle>
-              <CardText>의견에서 핵심 표현을 선택하면 더 깊은 논의로 확장됩니다.</CardText>
-            </FakeDebateCard>
-          </>
-        );
-      case 'types':
-        return (
-          <>
-            <GuideText>세 가지 토론 유형을 모두 눌러 차이를 확인해 보세요.</GuideText>
-            <CardGrid>
-              {TYPE_CARDS.map((card) => {
-                const active = visitedTypes.includes(card.key);
-                return (
-                  <TypeCard
-                    key={card.key}
-                    type="button"
-                    $active={active}
-                    onClick={() => toggleVisited(card.key, setVisitedTypes, visitedTypes)}
-                  >
-                    <CardTitle>{card.title}</CardTitle>
-                    <CardText>{card.text}</CardText>
-                  </TypeCard>
-                );
-              })}
-            </CardGrid>
-          </>
-        );
-      case 'selection':
-        return (
-          <>
-            <GuideText>
-              데스크톱에서는 문장을 드래그하고, 모바일에서는 강조된 문장을 눌러 선택 메뉴를 열 수 있습니다.
-            </GuideText>
-            <FakePost onMouseUp={handleSelectionMouseUp}>
-              <strong>예시 의견</strong>
-              <p>
-                AI 기술은 빠르게 확산되고 있습니다.{' '}
-                <SelectionPhrase
-                  type="button"
-                  onClick={() => {
-                    setSelectionDone(true);
-                    setSelectionMenuShown(true);
-                  }}
-                >
-                  {TARGET_PHRASE}
-                </SelectionPhrase>
-                는 문장은 별도 합의가 필요합니다.
-              </p>
-            </FakePost>
-            {selectionMenuShown && (
-              <FloatingMenu aria-label="선택 액션 메뉴">
-                <MenuChip type="button">합의안</MenuChip>
-                <MenuChip type="button">하위 토론</MenuChip>
-                <MenuChip type="button">복사</MenuChip>
-              </FloatingMenu>
-            )}
-          </>
-        );
-      case 'consensus':
-        return (
-          <>
-            <GuideText>선택한 문장을 바탕으로 가짜 합의안을 제출해 보세요.</GuideText>
-            <SheetLike>
-              <Quote>“{TARGET_PHRASE}”</Quote>
-              <Label>용어</Label>
-              <ReadonlyInput>{TARGET_PHRASE}</ReadonlyInput>
-              <Label htmlFor="consensus-title">제목</Label>
-              <TextInput
-                id="consensus-title"
-                value={consensusTitle}
-                onChange={(event) => setConsensusTitle(event.target.value)}
-                placeholder="합의안 제목"
-              />
-              <Label htmlFor="consensus-content">내용</Label>
-              <TextArea
-                id="consensus-content"
-                value={consensusContent}
-                onChange={(event) => setConsensusContent(event.target.value)}
-                placeholder="합의할 정의나 설명"
-              />
-              <ActionRow>
-                <SecondaryButton type="button" onClick={autofillConsensus}>
-                  예시 채우기
-                </SecondaryButton>
-                <PrimaryButton
-                  type="button"
-                  onClick={() => setConsensusSubmitted(true)}
-                  disabled={!consensusTitle.trim() || !consensusContent.trim()}
-                >
-                  제출
-                </PrimaryButton>
-              </ActionRow>
-            </SheetLike>
-            {consensusSubmitted && (
-              <ResultCard>
-                <StatusBadge>합의안</StatusBadge>
-                <CardTitle>{consensusTitle}</CardTitle>
-                <CardText>
-                  승인된 합의안은 토론의 기준 정의가 되고 나중에 검색하거나 글에 연결할 수 있습니다.
-                </CardText>
-              </ResultCard>
-            )}
-          </>
-        );
-      case 'child':
-        return (
-          <>
-            <GuideText>하위 토론은 부모 토론을 멈추지 않고 세부 쟁점을 분리해 다룹니다.</GuideText>
-            <SheetLike>
-              <Quote>{TARGET_PHRASE}</Quote>
-              <Label htmlFor="child-title">하위 토론 제목</Label>
-              <TextInput
-                id="child-title"
-                value={childTitle}
-                onChange={(event) => setChildTitle(event.target.value)}
-                placeholder="하위 토론 제목"
-              />
-              <ActionRow>
-                <SecondaryButton type="button" onClick={autofillChild}>
-                  예시 채우기
-                </SecondaryButton>
-                <PrimaryButton
-                  type="button"
-                  onClick={() => setChildSubmitted(true)}
-                  disabled={!childTitle.trim()}
-                >
-                  만들기
-                </PrimaryButton>
-              </ActionRow>
-            </SheetLike>
-            {childSubmitted && (
-              <ResultCard>
-                <StatusBadge>하위 토론</StatusBadge>
-                <CardTitle>{childTitle}</CardTitle>
-                <CardText>연결된 하위 토론은 원문 근거와 함께 부모 토론에 표시됩니다.</CardText>
-              </ResultCard>
-            )}
-          </>
-        );
-      case 'lifecycle':
-        return (
-          <>
-            <GuideText>
-              상태를 모두 눌러 보세요. 선택 원본으로 쓰인 글과 댓글은 수정이 제한될 수 있습니다.
-            </GuideText>
-            <LifecycleRow>
-              {LIFECYCLE_ITEMS.map((item, index) => {
-                const active = visitedStatuses.includes(item.key);
-                return (
-                  <StatusCard
-                    key={item.key}
-                    type="button"
-                    $active={active}
-                    onClick={() => toggleVisited(item.key, setVisitedStatuses, visitedStatuses)}
-                  >
-                    <StatusNumber>{index + 1}</StatusNumber>
-                    <CardTitle>{item.title}</CardTitle>
-                    <CardText>{item.text}</CardText>
-                  </StatusCard>
-                );
-              })}
-            </LifecycleRow>
-          </>
-        );
-      case 'finish':
-        return (
-          <>
-            <GuideText>
-              이제 정명에서 토론을 만들고, 선택하고, 합의하고, 기록으로 남길 준비가 끝났습니다.
-            </GuideText>
-            {error && <ErrorText>{error}</ErrorText>}
-            <FinishActions>
-              <PrimaryButton type="button" onClick={finishOnboarding} disabled={isSubmitting}>
-                {isSubmitting ? '완료 중...' : '정명 시작하기'}
-              </PrimaryButton>
-            </FinishActions>
-          </>
-        );
-    }
-  };
+  const canSubmitConsensus =
+    Boolean(consensusDraft?.term.trim()) &&
+    Boolean(consensusDraft?.title.trim()) &&
+    Boolean(consensusDraft?.content.trim());
 
   return (
     <Wrapper>
-      <ProgressText>{progressLabel}</ProgressText>
-      <Title>{currentMission.title}</Title>
-      <MissionPanel>{renderMission()}</MissionPanel>
-      {currentMission.key !== 'finish' && (
-        <Footer>
-          <SkipButton type="button" onClick={skipStep}>
-            건너뛰기
-          </SkipButton>
-          <NextButton type="button" onClick={goNext} disabled={!canGoNext}>
-            다음
-          </NextButton>
-        </Footer>
+      <TopBar>
+        <Kicker>정명 사용 흐름 익히기</Kicker>
+        <SkipButton type="button" onClick={finishOnboarding} disabled={isSubmitting}>
+          건너뛰기
+        </SkipButton>
+      </TopBar>
+
+      <Header>
+        <Title>샘플 토론</Title>
+        <HeaderText>
+          아래 의견에서 의미가 갈릴 수 있는 표현을 드래그해 선택하세요.
+        </HeaderText>
+      </Header>
+
+      {actionMessage && <Toast role="status">{actionMessage}</Toast>}
+      {error && <ErrorText>{error}</ErrorText>}
+
+      <SampleScreen aria-label="샘플 토론">
+        <DebateHeader>
+          <BadgeRow>
+            <StatusBadge>진행 중</StatusBadge>
+            <TypeBadge>합의 토론</TypeBadge>
+          </BadgeRow>
+          <DebateTitle>AI 시대의 책임은 어디에 있을까?</DebateTitle>
+          <DebateDescription>
+            선택한 표현을 기준으로 다음 행동을 고를 수 있습니다.
+          </DebateDescription>
+        </DebateHeader>
+
+        <Thread>
+          <PostCard>
+            <PostMeta>
+              <Avatar>J</Avatar>
+              <MetaText>
+                <Author>샘플 작성자</Author>
+                <TimeText>방금 전</TimeText>
+              </MetaText>
+            </PostMeta>
+            <SelectablePost
+              data-selection-source-type="POST"
+              data-selection-source-id={SAMPLE_POST_ID}
+              onMouseUp={() => scheduleSelectionExtraction()}
+              onKeyUp={() => scheduleSelectionExtraction()}
+              onTouchEnd={() => scheduleSelectionExtraction(160)}
+            >
+              {SAMPLE_POST_TEXT}
+            </SelectablePost>
+            <PostHint>
+              이 표현을 기준 정의로 정리하려면 합의안을 만듭니다.
+            </PostHint>
+          </PostCard>
+
+          {sampleConsensus && (
+            <ConsensusCard>
+              <ConsensusMeta>
+                <ConsensusBadge>합의안</ConsensusBadge>
+                <ConsensusTerm>{sampleConsensus.term}</ConsensusTerm>
+              </ConsensusMeta>
+              <ConsensusTitle>{sampleConsensus.title}</ConsensusTitle>
+              <ConsensusQuote>{sampleConsensus.quote}</ConsensusQuote>
+              <ConsensusContent>{sampleConsensus.content}</ConsensusContent>
+              <ConsensusHelp>
+                이 합의안이 승인되면 이 토론의 기준 정의로 사용합니다.
+              </ConsensusHelp>
+            </ConsensusCard>
+          )}
+        </Thread>
+      </SampleScreen>
+
+      {sampleConsensus && (
+        <CompletionPanel>
+          <CompletionTitle>핵심 흐름 완료</CompletionTitle>
+          <CompletionBody>
+            이제 실제 토론에서 표현을 선택해 합의안으로 이어갈 수 있습니다.
+          </CompletionBody>
+          <PrimaryButton type="button" onClick={finishOnboarding} disabled={isSubmitting}>
+            {isSubmitting ? '완료 중...' : '정명 시작하기'}
+          </PrimaryButton>
+        </CompletionPanel>
+      )}
+
+      {pendingSelection && (
+        <SelectionMenu
+          ref={selectionMenuRef}
+          data-placement={pendingSelection.menuPlacement}
+          style={{
+            left: pendingSelection.menuX,
+            top: pendingSelection.menuY,
+          }}
+          aria-label="선택 액션 메뉴"
+        >
+          <SelectionMenuButton type="button" onClick={openConsensusDraft}>
+            합의안
+          </SelectionMenuButton>
+          <SelectionMenuButton type="button" onClick={explainChildDebate}>
+            하위 토론
+          </SelectionMenuButton>
+          <SelectionMenuButton type="button" onClick={() => void copySelection()}>
+            복사
+          </SelectionMenuButton>
+        </SelectionMenu>
+      )}
+
+      {consensusDraft && (
+        <SheetBackdrop onClick={() => setConsensusDraft(null)}>
+          <BottomSheet onClick={(event) => event.stopPropagation()}>
+            <SheetTitle>합의안 등록</SheetTitle>
+            <SheetQuote>{consensusDraft.selection.selectedText}</SheetQuote>
+
+            <SheetField>
+              <SheetLabel>선택한 표현</SheetLabel>
+              <ReadonlyValue>{consensusDraft.selection.selectedText}</ReadonlyValue>
+            </SheetField>
+
+            <SheetField>
+              <SheetLabel>정리할 표현</SheetLabel>
+              <SheetInput
+                id="onboarding-consensus-term"
+                value={consensusDraft.term}
+                onChange={(event) =>
+                  setConsensusDraft((prev) =>
+                    prev ? { ...prev, term: event.target.value } : prev,
+                  )
+                }
+              />
+            </SheetField>
+
+            <SheetField>
+              <SheetLabel>합의안 제목</SheetLabel>
+              <SheetInput
+                id="onboarding-consensus-title"
+                value={consensusDraft.title}
+                onChange={(event) =>
+                  setConsensusDraft((prev) =>
+                    prev ? { ...prev, title: event.target.value } : prev,
+                  )
+                }
+              />
+            </SheetField>
+
+            <SheetField>
+              <SheetLabel>기준 정의</SheetLabel>
+              <SheetTextarea
+                id="onboarding-consensus-content"
+                value={consensusDraft.content}
+                onChange={(event) =>
+                  setConsensusDraft((prev) =>
+                    prev ? { ...prev, content: event.target.value } : prev,
+                  )
+                }
+              />
+            </SheetField>
+
+            <SheetActionRow>
+              <SheetSecondaryButton type="button" onClick={() => setConsensusDraft(null)}>
+                취소
+              </SheetSecondaryButton>
+              <SheetPrimaryButton
+                type="button"
+                onClick={submitConsensusDraft}
+                disabled={!canSubmitConsensus}
+              >
+                합의안 등록
+              </SheetPrimaryButton>
+            </SheetActionRow>
+          </BottomSheet>
+        </SheetBackdrop>
       )}
     </Wrapper>
   );
@@ -372,298 +495,483 @@ const OnboardingPage = () => {
 const Wrapper = styled.div`
   min-height: 100dvh;
   background: #f5f5f5;
-  padding: clamp(26px, 7vw, 34px) var(--page-x) max(24px, env(safe-area-inset-bottom));
+  padding: clamp(18px, 5vw, 24px) clamp(16px, 4.8vw, 22px)
+    max(24px, env(safe-area-inset-bottom));
+  text-align: left;
 `;
 
-const ProgressText = styled.p`
-  margin: 0 0 8px;
+const TopBar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+`;
+
+const Kicker = styled.p`
+  margin: 0;
   color: #2dcd97;
-  font-size: var(--body-sm);
+  font-size: 13px;
+  font-weight: 800;
+`;
+
+const SkipButton = styled.button`
+  min-height: 34px;
+  border: none;
+  border-radius: 999px;
+  background: #eeeeee;
+  color: #777777;
+  font-size: 12px;
   font-weight: 700;
-  text-align: center;
+  padding: 0 12px;
+
+  &:disabled {
+    opacity: 0.55;
+  }
+`;
+
+const Header = styled.header`
+  margin-bottom: 14px;
 `;
 
 const Title = styled.h1`
-  margin: 0 0 18px;
+  margin: 0 0 8px;
   color: #2f3238;
-  font-size: var(--title-lg);
-  text-align: center;
+  font-size: clamp(24px, 7vw, 32px);
   line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: 0;
 `;
 
-const MissionPanel = styled.section`
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-`;
-
-const GuideText = styled.p`
+const HeaderText = styled.p`
   margin: 0;
   color: #777777;
-  font-size: var(--body-md);
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.5;
   word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
-const FakeDebateCard = styled.button<{ $active: boolean }>`
-  width: 100%;
-  border: 2px solid ${({ $active }) => ($active ? '#2dcd97' : 'transparent')};
-  border-radius: var(--card-radius);
+const Toast = styled.p`
+  position: sticky;
+  top: 12px;
+  z-index: 40;
+  margin: 0 0 10px;
+  border-radius: 8px;
   background: #ffffff;
-  padding: 18px;
-  text-align: left;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  color: #2d8f73;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 9px 12px;
 `;
 
-const CardGrid = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+const ErrorText = styled(Toast)`
+  color: #f04444;
 `;
 
-const TypeCard = styled.button<{ $active: boolean }>`
-  width: 100%;
-  min-height: 96px;
-  border: 2px solid ${({ $active }) => ($active ? '#2dcd97' : '#ffffff')};
-  border-radius: var(--card-radius);
+const SampleScreen = styled.section`
+  border-radius: 14px;
+  background: #eeeeee;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.03);
+`;
+
+const DebateHeader = styled.div`
   background: #ffffff;
   padding: 16px;
-  text-align: left;
+  border-bottom: 1px solid #e7e7e7;
+`;
+
+const BadgeRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
 `;
 
 const StatusBadge = styled.span`
   display: inline-flex;
   align-items: center;
-  height: 26px;
+  min-height: 24px;
   border-radius: 999px;
   background: #eefaf6;
   color: #2dcd97;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 0 9px;
+`;
+
+const TypeBadge = styled(StatusBadge)`
+  background: #f1f1f1;
+  color: #777777;
+`;
+
+const DebateTitle = styled.h2`
+  margin: 0 0 6px;
+  color: #333333;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const DebateDescription = styled.p`
+  margin: 0;
+  color: #8f8f8f;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const Thread = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+`;
+
+const PostCard = styled.article`
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+`;
+
+const PostMeta = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 10px;
 `;
 
-const CardTitle = styled.strong`
-  display: block;
-  color: #333333;
-  font-size: var(--title-sm);
-  line-height: 1.3;
-  margin-bottom: 6px;
+const Avatar = styled.div`
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #2dcd97;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
 `;
 
-const CardText = styled.span`
+const MetaText = styled.div`
+  min-width: 0;
+`;
+
+const Author = styled.strong`
   display: block;
+  color: #555555;
+  font-size: 13px;
+  line-height: 1.25;
+`;
+
+const TimeText = styled.span`
+  color: #a0a0a0;
+  font-size: 11px;
+`;
+
+const SelectablePost = styled.p`
+  margin: 0;
+  color: #555555;
+  font-size: 15px;
+  line-height: 1.65;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+`;
+
+const PostHint = styled.p`
+  margin: 12px 0 0;
+  border-radius: 8px;
+  background: #fbfffd;
+  color: #2d8f73;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 9px 10px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const ConsensusCard = styled.section`
+  border-radius: 8px;
+  border-left: 3px solid #2dcd97;
+  background: #fbfffd;
+  padding: 12px;
+`;
+
+const ConsensusMeta = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+`;
+
+const ConsensusBadge = styled.span`
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: #2dcd97;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 0 8px;
+`;
+
+const ConsensusTerm = styled.span`
+  min-width: 0;
   color: #8f8f8f;
-  font-size: var(--body-sm);
-  line-height: 1.45;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
-const FakePost = styled.div`
-  border-radius: var(--card-radius);
+const ConsensusTitle = styled.h3`
+  margin: 0 0 6px;
+  color: #444444;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.35;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const ConsensusQuote = styled.blockquote`
+  margin: 0 0 8px;
+  border-left: 3px solid #d8f5ec;
+  padding-left: 8px;
+  color: #8f8f8f;
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const ConsensusContent = styled.p`
+  margin: 0;
+  color: #666666;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const ConsensusHelp = styled.p`
+  margin: 9px 0 0;
+  color: #2d8f73;
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const CompletionPanel = styled.section`
+  margin-top: 14px;
+  border-radius: 8px;
   background: #ffffff;
   padding: 16px;
-  color: #555555;
-  font-size: var(--body-md);
-  line-height: 1.6;
-
-  p {
-    margin: 10px 0 0;
-  }
 `;
 
-const SelectionPhrase = styled.button`
-  border: none;
-  border-radius: 4px;
-  background: #d8f5ec;
-  color: #2d8f73;
-  font: inherit;
-  padding: 2px 4px;
+const CompletionTitle = styled.h2`
+  margin: 0 0 6px;
+  color: #2f3238;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0;
 `;
 
-const FloatingMenu = styled.div`
-  align-self: center;
-  display: flex;
-  gap: 8px;
-  border-radius: 999px;
-  background: #ffffff;
-  padding: 8px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+const CompletionBody = styled.p`
+  margin: 0 0 14px;
+  color: #777777;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
-const MenuChip = styled.button`
-  min-height: 34px;
+const PrimaryButton = styled.button`
+  width: 100%;
+  min-height: 44px;
   border: none;
   border-radius: 999px;
   background: #2dcd97;
   color: #ffffff;
-  font-size: var(--body-sm);
-  font-weight: 700;
-  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 0 16px;
+
+  &:disabled {
+    opacity: 0.55;
+  }
 `;
 
-const SheetLike = styled.section`
-  border-radius: 18px;
+const SelectionMenu = styled.div`
+  position: fixed;
+  z-index: 80;
+  transform: translate(-50%, -100%);
+  min-width: 220px;
+  min-height: 44px;
+  border-radius: 999px;
   background: #ffffff;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 8px;
+
+  &[data-placement='top'] {
+    transform: translate(-50%, -100%);
+  }
+
+  &[data-placement='bottom'] {
+    transform: translate(-50%, 0);
+  }
 `;
 
-const Quote = styled.blockquote`
-  margin: 0;
+const SelectionMenuButton = styled.button`
+  min-height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #2f3238;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 10px;
+  touch-action: manipulation;
+
+  &:active {
+    background: #eefaf6;
+    color: #2dcd97;
+  }
+`;
+
+const SheetBackdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.28);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+`;
+
+const BottomSheet = styled.div`
+  width: 100%;
+  max-width: 1126px;
+  max-height: min(82dvh, 720px);
+  overflow-y: auto;
+  border-radius: 18px 18px 0 0;
+  background: #ffffff;
+  padding: 18px clamp(16px, 4.8vw, 22px) max(18px, env(safe-area-inset-bottom));
+`;
+
+const SheetTitle = styled.h2`
+  margin: 0 0 12px;
+  color: #2f3238;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0;
+`;
+
+const SheetQuote = styled.blockquote`
+  margin: 0 0 12px;
   border-left: 3px solid #2dcd97;
   padding-left: 10px;
-  color: #777777;
-  font-size: var(--body-sm);
-  line-height: 1.4;
+  color: #8f8f8f;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 `;
 
-const Label = styled.label`
-  color: #555555;
-  font-size: var(--body-sm);
-  font-weight: 700;
-`;
-
-const ReadonlyInput = styled.div`
-  min-height: 38px;
-  border-radius: 8px;
-  background: #f3f3f3;
-  color: #777777;
-  font-size: var(--body-sm);
+const SheetField = styled.label`
   display: flex;
-  align-items: center;
-  padding: 0 12px;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
 `;
 
-const TextInput = styled.input`
+const SheetLabel = styled.span`
+  color: #7f7f7f;
+  font-size: 12px;
+  font-weight: 800;
+`;
+
+const ReadonlyValue = styled.div`
+  min-height: 40px;
+  border-radius: 8px;
+  background: #f0f0f0;
+  color: #777777;
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 10px 12px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const SheetInput = styled.input`
+  width: 100%;
   height: 40px;
   border: none;
   border-radius: 8px;
-  background: #f3f3f3;
-  color: #333333;
-  font-size: var(--body-sm);
+  background: #f0f0f0;
+  color: #555555;
+  font-size: 16px;
   padding: 0 12px;
   outline: none;
 `;
 
-const TextArea = styled.textarea`
-  min-height: 92px;
+const SheetTextarea = styled.textarea`
+  width: 100%;
+  min-height: 96px;
   border: none;
   border-radius: 8px;
-  background: #f3f3f3;
-  color: #333333;
-  font-size: var(--body-sm);
+  background: #f0f0f0;
+  color: #555555;
+  font-size: 16px;
+  line-height: 1.45;
   padding: 10px 12px;
   resize: vertical;
   outline: none;
 `;
 
-const ActionRow = styled.div`
+const SheetActionRow = styled.div`
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: 12px;
 `;
 
-const PrimaryButton = styled.button`
-  min-height: 44px;
+const SheetSecondaryButton = styled.button`
+  height: 38px;
   border: none;
   border-radius: 999px;
+  background: #f0f0f0;
+  color: #7f7f7f;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 0 16px;
+`;
+
+const SheetPrimaryButton = styled(SheetSecondaryButton)`
   background: #2dcd97;
   color: #ffffff;
-  font-size: var(--body-sm);
-  font-weight: 700;
-  padding: 0 16px;
 
   &:disabled {
-    opacity: 0.55;
+    opacity: 0.6;
   }
-`;
-
-const SecondaryButton = styled.button`
-  min-height: 44px;
-  border: none;
-  border-radius: 999px;
-  background: #eeeeee;
-  color: #777777;
-  font-size: var(--body-sm);
-  font-weight: 700;
-  padding: 0 16px;
-
-  &:disabled {
-    opacity: 0.55;
-  }
-`;
-
-const ResultCard = styled.section`
-  border-radius: var(--card-radius);
-  background: #fbfffd;
-  border-left: 3px solid #2dcd97;
-  padding: 14px;
-`;
-
-const LifecycleRow = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-`;
-
-const StatusCard = styled.button<{ $active: boolean }>`
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 0 10px;
-  width: 100%;
-  border: 2px solid ${({ $active }) => ($active ? '#2dcd97' : '#ffffff')};
-  border-radius: var(--card-radius);
-  background: #ffffff;
-  padding: 14px;
-  text-align: left;
-
-  ${CardText} {
-    grid-column: 2;
-  }
-`;
-
-const StatusNumber = styled.span`
-  grid-row: 1 / 3;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #eefaf6;
-  color: #2dcd97;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-`;
-
-const FinishActions = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-`;
-
-const ErrorText = styled.p`
-  margin: 0;
-  color: #f04444;
-  font-size: var(--body-sm);
-`;
-
-const Footer = styled.footer`
-  position: sticky;
-  bottom: max(14px, env(safe-area-inset-bottom));
-  margin-top: 20px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-`;
-
-const SkipButton = styled(SecondaryButton)`
-  width: 100%;
-`;
-
-const NextButton = styled(PrimaryButton)`
-  width: 100%;
 `;
 
 export default OnboardingPage;
