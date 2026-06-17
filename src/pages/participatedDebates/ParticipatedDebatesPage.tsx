@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { LoadingContent } from '../../components/common/LoadingContent';
 import { DebateRoomCardSkeleton } from '../../components/common/PageSkeletons';
+import DebateRelationMeta from '../../components/debate/DebateRelationMeta';
 import { debateService } from '../../services/debateService';
 import { usePageLoading } from '../../hooks/usePageLoading';
 import type { Debate } from '../../types/debate';
@@ -62,6 +63,11 @@ const ParticipatedDebatesPage = () => {
               </StatusBadge>
             </CardTop>
             <CardTitle>{debate.title}</CardTitle>
+            <DebateRelationMeta
+              debate={debate}
+              compact
+              onParentClick={(parentId) => navigate(`/debate/${parentId}`)}
+            />
             <CardDesc>{debate.description}</CardDesc>
             {debate.tagMaps && debate.tagMaps.length > 0 && (
               <CardTag>#{debate.tagMaps[0].tag.name}</CardTag>

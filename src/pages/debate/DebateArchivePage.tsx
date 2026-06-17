@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import SideDrawer from '../../components/common/SideDrawer';
+import DebateRelationMeta from '../../components/debate/DebateRelationMeta';
 import TagPicker from '../../components/tags/TagPicker';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconChat from '../../assets/icon_chat.svg';
@@ -27,6 +28,7 @@ type ArchiveCardItem = {
   title: string;
   description: string;
   tags: string[];
+  relationData: Debate;
 };
 
 const getDebateTagLabels = (debate: Debate) => {
@@ -42,6 +44,7 @@ const mapToArchiveCard = (debate: Debate): ArchiveCardItem => ({
   title: debate.title,
   description: debate.description,
   tags: getDebateTagLabels(debate),
+  relationData: debate,
 });
 
 const DebateArchivePage = () => {
@@ -161,6 +164,11 @@ const DebateArchivePage = () => {
               <ChatCircleIconImg src={iconChat} alt="" />
             </CardTop>
             <CardTitle>{card.title}</CardTitle>
+            <DebateRelationMeta
+              debate={card.relationData}
+              compact
+              onParentClick={(parentId) => navigate(debateThreadPath(parentId))}
+            />
             <CardDesc>{card.description}</CardDesc>
             {card.tags.length > 0 && (
               <CardTagList>

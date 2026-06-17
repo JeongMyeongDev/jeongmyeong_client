@@ -143,6 +143,24 @@ const CONSENSUS_STATUS_LABEL: Record<string, string> = {
   CLOSED: "종료",
 };
 
+const DEBATE_STATUS_LABEL: Record<Debate["status"], string> = {
+  OPEN: "진행중",
+  CLOSED: "종료",
+  ARCHIVED: "보관",
+};
+
+const DEBATE_TYPE_LABEL: Record<Debate["debateType"], string> = {
+  FREE: "일반 토론",
+  CONSENSUS: "합의토론",
+  PROS_CONS: "찬반토론",
+};
+
+const getShortPreview = (value: string, maxLength = 56) => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength)}...`;
+};
+
 const buildConsensusSourceKey = (sourceType: SelectionSource, sourceId: string) =>
   `${sourceType}:${sourceId}`;
 
@@ -511,17 +529,25 @@ const DebateThreadPage = () => {
   };
 
   const refreshChildDebates = async (id: string) => {
-    const { data } = await debateService.getChildDebates(id);
-    setChildDebates(data.childDebates);
+    try {
+      const { data } = await debateService.getChildDebates(id);
+      setChildDebates(data.childDebates);
+    } catch {
+      setChildDebates([]);
+    }
   };
 
   const refreshParentDebate = async (id: string) => {
-    const { data } = await debateService.getParent(id);
-    setParentDebateInfo({
-      parentDebate: data.parentDebate,
-      selectedText: data.selectedText,
-      sourceSelectionTarget: data.sourceSelectionTarget,
-    });
+    try {
+      const { data } = await debateService.getParent(id);
+      setParentDebateInfo({
+        parentDebate: data.parentDebate,
+        selectedText: data.selectedText,
+        sourceSelectionTarget: data.sourceSelectionTarget,
+      });
+    } catch {
+      setParentDebateInfo(null);
+    }
   };
 
   const refreshProgress = async (id: string) => {
@@ -2336,13 +2362,20 @@ const DebateThreadPage = () => {
         <ChildDebateNotice>
           <ChildDebateNoticeBadge>하위 토론</ChildDebateNoticeBadge>
           <ChildDebateNoticeBody>
+            <ChildDebateBreadcrumb>
+              <button type="button" onClick={() => navigate(`/debate/${parentDebate.id}`)}>
+                상위 토론
+              </button>
+              <span>&gt;</span>
+              <span>현재 하위 토론</span>
+            </ChildDebateBreadcrumb>
             <ChildDebateNoticeTitle>
-              상위 토론에서 갈라진 토론입니다
+              이 토론은 "{parentDebate.title}"에서 파생된 하위 토론입니다.
             </ChildDebateNoticeTitle>
             <ChildDebateNoticeParent>{parentDebate.title}</ChildDebateNoticeParent>
             {parentDebateSelectedText && (
               <ChildDebateNoticeQuote>
-                {parentDebateSelectedText}
+                분기 기준: "{getShortPreview(parentDebateSelectedText)}"
               </ChildDebateNoticeQuote>
             )}
           </ChildDebateNoticeBody>
@@ -2353,6 +2386,34 @@ const DebateThreadPage = () => {
             상위 토론
           </ChildDebateNoticeAction>
         </ChildDebateNotice>
+      )}
+      {!parentDebate && childDebates.length > 0 && (
+        <LinkedChildDebateSection>
+          <LinkedChildDebateTitle>연결된 하위 토론</LinkedChildDebateTitle>
+          <LinkedChildDebateList>
+            {childDebates.map((childDebate) => (
+              <LinkedChildDebateCard key={childDebate.id}>
+                <LinkedChildDebateText>
+                  <strong>{childDebate.title}</strong>
+                  <span>
+                    {DEBATE_STATUS_LABEL[childDebate.status]} · {DEBATE_TYPE_LABEL[childDebate.debateType]}
+                  </span>
+                  {childDebate.sourceSelectionTarget?.selectedText && (
+                    <em>
+                      분기 기준: "{getShortPreview(childDebate.sourceSelectionTarget.selectedText)}"
+                    </em>
+                  )}
+                </LinkedChildDebateText>
+                <LinkedChildDebateAction
+                  type="button"
+                  onClick={() => navigate(`/debate/${childDebate.id}`)}
+                >
+                  이동
+                </LinkedChildDebateAction>
+              </LinkedChildDebateCard>
+            ))}
+          </LinkedChildDebateList>
+        </LinkedChildDebateSection>
       )}
 
       <ThreadArea>
@@ -3397,6 +3458,33 @@ const ChildDebateNoticeBody = styled.div`
   min-width: 0;
 `;
 
+const ChildDebateBreadcrumb = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+  min-width: 0;
+  color: #8f8f8f;
+  font-size: 11px;
+
+  button {
+    min-width: 0;
+    border: none;
+    background: transparent;
+    color: #2d8f73;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    flex-shrink: 0;
+  }
+`;
+
 const ChildDebateNoticeTitle = styled.strong`
   display: block;
   color: #555555;
@@ -3442,6 +3530,78 @@ const ChildDebateNoticeAction = styled.button`
   font-weight: 700;
   padding: 0 12px;
   white-space: nowrap;
+`;
+
+const LinkedChildDebateSection = styled.section`
+  margin: 0 var(--page-x) 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px 12px;
+`;
+
+const LinkedChildDebateTitle = styled.h2`
+  margin: 0 0 8px;
+  color: #555555;
+  font-size: 13px;
+  font-weight: 700;
+`;
+
+const LinkedChildDebateList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const LinkedChildDebateCard = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  background: #f7f7f7;
+  padding: 9px 10px;
+`;
+
+const LinkedChildDebateText = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  strong,
+  span,
+  em {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    color: #555555;
+    font-size: 13px;
+  }
+
+  span {
+    color: #7f7f7f;
+    font-size: 11px;
+  }
+
+  em {
+    color: #9a9a9a;
+    font-size: 12px;
+    font-style: normal;
+  }
+`;
+
+const LinkedChildDebateAction = styled.button`
+  min-width: 44px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #2dcd97;
+  font-size: 12px;
+  font-weight: 700;
 `;
 
 const ThreadArea = styled.section`

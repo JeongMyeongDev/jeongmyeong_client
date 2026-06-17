@@ -37,6 +37,12 @@ const formatCreatedDate = (createdAt?: string) => {
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
 };
 
+const getShortText = (value: string, maxLength = 56) => {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength)}...`;
+};
+
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (isAxiosError(error)) {
     const message = error.response?.data?.message;
@@ -95,16 +101,12 @@ const DebateInfoPage = () => {
           detailResponse,
           postsResponse,
           definitionsResponse,
-          childDebatesResponse,
-          parentResponse,
           progressResponse,
           stanceSummaryResponse,
         ] = await Promise.all([
           debateService.getById(debateId),
           debateService.getMessages(debateId, { page: 1, limit: 50 }),
           definitionService.getByDebate(debateId),
-          debateService.getChildDebates(debateId),
-          debateService.getParent(debateId),
           debateService.getProgress(debateId),
           debateService.getStanceSummary(debateId),
         ]);
@@ -121,11 +123,21 @@ const DebateInfoPage = () => {
         setDefinitions(definitionsResponse.data.definitions);
         setParticipantNames(participantNames.slice(0, 6));
         setPostCount(postsResponse.data.totalCount ?? posts.length);
-        setChildDebates(childDebatesResponse.data.childDebates);
-        setParentDebate(parentResponse.data.parentDebate);
-        setParentSelectionTarget(parentResponse.data.sourceSelectionTarget ?? null);
         setProgress(progressResponse.data.progress);
         setStanceSummary(stanceSummaryResponse.data.summary);
+
+        const [childDebatesResponse, parentResponse] = await Promise.allSettled([
+          debateService.getChildDebates(debateId),
+          debateService.getParent(debateId),
+        ]);
+
+        if (childDebatesResponse.status === 'fulfilled') {
+          setChildDebates(childDebatesResponse.value.data.childDebates);
+        }
+        if (parentResponse.status === 'fulfilled') {
+          setParentDebate(parentResponse.value.data.parentDebate);
+          setParentSelectionTarget(parentResponse.value.data.sourceSelectionTarget ?? null);
+        }
       });
     };
 
@@ -330,8 +342,11 @@ const DebateInfoPage = () => {
           {parentDebate && (
             <RelationBlock>
               <RelationTitle>상위 토론</RelationTitle>
+              <RelationHelpText>
+                이 토론은 "{parentDebate.title}"에서 파생된 하위 토론입니다.
+              </RelationHelpText>
               {parentSelectionTarget?.selectedText && (
-                <RelationQuote>{parentSelectionTarget.selectedText}</RelationQuote>
+                <RelationQuote>분기 기준: "{getShortText(parentSelectionTarget.selectedText)}"</RelationQuote>
               )}
               <RelationButton
                 type="button"
@@ -343,14 +358,17 @@ const DebateInfoPage = () => {
           )}
           {childDebates.length > 0 && (
             <RelationBlock>
-              <RelationTitle>하위 토론</RelationTitle>
+              <RelationTitle>연결된 하위 토론</RelationTitle>
               <RelationList>
                 {childDebates.map((childDebate) => (
                   <RelationItem key={childDebate.id}>
                     <RelationItemText>
                       <strong>{childDebate.title}</strong>
+                      <small>
+                        {STATUS_LABEL_MAP[childDebate.status]} · {DEBATE_TYPE_LABEL_MAP[childDebate.debateType]}
+                      </small>
                       {childDebate.sourceSelectionTarget?.selectedText && (
-                        <span>{childDebate.sourceSelectionTarget.selectedText}</span>
+                        <span>분기 기준: "{getShortText(childDebate.sourceSelectionTarget.selectedText)}"</span>
                       )}
                     </RelationItemText>
                     <RelationSmallButton
@@ -632,6 +650,15 @@ const RelationTitle = styled.h2`
   font-weight: 700;
 `;
 
+const RelationHelpText = styled.p`
+  margin: 0;
+  color: #555555;
+  font-size: var(--body-sm);
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
 const RelationQuote = styled.p`
   margin: 0;
   border-left: 3px solid #2dcd97;
@@ -680,6 +707,7 @@ const RelationItemText = styled.div`
   gap: 3px;
 
   strong,
+  small,
   span {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -694,6 +722,11 @@ const RelationItemText = styled.div`
   span {
     color: #9a9a9a;
     font-size: 12px;
+  }
+
+  small {
+    color: #7f7f7f;
+    font-size: 11px;
   }
 `;
 
