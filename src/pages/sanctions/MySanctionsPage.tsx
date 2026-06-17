@@ -1,5 +1,6 @@
 import { isAxiosError } from 'axios';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { moderationService } from '../../services/moderationService';
 import type { Sanction } from '../../types/moderation';
@@ -44,6 +45,7 @@ const getErrorMessage = (error: unknown) => {
 };
 
 const MySanctionsPage = () => {
+  const navigate = useNavigate();
   const [sanctions, setSanctions] = useState<Sanction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
@@ -85,9 +87,17 @@ const MySanctionsPage = () => {
 
   return (
     <Wrapper>
-      <TopSpacing />
+      <TopBar>
+        <BackButton type="button" onClick={() => navigate(-1)} aria-label="뒤로">
+          <BackIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <line x1="20" y1="12" x2="4" y2="12" />
+            <polyline points="10 6 4 12 10 18" />
+          </BackIcon>
+        </BackButton>
+        <TopTitle>제재 내역</TopTitle>
+      </TopBar>
+
       <Header>
-        <Title>제재 내역</Title>
         <Subtitle>계정에 적용된 제재를 확인하고 읽음 처리할 수 있습니다.</Subtitle>
       </Header>
 
@@ -141,25 +151,50 @@ const MySanctionsPage = () => {
 const Wrapper = styled.div`
   min-height: 100dvh;
   background: #f5f5f5;
-  padding: 0 var(--page-x) var(--page-bottom);
+  padding-bottom: var(--page-bottom);
 `;
 
-const TopSpacing = styled.div`
-  height: var(--page-top);
+const TopBar = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 16px 16px 12px;
+  gap: 8px;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+`;
+
+const BackButton = styled.button`
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #353535;
+  flex-shrink: 0;
+`;
+
+const BackIcon = styled.svg`
+  width: 24px;
+  height: 24px;
+`;
+
+const TopTitle = styled.h1`
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
 `;
 
 const Header = styled.header`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 18px;
-`;
-
-const Title = styled.h1`
-  margin: 0;
-  color: #202329;
-  font-size: clamp(24px, 7vw, 32px);
-  line-height: 1.2;
+  margin: 18px var(--page-x);
 `;
 
 const Subtitle = styled.p`
@@ -173,6 +208,7 @@ const List = styled.div`
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 0 var(--page-x);
 `;
 
 const SanctionItem = styled.article`
@@ -260,12 +296,13 @@ const AcknowledgeButton = styled.button`
 
 const StateText = styled.p`
   margin: 0 0 14px;
+  padding: 0 var(--page-x);
   color: #667085;
   font-size: var(--body-sm);
 `;
 
 const EmptyState = styled.p`
-  margin: 0;
+  margin: 0 var(--page-x);
   background: #ffffff;
   border: 1px solid #e4e7ec;
   border-radius: 8px;
@@ -277,6 +314,7 @@ const EmptyState = styled.p`
 
 const ErrorText = styled.p`
   margin: 0 0 14px;
+  padding: 0 var(--page-x);
   color: #d92d20;
   font-size: var(--body-sm);
   line-height: 1.45;

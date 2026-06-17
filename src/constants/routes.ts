@@ -8,6 +8,7 @@ export const ROUTES = {
   DEFINITIONS: '/definitions',
   PROFILE: '/profile',
   NOTIFICATIONS: '/notifications',
+  NOTIFICATION_SETTINGS: '/notification-settings',
   MY_DEBATES: '/my-debates',
   MY_SANCTIONS: '/my-sanctions',
   ADMIN_REPORTS: '/admin/reports',
