@@ -794,7 +794,7 @@ const TagPill = styled.span`
   font-size: var(--body-md);
   background: transparent;
   color: #9f9f9f;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
