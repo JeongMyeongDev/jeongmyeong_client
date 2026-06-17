@@ -4,6 +4,8 @@ import styled from 'styled-components';
 import { isAxiosError } from 'axios';
 import { useAuth } from '../../hooks/useAuth';
 
+type TutorialStep = 'intro' | 'practice';
+
 type PendingSelection = {
   sourceType: 'POST';
   sourceId: string;
@@ -32,7 +34,7 @@ type SampleConsensus = {
 const SELECTION_SOURCE_SELECTOR = '[data-selection-source-type][data-selection-source-id]';
 const SAMPLE_POST_ID = 'onboarding-sample-post';
 const SAMPLE_POST_TEXT =
-  'AI 기술은 빠르게 확산되고 있습니다. 인공지능의 책임은 개발자에게 있다고 말하기보다는, 설계자부터 배포자까지 사용에 대한 관계를 정리해야 합니다.';
+  'AI가 만든 결과의 책임은 결국 개발자에게 있다. 사용자는 도구를 사용하는 쪽이고, 실제 위험을 예측하고 막을 수 있는 쪽은 개발자이기 때문이다.';
 const INVALID_SELECTION_MESSAGE = '문장 일부를 드래그해 선택해 주세요.';
 
 const getErrorMessage = (error: unknown) => {
@@ -87,7 +89,7 @@ const calculateSelectionMenuPosition = (range: Range, source: HTMLElement) => {
   const sourceRect = source.getBoundingClientRect();
   const viewport = getViewportBox();
   const targetRect = rect.width || rect.height ? rect : sourceRect;
-  const menuWidth = 220;
+  const menuWidth = 226;
   const menuHeight = 46;
   const margin = 10;
   const minX = viewport.left + menuWidth / 2 + 8;
@@ -120,6 +122,7 @@ const OnboardingPage = () => {
   const selectionReadTimerRef = useRef<number | null>(null);
   const messageTimerRef = useRef<number | null>(null);
   const selectionMenuRef = useRef<HTMLDivElement>(null);
+  const [step, setStep] = useState<TutorialStep>('intro');
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [consensusDraft, setConsensusDraft] = useState<ConsensusDraft | null>(null);
   const [sampleConsensus, setSampleConsensus] = useState<SampleConsensus | null>(null);
@@ -191,6 +194,7 @@ const OnboardingPage = () => {
 
     if (!sourceSelectedText) {
       setPendingSelection(null);
+      selection.removeAllRanges();
       showMessage(INVALID_SELECTION_MESSAGE);
       return;
     }
@@ -242,7 +246,7 @@ const OnboardingPage = () => {
       await navigator.clipboard.writeText(pendingSelection.selectedText);
       showMessage('선택한 표현을 복사했습니다.');
     } catch {
-      showMessage('복사에 실패했습니다. 다시 시도해 주세요.');
+      showMessage('복사할 수 없습니다. 선택한 표현을 다시 확인해 주세요.');
     } finally {
       clearSelectionMenu();
     }
@@ -250,7 +254,7 @@ const OnboardingPage = () => {
 
   const explainChildDebate = () => {
     showMessage(
-      '하위 토론은 실제 토론에서 선택한 표현을 별도 논의로 분리할 때 사용합니다.',
+      '하위 토론은 선택한 표현에서 생긴 별도 쟁점을 별도 논의로 분리할 때 사용합니다.',
     );
   };
 
@@ -327,78 +331,130 @@ const OnboardingPage = () => {
         </SkipButton>
       </TopBar>
 
-      <Header>
-        <Title>샘플 토론</Title>
-        <HeaderText>
-          아래 의견에서 의미가 갈릴 수 있는 표현을 드래그해 선택하세요.
-        </HeaderText>
-      </Header>
-
       {actionMessage && <Toast role="status">{actionMessage}</Toast>}
       {error && <ErrorText>{error}</ErrorText>}
 
-      <SampleScreen aria-label="샘플 토론">
-        <DebateHeader>
-          <BadgeRow>
-            <StatusBadge>진행 중</StatusBadge>
-            <TypeBadge>합의 토론</TypeBadge>
-          </BadgeRow>
-          <DebateTitle>AI 시대의 책임은 어디에 있을까?</DebateTitle>
-          <DebateDescription>
-            선택한 표현을 기준으로 다음 행동을 고를 수 있습니다.
-          </DebateDescription>
-        </DebateHeader>
+      {step === 'intro' && (
+        <>
+          <IntroSection>
+            <Title>정명 사용 흐름 익히기</Title>
+            <IntroBody>
+              정명은 토론 중 모호하거나 갈리는 표현을 선택해 합의안이나 하위
+              토론으로 이어가는 서비스입니다. 먼저 자유 토론과 합의형 토론의
+              차이를 확인하고, 샘플 토론에서 핵심 흐름을 연습합니다.
+            </IntroBody>
+            <PrimaryButton type="button" onClick={() => setStep('practice')}>
+              연습 시작하기
+            </PrimaryButton>
+          </IntroSection>
 
-        <Thread>
-          <PostCard>
-            <PostMeta>
-              <Avatar>J</Avatar>
-              <MetaText>
-                <Author>샘플 작성자</Author>
-                <TimeText>방금 전</TimeText>
-              </MetaText>
-            </PostMeta>
-            <SelectablePost
-              data-selection-source-type="POST"
-              data-selection-source-id={SAMPLE_POST_ID}
-              onMouseUp={() => scheduleSelectionExtraction()}
-              onKeyUp={() => scheduleSelectionExtraction()}
-              onTouchEnd={() => scheduleSelectionExtraction(160)}
-            >
-              {SAMPLE_POST_TEXT}
-            </SelectablePost>
-            <PostHint>
-              이 표현을 기준 정의로 정리하려면 합의안을 만듭니다.
-            </PostHint>
-          </PostCard>
+          <PolicySection aria-labelledby="debate-policy-title">
+            <SectionTitle id="debate-policy-title">토론 방식</SectionTitle>
+            <PolicyGrid>
+              <PolicyCard>
+                <PolicyTopline>의견 흐름 중심</PolicyTopline>
+                <PolicyTitle>자유 토론</PolicyTitle>
+                <PolicyBody>
+                  의견이 자유롭게 이어지는 방식입니다. 표현을 선택해 합의안이나
+                  하위 토론을 만들 수 있지만, 토론 전체가 합의안 중심으로 멈추지
+                  않고 계속 진행됩니다.
+                </PolicyBody>
+              </PolicyCard>
+
+              <PolicyCard data-emphasis="true">
+                <PolicyTopline>기준 정의 중심</PolicyTopline>
+                <PolicyTitle>합의형 토론</PolicyTitle>
+                <PolicyBody>
+                  모호하거나 갈리는 표현을 선택하고, 그 표현의 기준 정의를 함께
+                  정하는 방식입니다. 승인된 합의안은 해당 토론의 기준 정의로
+                  사용됩니다.
+                </PolicyBody>
+              </PolicyCard>
+            </PolicyGrid>
+            <PolicyNote>
+              이번 연습에서는 합의형 토론의 핵심 흐름을 따라갑니다.
+            </PolicyNote>
+          </PolicySection>
+        </>
+      )}
+
+      {step === 'practice' && (
+        <>
+          <Header>
+            <Title>샘플 토론</Title>
+            <HeaderText>
+              아래 의견에서 모호하거나 갈릴 수 있는 표현을 드래그해 선택하세요.
+            </HeaderText>
+          </Header>
+
+          <SampleScreen aria-label="샘플 합의형 토론">
+            <DebateHeader>
+              <BadgeRow>
+                <TypeBadge>합의형 토론</TypeBadge>
+                <StatusBadge>진행 중</StatusBadge>
+              </BadgeRow>
+              <DebateTitle>AI가 만든 결과의 책임은 누구에게 있을까?</DebateTitle>
+              <DebateDescription>
+                선택한 표현을 기준으로 다음 행동을 고를 수 있습니다.
+              </DebateDescription>
+            </DebateHeader>
+
+            <Thread>
+              <PostCard>
+                <PostMeta>
+                  <Avatar>J</Avatar>
+                  <MetaText>
+                    <Author>샘플 사용자</Author>
+                    <TimeText>방금 전</TimeText>
+                  </MetaText>
+                </PostMeta>
+                <SelectablePost
+                  data-selection-source-type="POST"
+                  data-selection-source-id={SAMPLE_POST_ID}
+                  onMouseUp={() => scheduleSelectionExtraction()}
+                  onKeyUp={() => scheduleSelectionExtraction()}
+                  onTouchEnd={() => scheduleSelectionExtraction(160)}
+                >
+                  {SAMPLE_POST_TEXT}
+                </SelectablePost>
+                <PostHint>
+                  이 표현을 기준 정의로 정리하려면 합의안을 만듭니다.
+                </PostHint>
+              </PostCard>
+
+              {sampleConsensus && (
+                <ConsensusCard>
+                  <ConsensusMeta>
+                    <ConsensusBadge>합의안</ConsensusBadge>
+                    <ConsensusTerm>{sampleConsensus.term}</ConsensusTerm>
+                  </ConsensusMeta>
+                  <ConsensusTitle>{sampleConsensus.title}</ConsensusTitle>
+                  <ConsensusQuote>{sampleConsensus.quote}</ConsensusQuote>
+                  <ConsensusContent>{sampleConsensus.content}</ConsensusContent>
+                  <ConsensusHelp>
+                    이 합의안이 승인되면 이 토론의 기준 정의로 사용됩니다.
+                  </ConsensusHelp>
+                </ConsensusCard>
+              )}
+            </Thread>
+          </SampleScreen>
 
           {sampleConsensus && (
-            <ConsensusCard>
-              <ConsensusMeta>
-                <ConsensusBadge>합의안</ConsensusBadge>
-                <ConsensusTerm>{sampleConsensus.term}</ConsensusTerm>
-              </ConsensusMeta>
-              <ConsensusTitle>{sampleConsensus.title}</ConsensusTitle>
-              <ConsensusQuote>{sampleConsensus.quote}</ConsensusQuote>
-              <ConsensusContent>{sampleConsensus.content}</ConsensusContent>
-              <ConsensusHelp>
-                이 합의안이 승인되면 이 토론의 기준 정의로 사용합니다.
-              </ConsensusHelp>
-            </ConsensusCard>
+            <CompletionPanel>
+              <CompletionTitle>핵심 흐름 완료</CompletionTitle>
+              <CompletionBody>
+                이제 실제 토론에서 표현을 선택해 합의안으로 이어갈 수 있습니다.
+              </CompletionBody>
+              <CompletionNote>
+                정명에서는 의견을 따르는 것뿐 아니라, 의견 속 표현을 골라 기준을
+                정하고 논의를 분리할 수 있습니다.
+              </CompletionNote>
+              <PrimaryButton type="button" onClick={finishOnboarding} disabled={isSubmitting}>
+                {isSubmitting ? '완료 중...' : '정명 시작하기'}
+              </PrimaryButton>
+            </CompletionPanel>
           )}
-        </Thread>
-      </SampleScreen>
-
-      {sampleConsensus && (
-        <CompletionPanel>
-          <CompletionTitle>핵심 흐름 완료</CompletionTitle>
-          <CompletionBody>
-            이제 실제 토론에서 표현을 선택해 합의안으로 이어갈 수 있습니다.
-          </CompletionBody>
-          <PrimaryButton type="button" onClick={finishOnboarding} disabled={isSubmitting}>
-            {isSubmitting ? '완료 중...' : '정명 시작하기'}
-          </PrimaryButton>
-        </CompletionPanel>
+        </>
       )}
 
       {pendingSelection && (
@@ -409,7 +465,7 @@ const OnboardingPage = () => {
             left: pendingSelection.menuX,
             top: pendingSelection.menuY,
           }}
-          aria-label="선택 액션 메뉴"
+          aria-label="선택 행동 메뉴"
         >
           <SelectionMenuButton type="button" onClick={openConsensusDraft}>
             합의안
@@ -426,7 +482,7 @@ const OnboardingPage = () => {
       {consensusDraft && (
         <SheetBackdrop onClick={() => setConsensusDraft(null)}>
           <BottomSheet onClick={(event) => event.stopPropagation()}>
-            <SheetTitle>합의안 등록</SheetTitle>
+            <SheetTitle>합의안 만들기</SheetTitle>
             <SheetQuote>{consensusDraft.selection.selectedText}</SheetQuote>
 
             <SheetField>
@@ -439,6 +495,7 @@ const OnboardingPage = () => {
               <SheetInput
                 id="onboarding-consensus-term"
                 value={consensusDraft.term}
+                placeholder="예: AI 책임"
                 onChange={(event) =>
                   setConsensusDraft((prev) =>
                     prev ? { ...prev, term: event.target.value } : prev,
@@ -452,6 +509,7 @@ const OnboardingPage = () => {
               <SheetInput
                 id="onboarding-consensus-title"
                 value={consensusDraft.title}
+                placeholder="이 표현을 어떻게 정의할까요?"
                 onChange={(event) =>
                   setConsensusDraft((prev) =>
                     prev ? { ...prev, title: event.target.value } : prev,
@@ -465,6 +523,7 @@ const OnboardingPage = () => {
               <SheetTextarea
                 id="onboarding-consensus-content"
                 value={consensusDraft.content}
+                placeholder="앞으로 이 토론에서 사용할 의미를 적어주세요."
                 onChange={(event) =>
                   setConsensusDraft((prev) =>
                     prev ? { ...prev, content: event.target.value } : prev,
@@ -530,6 +589,12 @@ const SkipButton = styled.button`
   }
 `;
 
+const IntroSection = styled.section`
+  border-radius: 8px;
+  background: #ffffff;
+  padding: clamp(18px, 5vw, 22px);
+`;
+
 const Header = styled.header`
   margin-bottom: 14px;
 `;
@@ -543,6 +608,15 @@ const Title = styled.h1`
   letter-spacing: 0;
 `;
 
+const IntroBody = styled.p`
+  margin: 0 0 18px;
+  color: #666666;
+  font-size: 14px;
+  line-height: 1.55;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
 const HeaderText = styled.p`
   margin: 0;
   color: #777777;
@@ -550,6 +624,71 @@ const HeaderText = styled.p`
   line-height: 1.5;
   word-break: keep-all;
   overflow-wrap: anywhere;
+`;
+
+const PolicySection = styled.section`
+  margin-top: 14px;
+`;
+
+const SectionTitle = styled.h2`
+  margin: 0 0 10px;
+  color: #2f3238;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0;
+`;
+
+const PolicyGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+
+  @media (min-width: 720px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+`;
+
+const PolicyCard = styled.article`
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+  border: 1px solid transparent;
+
+  &[data-emphasis='true'] {
+    border-color: #d8f5ec;
+    background: #fbfffd;
+  }
+`;
+
+const PolicyTopline = styled.p`
+  margin: 0 0 6px;
+  color: #2d8f73;
+  font-size: 12px;
+  font-weight: 800;
+`;
+
+const PolicyTitle = styled.h3`
+  margin: 0 0 8px;
+  color: #333333;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0;
+`;
+
+const PolicyBody = styled.p`
+  margin: 0;
+  color: #666666;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const PolicyNote = styled.p`
+  margin: 10px 0 0;
+  color: #777777;
+  font-size: 13px;
+  line-height: 1.45;
 `;
 
 const Toast = styled.p`
@@ -792,12 +931,16 @@ const CompletionTitle = styled.h2`
 `;
 
 const CompletionBody = styled.p`
-  margin: 0 0 14px;
+  margin: 0 0 8px;
   color: #777777;
   font-size: 13px;
   line-height: 1.45;
   word-break: keep-all;
   overflow-wrap: anywhere;
+`;
+
+const CompletionNote = styled(CompletionBody)`
+  margin-bottom: 14px;
 `;
 
 const PrimaryButton = styled.button`
@@ -820,7 +963,7 @@ const SelectionMenu = styled.div`
   position: fixed;
   z-index: 80;
   transform: translate(-50%, -100%);
-  min-width: 220px;
+  min-width: 226px;
   min-height: 44px;
   border-radius: 999px;
   background: #ffffff;
@@ -869,7 +1012,7 @@ const SheetBackdrop = styled.div`
 
 const BottomSheet = styled.div`
   width: 100%;
-  max-width: 1126px;
+  max-width: var(--app-max-width, 1126px);
   max-height: min(82dvh, 720px);
   overflow-y: auto;
   border-radius: 18px 18px 0 0;
@@ -931,6 +1074,10 @@ const SheetInput = styled.input`
   font-size: 16px;
   padding: 0 12px;
   outline: none;
+
+  &::placeholder {
+    color: #a0a0a0;
+  }
 `;
 
 const SheetTextarea = styled.textarea`
@@ -945,6 +1092,10 @@ const SheetTextarea = styled.textarea`
   padding: 10px 12px;
   resize: vertical;
   outline: none;
+
+  &::placeholder {
+    color: #a0a0a0;
+  }
 `;
 
 const SheetActionRow = styled.div`
