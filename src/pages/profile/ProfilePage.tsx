@@ -98,6 +98,7 @@ const ProfilePage = () => {
   const activityRows = useMemo<MenuRow[]>(
     () => [
       { label: '내 토론', action: () => navigate(ROUTES.MY_DEBATES) },
+      { label: '참여한 토론', action: () => navigate(ROUTES.PARTICIPATED_DEBATES) },
       { label: '알림', action: () => navigate(ROUTES.NOTIFICATIONS) },
       { label: '제재 내역', action: () => navigate(ROUTES.MY_SANCTIONS) },
     ],
