@@ -61,6 +61,7 @@ type PendingSelection = {
   endOffset: number;
   menuX: number;
   menuY: number;
+  menuPlacement?: "top" | "bottom";
 };
 
 type ComposerSelection = {
@@ -254,6 +255,81 @@ const getOffsetInsideElement = (
 
 const clampMenuCoordinate = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
+
+const getViewportBox = () => {
+  const viewport = window.visualViewport;
+
+  return {
+    left: viewport?.offsetLeft ?? 0,
+    top: viewport?.offsetTop ?? 0,
+    width: viewport?.width ?? window.innerWidth,
+    height: viewport?.height ?? window.innerHeight,
+  };
+};
+
+const isMobileSelectionViewport = () =>
+  window.matchMedia?.("(pointer: coarse)")?.matches || window.innerWidth <= 768;
+
+const calculateSelectionMenuPosition = (
+  range: Range,
+  source: HTMLElement,
+) => {
+  const rect = range.getBoundingClientRect();
+  const sourceRect = source.getBoundingClientRect();
+  const viewport = getViewportBox();
+  const targetRect = rect.width || rect.height ? rect : sourceRect;
+  const menuWidth = 190;
+  const menuHeight = 46;
+  const margin = 10;
+  const bottomReserved = 96;
+
+  const minX = viewport.left + menuWidth / 2 + 8;
+  const maxX = viewport.left + viewport.width - menuWidth / 2 - 8;
+  const x = clampMenuCoordinate(
+    targetRect.left + targetRect.width / 2,
+    minX,
+    maxX,
+  );
+
+  if (!isMobileSelectionViewport()) {
+    const preferredY = targetRect.top - margin;
+    const fallbackY = targetRect.bottom + margin + menuHeight;
+    return {
+      menuX: x,
+      menuY: clampMenuCoordinate(
+        preferredY < viewport.top + 72 ? fallbackY : preferredY,
+        viewport.top + 72,
+        viewport.top + viewport.height - 88,
+      ),
+      menuPlacement: preferredY < viewport.top + 72 ? "bottom" : "top",
+    } as const;
+  }
+
+  const belowY = targetRect.bottom + margin + menuHeight;
+  const aboveY = targetRect.top - margin;
+
+  if (belowY < viewport.top + viewport.height - bottomReserved) {
+    return {
+      menuX: x,
+      menuY: belowY,
+      menuPlacement: "bottom",
+    } as const;
+  }
+
+  if (aboveY - menuHeight > viewport.top + 12) {
+    return {
+      menuX: x,
+      menuY: aboveY,
+      menuPlacement: "top",
+    } as const;
+  }
+
+  return {
+    menuX: x,
+    menuY: viewport.top + viewport.height - bottomReserved,
+    menuPlacement: "bottom",
+  } as const;
+};
 
 const normalizeDefinitionTerm = (value: string) =>
   value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -760,24 +836,8 @@ const DebateThreadPage = () => {
       return false;
     }
 
-    const rects = Array.from(range.getClientRects());
-    const rect = rects[0] ?? range.getBoundingClientRect();
-    const sourceRect = source.getBoundingClientRect();
-    const hasRangeRect = rect.width > 0 || rect.height > 0;
-    const menuX = clampMenuCoordinate(
-      hasRangeRect
-        ? rect.left + rect.width / 2
-        : sourceRect.left + sourceRect.width / 2,
-      88,
-      window.innerWidth - 88,
-    );
-    const preferredMenuY = hasRangeRect ? rect.top - 10 : sourceRect.top - 10;
-    const fallbackMenuY = hasRangeRect ? rect.bottom + 48 : sourceRect.bottom + 48;
-    const menuY = clampMenuCoordinate(
-      preferredMenuY < 72 ? fallbackMenuY : preferredMenuY,
-      72,
-      window.innerHeight - 88,
-    );
+    const { menuX, menuY, menuPlacement } =
+      calculateSelectionMenuPosition(range, source);
 
     setActionMessage("");
     setPendingSelection({
@@ -788,6 +848,7 @@ const DebateThreadPage = () => {
       endOffset: normalizedEndOffset,
       menuX,
       menuY,
+      menuPlacement,
     });
     return true;
   };
@@ -865,12 +926,12 @@ const DebateThreadPage = () => {
     };
 
     const handlePointerUp = (event: PointerEvent) => {
-      const delay = event.pointerType === "touch" ? 150 : 0;
+      const delay = event.pointerType === "touch" ? 180 : 0;
       scheduleSelectionExtraction(delay, event.pointerType !== "touch");
     };
 
     const handleTouchEnd = () => {
-      scheduleSelectionExtraction(170, true);
+      scheduleSelectionExtraction(180, true);
     };
 
     const handleSelectionChange = () => {
@@ -2574,6 +2635,7 @@ const DebateThreadPage = () => {
       {pendingSelection && (
         <SelectionMenu
           ref={selectionMenuRef}
+          data-placement={pendingSelection.menuPlacement ?? "top"}
           style={{
             left: pendingSelection.menuX,
             top: pendingSelection.menuY,
@@ -2611,6 +2673,7 @@ const DebateThreadPage = () => {
       {composerSelection && (
         <SelectionMenu
           ref={composerSelectionMenuRef}
+          data-placement="top"
           style={{
             left: composerSelection.menuX,
             top: composerSelection.menuY,
@@ -2628,6 +2691,7 @@ const DebateThreadPage = () => {
       {editSelection && (
         <SelectionMenu
           ref={editSelectionMenuRef}
+          data-placement="top"
           style={{
             left: editSelection.menuX,
             top: editSelection.menuY,
@@ -4548,10 +4612,10 @@ const ActionNotice = styled.p`
 
 const SelectionMenu = styled.div`
   position: fixed;
-  z-index: 40;
+  z-index: 80;
   transform: translate(-50%, -100%);
-  min-width: 176px;
-  height: 38px;
+  min-width: 190px;
+  min-height: 44px;
   border-radius: 999px;
   background: #ffffff;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
@@ -4559,18 +4623,27 @@ const SelectionMenu = styled.div`
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 0 8px;
+  padding: 4px 8px;
+
+  &[data-placement="top"] {
+    transform: translate(-50%, -100%);
+  }
+
+  &[data-placement="bottom"] {
+    transform: translate(-50%, 0);
+  }
 `;
 
 const SelectionMenuButton = styled.button`
-  height: 28px;
+  min-height: 36px;
   border: none;
   border-radius: 999px;
   background: transparent;
   color: #2f3238;
   font-size: 12px;
   font-weight: 700;
-  padding: 0 9px;
+  padding: 0 11px;
+  touch-action: manipulation;
 
   &:active {
     background: #eefaf6;
