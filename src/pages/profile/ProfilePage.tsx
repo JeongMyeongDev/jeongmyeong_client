@@ -106,7 +106,7 @@ const ProfilePage = () => {
 
   const settingRows = useMemo<MenuRow[]>(
     () => [
-      { label: '알림 설정', action: () => navigate(ROUTES.NOTIFICATIONS) },
+      { label: '알림 설정', action: () => navigate(ROUTES.NOTIFICATION_SETTINGS) },
       { label: '튜토리얼 다시 보기', action: () => navigate(ROUTES.ONBOARDING) },
     ],
     [navigate],

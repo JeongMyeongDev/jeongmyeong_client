@@ -16,6 +16,7 @@ import DefinitionSearchPage from '../pages/definition/DefinitionSearchPage';
 import MessagePage from '../pages/message/MessagePage';
 import ProfilePage from '../pages/profile/ProfilePage';
 import NotificationPage from '../pages/notification/NotificationPage';
+import NotificationSettingsPage from '../pages/notification/NotificationSettingsPage';
 import MyDebatesPage from '../pages/myDebates/MyDebatesPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
 import MySanctionsPage from '../pages/sanctions/MySanctionsPage';
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
           { path: 'message', element: <MessagePage /> },
           { path: ROUTES.PROFILE.slice(1), element: <ProfilePage /> },
           { path: ROUTES.NOTIFICATIONS.slice(1), element: <NotificationPage /> },
+          { path: ROUTES.NOTIFICATION_SETTINGS.slice(1), element: <NotificationSettingsPage /> },
           { path: ROUTES.MY_DEBATES.slice(1), element: <MyDebatesPage /> },
           { path: ROUTES.MY_SANCTIONS.slice(1), element: <MySanctionsPage /> },
           { path: ROUTES.ADMIN_REPORTS.slice(1), element: <AdminReportsPage /> },
