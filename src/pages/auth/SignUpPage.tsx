@@ -1,26 +1,40 @@
-import { useState } from 'react';
-import { isAxiosError } from 'axios';
-import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
-import { useAuth } from '../../hooks/useAuth';
-import { sanitizePlainText } from '../../utils/textSanitizer';
+import { useState } from "react";
+import { isAxiosError } from "axios";
+import { useNavigate } from "react-router-dom";
+import styled from "styled-components";
+import { useAuth } from "../../hooks/useAuth";
+import { sanitizePlainText } from "../../utils/textSanitizer";
 
 const EyeIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
 
 const CloseIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+  >
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
 
 const TERMS_TEXT =
-  '정명 서비스 이용을 위해 개인정보 수집 및 이용에 동의해 주세요. 수집된 정보는 회원 식별, 로그인, 서비스 제공 목적에만 사용됩니다.';
+  "정명 서비스 이용을 위해 개인정보 수집 및 이용에 동의해 주세요. 수집된 정보는 회원 식별, 로그인, 서비스 제공 목적에만 사용됩니다.";
 
 interface PasswordFieldProps {
   label: string;
@@ -29,14 +43,19 @@ interface PasswordFieldProps {
   onChange: (v: string) => void;
 }
 
-const PasswordField = ({ label, placeholder, value, onChange }: PasswordFieldProps) => {
+const PasswordField = ({
+  label,
+  placeholder,
+  value,
+  onChange,
+}: PasswordFieldProps) => {
   const [show, setShow] = useState(false);
   return (
     <FieldGroup>
       <Label>{label}</Label>
       <InputRow>
         <UnderlineInput
-          type={show ? 'text' : 'password'}
+          type={show ? "text" : "password"}
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -47,7 +66,7 @@ const PasswordField = ({ label, placeholder, value, onChange }: PasswordFieldPro
             <EyeIcon />
           </IconButton>
           {value && (
-            <IconButton type="button" onClick={() => onChange('')}>
+            <IconButton type="button" onClick={() => onChange("")}>
               <CloseIcon />
             </IconButton>
           )}
@@ -60,44 +79,45 @@ const PasswordField = ({ label, placeholder, value, onChange }: PasswordFieldPro
 const SignUpPage = () => {
   const navigate = useNavigate();
   const { signup } = useAuth();
-  const [nickname, setNickname] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [nickname, setNickname] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [agreed, setAgreed] = useState(false);
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
       const message = error.response?.data?.message;
-      if (Array.isArray(message)) return message.join(', ');
-      if (typeof message === 'string') return message;
-      if (!error.response) return '서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요.';
+      if (Array.isArray(message)) return message.join(", ");
+      if (typeof message === "string") return message;
+      if (!error.response)
+        return "서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요.";
     }
-    return '회원가입에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+    return "회원가입에 실패했습니다. 잠시 후 다시 시도해 주세요.";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccessMessage('');
+    setError("");
+    setSuccessMessage("");
 
     if (!agreed) return;
     if (!nickname.trim()) {
-      setError('닉네임을 입력해 주세요.');
+      setError("닉네임을 입력해 주세요.");
       return;
     }
     if (password !== passwordConfirm) {
-      setError('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+      setError("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
       return;
     }
 
     setIsSubmitting(true);
     try {
       await signup(email, nickname.trim(), password, passwordConfirm);
-      setSuccessMessage('회원가입이 완료되었습니다. 이제 로그인할 수 있습니다.');
+      setSuccessMessage("회원가입이 완료되었습니다. 로그인해 주세요.");
     } catch (error) {
       setError(getErrorMessage(error));
     } finally {
@@ -157,12 +177,16 @@ const SignUpPage = () => {
         {error && <ErrorText>{error}</ErrorText>}
         {successMessage && <SuccessText>{successMessage}</SuccessText>}
         {successMessage ? (
-          <SubmitButton type="button" disabled={false} onClick={() => navigate('/login')}>
+          <SubmitButton
+            type="button"
+            disabled={false}
+            onClick={() => navigate("/login")}
+          >
             로그인하러 가기
           </SubmitButton>
         ) : (
           <SubmitButton type="submit" disabled={!agreed || isSubmitting}>
-            {isSubmitting ? '가입 요청 중...' : '계정 만들기'}
+            {isSubmitting ? "가입 요청 중..." : "계정 만들기"}
           </SubmitButton>
         )}
       </Form>
@@ -172,7 +196,8 @@ const SignUpPage = () => {
 
 const Wrapper = styled.div`
   min-height: 100dvh;
-  padding: clamp(42px, 14vw, 60px) clamp(24px, 7.4vw, 32px) clamp(32px, 9.3vw, 40px);
+  padding: clamp(42px, 14vw, 60px) clamp(24px, 7.4vw, 32px)
+    clamp(32px, 9.3vw, 40px);
   background: #f5f5f5;
 `;
 
@@ -303,13 +328,13 @@ const SuccessText = styled.p`
 const SubmitButton = styled.button<{ disabled: boolean }>`
   width: 100%;
   height: clamp(48px, 12.1vw, 52px);
-  background: ${({ disabled }) => (disabled ? '#a8e6c8' : '#4dc891')};
+  background: ${({ disabled }) => (disabled ? "#a8e6c8" : "#4dc891")};
   color: #ffffff;
   border: none;
   border-radius: 999px;
   font-size: var(--body-md);
   font-weight: 600;
-  cursor: ${({ disabled }) => (disabled ? 'not-allowed' : 'pointer')};
+  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
 `;
 
 export default SignUpPage;

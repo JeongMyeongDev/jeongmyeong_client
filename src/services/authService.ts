@@ -1,6 +1,6 @@
-import api from './api';
-import type { ApiResponse } from '../types/api';
-import type { User } from '../types/user';
+import api from "./api";
+import type { ApiResponse } from "../types/api";
+import type { User } from "../types/user";
 
 interface SignupRequest {
   email: string;
@@ -20,8 +20,10 @@ interface AuthResponse {
 }
 
 export const authService = {
-  signup: (data: SignupRequest) => api.post<ApiResponse<{ user: User }>>('/auth/signup', data),
-  login: (data: LoginRequest) => api.post<ApiResponse<AuthResponse>>('/auth/login', data),
-  logout: () => api.post('/auth/logout'),
-  getMe: () => api.get<ApiResponse<{ user: User }>>('/auth/me'),
+  signup: (data: SignupRequest) =>
+    api.post<ApiResponse<{ message: string }>>("/auth/signup", data),
+  login: (data: LoginRequest) =>
+    api.post<ApiResponse<AuthResponse>>("/auth/login", data),
+  logout: () => api.post("/auth/logout"),
+  getMe: () => api.get<ApiResponse<{ user: User }>>("/auth/me"),
 };
