@@ -19,6 +19,7 @@ import NotificationPage from '../pages/notification/NotificationPage';
 import MyDebatesPage from '../pages/myDebates/MyDebatesPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
 import MySanctionsPage from '../pages/sanctions/MySanctionsPage';
+import { ROUTES } from '../constants/routes';
 
 const router = createBrowserRouter([
   {
@@ -30,26 +31,26 @@ const router = createBrowserRouter([
     ],
   },
   {
-    path: '/',
+    path: ROUTES.HOME,
     element: <App />,
     children: [
       {
         element: <ProtectedRoute />,
         children: [
           { index: true, element: <MainPage /> },
-          { path: 'debate-room', element: <DebatePage /> },
-          { path: 'onboarding', element: <OnboardingPage /> },
-          { path: 'debate/:id/info', element: <DebateInfoPage /> },
-          { path: 'debate/:id', element: <DebateThreadPage /> },
-          { path: 'debate/create', element: <DebateCreatePage /> },
-          { path: 'debate/archive', element: <DebateArchivePage /> },
-          { path: 'definitions', element: <DefinitionSearchPage /> },
+          { path: ROUTES.DEBATE_ROOM.slice(1), element: <DebatePage /> },
+          { path: ROUTES.ONBOARDING.slice(1), element: <OnboardingPage /> },
+          { path: ROUTES.DEBATE_INFO.slice(1), element: <DebateInfoPage /> },
+          { path: ROUTES.DEBATE_DETAIL.slice(1), element: <DebateThreadPage /> },
+          { path: ROUTES.DEBATE_CREATE.slice(1), element: <DebateCreatePage /> },
+          { path: ROUTES.DEBATE_ARCHIVE.slice(1), element: <DebateArchivePage /> },
+          { path: ROUTES.DEFINITIONS.slice(1), element: <DefinitionSearchPage /> },
           { path: 'message', element: <MessagePage /> },
-          { path: 'profile', element: <ProfilePage /> },
-          { path: 'notifications', element: <NotificationPage /> },
-          { path: 'my-debates', element: <MyDebatesPage /> },
-          { path: 'my-sanctions', element: <MySanctionsPage /> },
-          { path: 'admin/reports', element: <AdminReportsPage /> },
+          { path: ROUTES.PROFILE.slice(1), element: <ProfilePage /> },
+          { path: ROUTES.NOTIFICATIONS.slice(1), element: <NotificationPage /> },
+          { path: ROUTES.MY_DEBATES.slice(1), element: <MyDebatesPage /> },
+          { path: ROUTES.MY_SANCTIONS.slice(1), element: <MySanctionsPage /> },
+          { path: ROUTES.ADMIN_REPORTS.slice(1), element: <AdminReportsPage /> },
         ],
       },
     ],

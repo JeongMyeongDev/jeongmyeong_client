@@ -1,6 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import iconBtnGenerate from '../../../assets/icon_btn_generate.svg';
+import { ROUTES } from '../../../constants/routes';
+import { NAV_LABELS } from '../../../constants/ui';
 
 const HomeIcon = ({ active }: { active: boolean }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? '#4dc891' : 'none'} stroke={active ? '#4dc891' : '#bbb'} strokeWidth="2">
@@ -28,19 +30,24 @@ const ProfileIcon = ({ active }: { active: boolean }) => (
   </svg>
 );
 
-const NAV_ITEMS = [
-  { to: '/', label: '홈', icon: HomeIcon, end: true },
-  { to: '/debate-room', label: '토론방', icon: DebateIcon, end: false },
-  { to: '/debate/archive', label: '저장소', icon: ArchiveIcon, end: false },
-  { to: '/profile', label: '프로필', icon: ProfileIcon, end: false },
-];
+const leftItems = [
+  { to: ROUTES.HOME, label: NAV_LABELS.HOME, icon: HomeIcon, end: true },
+  { to: ROUTES.DEBATE_ROOM, label: NAV_LABELS.DEBATE_ROOM, icon: DebateIcon, end: false },
+] as const;
+
+const centerAction = { to: ROUTES.DEBATE_CREATE, label: '토론 생성' } as const;
+
+const rightItems = [
+  { to: ROUTES.DEBATE_ARCHIVE, label: NAV_LABELS.ARCHIVE, icon: ArchiveIcon, end: false },
+  { to: ROUTES.PROFILE, label: NAV_LABELS.PROFILE, icon: ProfileIcon, end: false },
+] as const;
 
 const BottomNav = () => {
   const navigate = useNavigate();
 
   return (
     <Wrapper>
-      {NAV_ITEMS.slice(0, 2).map(({ to, label, icon: Icon, end }) => (
+      {leftItems.map(({ to, label, icon: Icon, end }) => (
         <Tab key={to} to={to} end={end}>
           {({ isActive }) => (
             <>
@@ -52,12 +59,12 @@ const BottomNav = () => {
       ))}
 
       <FabWrapper>
-        <Fab type="button" aria-label="토론 생성" onClick={() => navigate('/debate/create')}>
+        <Fab type="button" aria-label={centerAction.label} onClick={() => navigate(centerAction.to)}>
           <FabIcon src={iconBtnGenerate} alt="" />
         </Fab>
       </FabWrapper>
 
-      {NAV_ITEMS.slice(2).map(({ to, label, icon: Icon, end }) => (
+      {rightItems.map(({ to, label, icon: Icon, end }) => (
         <Tab key={to} to={to} end={end}>
           {({ isActive }) => (
             <>

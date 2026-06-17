@@ -8,10 +8,19 @@ import iconChat from '../../assets/icon_chat.svg';
 import iconMenu from '../../assets/icon_menu.svg';
 import iconSearch from '../../assets/icon_search.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
+import {
+  ALL_DEBATE_FILTER_LABEL,
+  DEBATE_STATUS_LABELS,
+  DEBATE_TYPE_FILTER_ITEMS,
+  DEBATE_TYPE_FILTER_MAP,
+} from '../../constants/debate';
+import { MESSAGES } from '../../constants/messages';
+import { ARCHIVE_LIMIT } from '../../constants/pagination';
+import { debateThreadPath, ROUTES } from '../../constants/routes';
 import { useDebate } from '../../hooks/useDebate';
 import type { Debate, DebateTag } from '../../types/debate';
 
-type ArchiveFilter = '전체' | '찬반토론' | '합의토론' | '자유토론';
+type ArchiveFilter = (typeof DEBATE_TYPE_FILTER_ITEMS)[number];
 
 type ArchiveCardItem = {
   id: string;
@@ -20,19 +29,12 @@ type ArchiveCardItem = {
   tags: string[];
 };
 
-const FILTER_ITEMS: ArchiveFilter[] = ['전체', '찬반토론', '합의토론', '자유토론'];
-const FILTER_TYPE_MAP: Partial<Record<ArchiveFilter, 'PROS_CONS' | 'CONSENSUS' | 'FREE'>> = {
-  찬반토론: 'PROS_CONS',
-  합의토론: 'CONSENSUS',
-  자유토론: 'FREE',
-};
-
 const getDebateTagLabels = (debate: Debate) => {
   const tags = (debate.tags ?? debate.tagMaps?.map((tagMap) => tagMap.tag))
     ?.map((tag) => tag.name.trim())
     .filter(Boolean)
     .map((tag) => `#${tag}`);
-  return tags?.length ? tags : ['#기타'];
+  return tags?.length ? tags : [];
 };
 
 const mapToArchiveCard = (debate: Debate): ArchiveCardItem => ({
@@ -45,7 +47,7 @@ const mapToArchiveCard = (debate: Debate): ArchiveCardItem => ({
 const DebateArchivePage = () => {
   const navigate = useNavigate();
   const { debates, fetchArchivedDebates } = useDebate();
-  const [activeFilter, setActiveFilter] = useState<ArchiveFilter>('전체');
+  const [activeFilter, setActiveFilter] = useState<ArchiveFilter>(ALL_DEBATE_FILTER_LABEL);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [submittedKeyword, setSubmittedKeyword] = useState('');
   const [selectedTags, setSelectedTags] = useState<DebateTag[]>([]);
@@ -56,18 +58,18 @@ const DebateArchivePage = () => {
   useEffect(() => {
     const loadDebates = async () => {
       try {
-        const type = FILTER_TYPE_MAP[activeFilter];
+        const type = DEBATE_TYPE_FILTER_MAP[activeFilter];
         await fetchArchivedDebates({
           ...(type ? { type } : {}),
           ...(submittedKeyword.trim() ? { keyword: submittedKeyword.trim() } : {}),
           tagIds: selectedTags.length ? selectedTags.map((tag) => tag.id).join(',') : undefined,
           sort: 'archivedAt',
           direction: 'desc',
-          limit: 20,
+          limit: ARCHIVE_LIMIT,
         });
         setListError('');
       } catch {
-        setListError('보관된 토론 목록을 불러오지 못했습니다.');
+        setListError(MESSAGES.REQUEST_FAILED);
       }
     };
     void loadDebates();
@@ -78,7 +80,7 @@ const DebateArchivePage = () => {
     setSubmittedKeyword(searchKeyword.trim());
   };
 
-  const archiveCards = useMemo(() => debates.slice(0, 8).map(mapToArchiveCard), [debates]);
+  const archiveCards = useMemo(() => debates.map(mapToArchiveCard), [debates]);
 
   return (
     <Wrapper>
@@ -88,9 +90,9 @@ const DebateArchivePage = () => {
         alt="정명"
         role="button"
         tabIndex={0}
-        onClick={() => navigate('/')}
+        onClick={() => navigate(ROUTES.HOME)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') navigate('/');
+          if (event.key === 'Enter' || event.key === ' ') navigate(ROUTES.HOME);
         }}
       />
 
@@ -106,7 +108,7 @@ const DebateArchivePage = () => {
           >
             <TopIcon src={iconSearch} alt="" />
           </SideButton>
-          <SideButton type="button" aria-label="알림" onClick={() => navigate('/message')}>
+          <SideButton type="button" aria-label="알림" onClick={() => navigate(ROUTES.NOTIFICATIONS)}>
             <TopIcon src={iconAlarm} alt="" />
           </SideButton>
         </HeaderRight>
@@ -117,14 +119,14 @@ const DebateArchivePage = () => {
           <SearchInput
             value={searchKeyword}
             onChange={(event) => setSearchKeyword(event.target.value)}
-            placeholder="보관된 토론 검색"
+            placeholder="아카이브 토론 검색"
           />
           <SearchButton type="submit">검색</SearchButton>
         </SearchForm>
       )}
 
       <FilterRow>
-        {FILTER_ITEMS.map((item) => (
+        {DEBATE_TYPE_FILTER_ITEMS.map((item) => (
           <FilterChip
             key={item}
             type="button"
@@ -151,20 +153,22 @@ const DebateArchivePage = () => {
 
       <ListWrap>
         {listError && <ErrorText>{listError}</ErrorText>}
-        {!listError && archiveCards.length === 0 && <ErrorText>보관된 토론이 없습니다.</ErrorText>}
+        {!listError && archiveCards.length === 0 && <ErrorText>{MESSAGES.NO_ARCHIVED_DEBATES}</ErrorText>}
         {archiveCards.map((card) => (
-          <Card key={card.id} onClick={() => navigate(`/debate/${card.id}`)}>
+          <Card key={card.id} onClick={() => navigate(debateThreadPath(card.id))}>
             <CardTop>
-              <ClosedBadge>종료됨</ClosedBadge>
+              <ClosedBadge>{DEBATE_STATUS_LABELS.ARCHIVED}</ClosedBadge>
               <ChatCircleIconImg src={iconChat} alt="" />
             </CardTop>
             <CardTitle>{card.title}</CardTitle>
             <CardDesc>{card.description}</CardDesc>
-            <CardTagList>
-              {card.tags.map((tag) => (
-                <CardTag key={tag}>{tag}</CardTag>
-              ))}
-            </CardTagList>
+            {card.tags.length > 0 && (
+              <CardTagList>
+                {card.tags.map((tag) => (
+                  <CardTag key={tag}>{tag}</CardTag>
+                ))}
+              </CardTagList>
+            )}
           </Card>
         ))}
       </ListWrap>

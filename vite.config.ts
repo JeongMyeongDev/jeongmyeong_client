@@ -1,26 +1,46 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    allowedHosts: ['jeongmyeong.mirim-it-show.site'],
-    proxy: {
-      '/auth': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
-      '/debates': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
-      '/selection-targets': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
-      '/consensuses': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
-      '/posts': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
-      '/comments': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
-      '/definition-references': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
-      '/definitions': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
-      '/notifications': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
-      '/users': { target: 'http://localhost:3000', rewrite: (path) => `/api${path}` },
+const proxiedPaths = [
+  '/auth',
+  '/debates',
+  '/selection-targets',
+  '/consensuses',
+  '/posts',
+  '/comments',
+  '/definition-references',
+  '/definitions',
+  '/notifications',
+  '/users',
+] as const;
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const proxyTarget = env.VITE_DEV_PROXY_TARGET || 'http://localhost:3000';
+  const hmr =
+    env.VITE_DEV_HMR_HOST || env.VITE_DEV_HMR_PROTOCOL || env.VITE_DEV_HMR_CLIENT_PORT
+      ? {
+          protocol: env.VITE_DEV_HMR_PROTOCOL,
+          host: env.VITE_DEV_HMR_HOST,
+          clientPort: env.VITE_DEV_HMR_CLIENT_PORT
+            ? Number(env.VITE_DEV_HMR_CLIENT_PORT)
+            : undefined,
+        }
+      : undefined;
+
+  return {
+    plugins: [react()],
+    server: {
+      allowedHosts: env.VITE_DEV_ALLOWED_HOST
+        ? env.VITE_DEV_ALLOWED_HOST.split(',').map((host) => host.trim()).filter(Boolean)
+        : undefined,
+      proxy: Object.fromEntries(
+        proxiedPaths.map((path) => [
+          path,
+          { target: proxyTarget, rewrite: (value: string) => `/api${value}` },
+        ]),
+      ),
+      ...(hmr ? { hmr } : {}),
     },
-    hmr: {
-      protocol: 'wss',
-      host: 'jeongmyeong.mirim-it-show.site',
-      clientPort: 443,
-    },
-  },
-})
+  };
+});

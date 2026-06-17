@@ -3,27 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { LoadingContent } from '../../components/common/LoadingContent';
 import { NotificationListSkeleton } from '../../components/common/PageSkeletons';
-import { notificationService, type Notification } from '../../services/notificationService';
+import { MESSAGES } from '../../constants/messages';
+import { NOTIFICATION_TYPE_LABELS } from '../../constants/notification';
+import { NOTIFICATION_LIMIT } from '../../constants/pagination';
+import { debateThreadPath } from '../../constants/routes';
 import { usePageLoading } from '../../hooks/usePageLoading';
-
-const TYPE_LABEL: Record<string, string> = {
-  COMMENT_ON_POST: '회원님의 의견에 댓글이 달렸어요.',
-  REPLY_TO_COMMENT: '회원님의 댓글에 답글이 달렸어요.',
-  NEW_POST_IN_DEBATE: '참여 중인 토론에 새 글이 올라왔어요.',
-  NEW_CONSENSUS_IN_DEBATE: '구독 중인 토론에 새 합의안이 올라왔어요.',
-};
-
-const formatDate = (iso: string) => {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return '방금 전';
-  if (diffMin < 60) return `${diffMin}분 전`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH}시간 전`;
-  return `${Math.floor(diffH / 24)}일 전`;
-};
+import { notificationService, type Notification } from '../../services/notificationService';
+import { formatRelativeTime } from '../../utils/dateFormat';
 
 const NotificationPage = () => {
   const navigate = useNavigate();
@@ -37,7 +23,7 @@ const NotificationPage = () => {
   useEffect(() => {
     const load = async () => {
       const result = await executeAsync(async () => {
-        const { data } = await notificationService.getAll({ page: 1, limit: 20 });
+        const { data } = await notificationService.getAll({ page: 1, limit: NOTIFICATION_LIMIT });
         return data;
       });
       if (result) {
@@ -60,13 +46,14 @@ const NotificationPage = () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const { data } = await notificationService.getAll({ page: page + 1, limit: 20 });
+      const { data } = await notificationService.getAll({
+        page: page + 1,
+        limit: NOTIFICATION_LIMIT,
+      });
       setNotifications((prev) => [...prev, ...data.notifications]);
       setUnreadCount(data.unreadCount);
       setPage(data.page);
       setHasMore(data.hasMore);
-    } catch {
-      // Error handling - keep loadMore silent or add user feedback if needed
     } finally {
       setLoadingMore(false);
     }
@@ -80,7 +67,9 @@ const NotificationPage = () => {
       );
       setUnreadCount((c) => Math.max(0, c - 1));
     }
-    navigate(`/debate/${item.debateId}`);
+
+    // TODO: support deep link to post/comment/consensus by referenceId.
+    navigate(debateThreadPath(item.debateId));
   };
 
   return (
@@ -110,25 +99,26 @@ const NotificationPage = () => {
         showLoadingUI={showLoadingUI}
         skeleton={<NotificationListSkeleton count={5} />}
       >
-      <List>
-        {notifications.map((item) => (
-          <Item
-            key={item.id}
-            $unread={!item.isRead}
-            onClick={() => void handleClickItem(item)}
-          >
-            <ItemAvatar />
-            <ItemBody>
-              <ItemActor>{item.actor.nickname}</ItemActor>
-              <ItemDesc>{TYPE_LABEL[item.type] ?? item.type}</ItemDesc>
-              <ItemDebate>{item.debate.title}</ItemDebate>
-              <ItemDate>{formatDate(item.createdAt)}</ItemDate>
-            </ItemBody>
-            {!item.isRead && <UnreadDot />}
-          </Item>
-        ))}
-      </List>
+        <List>
+          {notifications.map((item) => (
+            <Item
+              key={item.id}
+              $unread={!item.isRead}
+              onClick={() => void handleClickItem(item)}
+            >
+              <ItemAvatar />
+              <ItemBody>
+                <ItemActor>{item.actor.nickname}</ItemActor>
+                <ItemDesc>{NOTIFICATION_TYPE_LABELS[item.type] ?? MESSAGES.UNKNOWN_NOTIFICATION}</ItemDesc>
+                <ItemDebate>{item.debate.title}</ItemDebate>
+                <ItemDate>{formatRelativeTime(item.createdAt)}</ItemDate>
+              </ItemBody>
+              {!item.isRead && <UnreadDot />}
+            </Item>
+          ))}
+        </List>
       </LoadingContent>
+
       {hasMore && !isLoading && !error && (
         <LoadMoreButton type="button" onClick={() => void handleLoadMore()} disabled={loadingMore}>
           {loadingMore ? '불러오는 중...' : '더 보기'}
