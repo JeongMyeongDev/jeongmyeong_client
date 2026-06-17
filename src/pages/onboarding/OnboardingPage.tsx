@@ -33,6 +33,9 @@ type SampleConsensus = {
 
 const SELECTION_SOURCE_SELECTOR = '[data-selection-source-type][data-selection-source-id]';
 const SAMPLE_POST_ID = 'onboarding-sample-post';
+const FALLBACK_SELECTION_TEXT = '책임';
+const FALLBACK_HELP_TEXT =
+  '드래그가 어려우면 이 버튼으로 선택 흐름을 연습할 수 있습니다.';
 const SAMPLE_POST_TEXT =
   'AI가 만든 결과의 책임은 결국 개발자에게 있다. 사용자는 도구를 사용하는 쪽이고, 실제 위험을 예측하고 막을 수 있는 쪽은 개발자이기 때문이다.';
 const INVALID_SELECTION_MESSAGE = '문장 일부를 드래그해 선택해 주세요.';
@@ -84,6 +87,9 @@ const getViewportBox = () => {
   };
 };
 
+const isMobileSelectionViewport = () =>
+  window.matchMedia?.('(pointer: coarse)')?.matches || window.innerWidth <= 768;
+
 const calculateSelectionMenuPosition = (range: Range, source: HTMLElement) => {
   const rect = range.getBoundingClientRect();
   const sourceRect = source.getBoundingClientRect();
@@ -92,26 +98,47 @@ const calculateSelectionMenuPosition = (range: Range, source: HTMLElement) => {
   const menuWidth = 226;
   const menuHeight = 46;
   const margin = 10;
+  const bottomReserved = 96;
   const minX = viewport.left + menuWidth / 2 + 8;
   const maxX = viewport.left + viewport.width - menuWidth / 2 - 8;
   const x = clampMenuCoordinate(targetRect.left + targetRect.width / 2, minX, maxX);
-  const preferredTop = targetRect.top - margin;
 
-  if (preferredTop > viewport.top + 72) {
+  if (!isMobileSelectionViewport()) {
+    const preferredY = targetRect.top - margin;
+    const fallbackY = targetRect.bottom + margin + menuHeight;
     return {
       menuX: x,
-      menuY: preferredTop,
+      menuY: clampMenuCoordinate(
+        preferredY < viewport.top + 72 ? fallbackY : preferredY,
+        viewport.top + 72,
+        viewport.top + viewport.height - 88,
+      ),
+      menuPlacement: preferredY < viewport.top + 72 ? 'bottom' : 'top',
+    } as const;
+  }
+
+  const belowY = targetRect.bottom + margin + menuHeight;
+  const aboveY = targetRect.top - margin;
+
+  if (belowY < viewport.top + viewport.height - bottomReserved) {
+    return {
+      menuX: x,
+      menuY: belowY,
+      menuPlacement: 'bottom',
+    } as const;
+  }
+
+  if (aboveY - menuHeight > viewport.top + 12) {
+    return {
+      menuX: x,
+      menuY: aboveY,
       menuPlacement: 'top',
     } as const;
   }
 
   return {
     menuX: x,
-    menuY: clampMenuCoordinate(
-      targetRect.bottom + margin + menuHeight,
-      viewport.top + 72,
-      viewport.top + viewport.height - 88,
-    ),
+    menuY: viewport.top + viewport.height - bottomReserved,
     menuPlacement: 'bottom',
   } as const;
 };
@@ -121,7 +148,10 @@ const OnboardingPage = () => {
   const { completeOnboarding } = useAuth();
   const selectionReadTimerRef = useRef<number | null>(null);
   const messageTimerRef = useRef<number | null>(null);
+  const selectionDragSourceRef = useRef<HTMLElement | null>(null);
+  const lastInvalidSelectionMessageAtRef = useRef(0);
   const selectionMenuRef = useRef<HTMLDivElement>(null);
+  const samplePostRef = useRef<HTMLParagraphElement>(null);
   const [step, setStep] = useState<TutorialStep>('intro');
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [consensusDraft, setConsensusDraft] = useState<ConsensusDraft | null>(null);
@@ -146,6 +176,13 @@ const OnboardingPage = () => {
     window.getSelection()?.removeAllRanges();
   };
 
+  const showInvalidSelectionMessage = () => {
+    const now = Date.now();
+    if (now - lastInvalidSelectionMessageAtRef.current < 1200) return;
+    lastInvalidSelectionMessageAtRef.current = now;
+    showMessage(INVALID_SELECTION_MESSAGE);
+  };
+
   const extractSelection = () => {
     const selection = window.getSelection();
     const selectedText = selection?.toString() ?? '';
@@ -157,32 +194,39 @@ const OnboardingPage = () => {
     const range = selection.getRangeAt(0);
     const anchorSource = getSelectionSourceElement(selection.anchorNode);
     const focusSource = getSelectionSourceElement(selection.focusNode);
+    const dragSource = selectionDragSourceRef.current;
+    const source =
+      anchorSource && anchorSource === focusSource
+        ? anchorSource
+        : dragSource &&
+            dragSource.contains(range.startContainer) &&
+            dragSource.contains(range.endContainer)
+          ? dragSource
+          : null;
 
-    if (!anchorSource || anchorSource !== focusSource) {
+    if (!source) {
       setPendingSelection(null);
-      selection.removeAllRanges();
-      showMessage(INVALID_SELECTION_MESSAGE);
+      showInvalidSelectionMessage();
       return;
     }
 
     if (
-      !anchorSource.contains(range.startContainer) ||
-      !anchorSource.contains(range.endContainer)
+      !source.contains(range.startContainer) ||
+      !source.contains(range.endContainer)
     ) {
       setPendingSelection(null);
-      selection.removeAllRanges();
-      showMessage(INVALID_SELECTION_MESSAGE);
+      showInvalidSelectionMessage();
       return;
     }
 
-    const sourceText = anchorSource.textContent ?? '';
+    const sourceText = source.textContent ?? '';
     const startOffset = getOffsetInsideElement(
-      anchorSource,
+      source,
       range.startContainer,
       range.startOffset,
     );
     const endOffset = getOffsetInsideElement(
-      anchorSource,
+      source,
       range.endContainer,
       range.endOffset,
     );
@@ -194,20 +238,19 @@ const OnboardingPage = () => {
 
     if (!sourceSelectedText) {
       setPendingSelection(null);
-      selection.removeAllRanges();
-      showMessage(INVALID_SELECTION_MESSAGE);
+      showInvalidSelectionMessage();
       return;
     }
 
     const { menuX, menuY, menuPlacement } = calculateSelectionMenuPosition(
       range,
-      anchorSource,
+      source,
     );
 
     setConsensusDraft(null);
     setPendingSelection({
       sourceType: 'POST',
-      sourceId: anchorSource.dataset.selectionSourceId ?? SAMPLE_POST_ID,
+      sourceId: source.dataset.selectionSourceId ?? SAMPLE_POST_ID,
       selectedText: sourceSelectedText,
       startOffset: normalizedStartOffset,
       endOffset: normalizedEndOffset,
@@ -217,7 +260,7 @@ const OnboardingPage = () => {
     });
   };
 
-  const scheduleSelectionExtraction = (delay = 80) => {
+  const scheduleSelectionExtraction = (delay = 80, resetDragSource = false) => {
     if (selectionReadTimerRef.current) {
       window.clearTimeout(selectionReadTimerRef.current);
     }
@@ -225,7 +268,71 @@ const OnboardingPage = () => {
     selectionReadTimerRef.current = window.setTimeout(() => {
       selectionReadTimerRef.current = null;
       extractSelection();
+      if (resetDragSource) {
+        window.setTimeout(() => {
+          selectionDragSourceRef.current = null;
+        }, 220);
+      }
     }, delay);
+  };
+
+  const openFallbackSelection = () => {
+    const source = samplePostRef.current;
+    if (!source) return;
+
+    const sourceText = source.textContent ?? '';
+    const startOffset = sourceText.indexOf(FALLBACK_SELECTION_TEXT);
+    const selectedText =
+      startOffset >= 0 ? FALLBACK_SELECTION_TEXT : sourceText.slice(0, 8).trim();
+    const normalizedStartOffset = startOffset >= 0 ? startOffset : 0;
+    const normalizedEndOffset = normalizedStartOffset + selectedText.length;
+    const selection = window.getSelection();
+    const textNode = Array.from(source.childNodes).find(
+      (node) => node.nodeType === Node.TEXT_NODE,
+    );
+
+    let menuX = window.innerWidth / 2;
+    let menuY = Math.max(72, source.getBoundingClientRect().top - 10);
+    let menuPlacement: 'top' | 'bottom' = 'top';
+
+    if (textNode && selectedText) {
+      const range = document.createRange();
+      range.setStart(textNode, normalizedStartOffset);
+      range.setEnd(textNode, normalizedEndOffset);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      const position = calculateSelectionMenuPosition(range, source);
+      menuX = position.menuX;
+      menuY = position.menuY;
+      menuPlacement = position.menuPlacement;
+    } else {
+      const viewport = getViewportBox();
+      const rect = source.getBoundingClientRect();
+      menuX = clampMenuCoordinate(
+        rect.left + rect.width / 2,
+        viewport.left + 113,
+        viewport.left + viewport.width - 113,
+      );
+      menuY = clampMenuCoordinate(
+        rect.bottom + 56,
+        viewport.top + 72,
+        viewport.top + viewport.height - 96,
+      );
+      menuPlacement = 'bottom';
+    }
+
+    setConsensusDraft(null);
+    setPendingSelection({
+      sourceType: 'POST',
+      sourceId: SAMPLE_POST_ID,
+      selectedText,
+      startOffset: normalizedStartOffset,
+      endOffset: normalizedEndOffset,
+      menuX,
+      menuY,
+      menuPlacement,
+    });
+    showMessage(FALLBACK_HELP_TEXT);
   };
 
   const openConsensusDraft = () => {
@@ -293,6 +400,10 @@ const OnboardingPage = () => {
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
+      selectionDragSourceRef.current = getSelectionSourceElement(
+        event.target as Node,
+      );
+
       if (
         pendingSelection &&
         selectionMenuRef.current &&
@@ -302,8 +413,33 @@ const OnboardingPage = () => {
       }
     };
 
+    const handlePointerUp = (event: PointerEvent) => {
+      scheduleSelectionExtraction(event.pointerType === 'touch' ? 180 : 0, true);
+    };
+
+    const handleTouchEnd = () => {
+      scheduleSelectionExtraction(180, true);
+    };
+
+    const handleSelectionChange = () => {
+      scheduleSelectionExtraction(140);
+    };
+
     document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      if (selectionReadTimerRef.current) {
+        window.clearTimeout(selectionReadTimerRef.current);
+        selectionReadTimerRef.current = null;
+      }
+      selectionDragSourceRef.current = null;
+    };
   }, [pendingSelection]);
 
   useEffect(() => {
@@ -409,14 +545,18 @@ const OnboardingPage = () => {
                   </MetaText>
                 </PostMeta>
                 <SelectablePost
+                  ref={samplePostRef}
                   data-selection-source-type="POST"
                   data-selection-source-id={SAMPLE_POST_ID}
                   onMouseUp={() => scheduleSelectionExtraction()}
                   onKeyUp={() => scheduleSelectionExtraction()}
-                  onTouchEnd={() => scheduleSelectionExtraction(160)}
+                  onTouchEnd={() => scheduleSelectionExtraction(180, true)}
                 >
                   {SAMPLE_POST_TEXT}
                 </SelectablePost>
+                <FallbackSelectionButton type="button" onClick={openFallbackSelection}>
+                  선택 연습
+                </FallbackSelectionButton>
                 <PostHint>
                   이 표현을 기준 정의로 정리하려면 합의안을 만듭니다.
                 </PostHint>
@@ -554,6 +694,8 @@ const OnboardingPage = () => {
 const Wrapper = styled.div`
   min-height: 100dvh;
   background: #f5f5f5;
+  color: #2f3238;
+  color-scheme: light;
   padding: clamp(18px, 5vw, 24px) clamp(16px, 4.8vw, 22px)
     max(24px, env(safe-area-inset-bottom));
   text-align: left;
@@ -827,6 +969,23 @@ const SelectablePost = styled.p`
   -webkit-user-select: text;
 `;
 
+const FallbackSelectionButton = styled.button`
+  margin-top: 12px;
+  min-height: 34px;
+  border: 1px solid #d8f5ec;
+  border-radius: 999px;
+  background: #fbfffd;
+  color: #2d8f73;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 12px;
+  touch-action: manipulation;
+
+  &:active {
+    background: #eefaf6;
+  }
+`;
+
 const PostHint = styled.p`
   margin: 12px 0 0;
   border-radius: 8px;
@@ -1074,6 +1233,8 @@ const SheetInput = styled.input`
   font-size: 16px;
   padding: 0 12px;
   outline: none;
+  color-scheme: light;
+  caret-color: #2f3238;
 
   &::placeholder {
     color: #a0a0a0;
@@ -1092,6 +1253,8 @@ const SheetTextarea = styled.textarea`
   padding: 10px 12px;
   resize: vertical;
   outline: none;
+  color-scheme: light;
+  caret-color: #2f3238;
 
   &::placeholder {
     color: #a0a0a0;
