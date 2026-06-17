@@ -18,6 +18,7 @@ import ProfilePage from '../pages/profile/ProfilePage';
 import NotificationPage from '../pages/notification/NotificationPage';
 import NotificationSettingsPage from '../pages/notification/NotificationSettingsPage';
 import MyDebatesPage from '../pages/myDebates/MyDebatesPage';
+import ParticipatedDebatesPage from '../pages/participatedDebates/ParticipatedDebatesPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
 import MySanctionsPage from '../pages/sanctions/MySanctionsPage';
 import { ROUTES } from '../constants/routes';
@@ -51,6 +52,7 @@ const router = createBrowserRouter([
           { path: ROUTES.NOTIFICATIONS.slice(1), element: <NotificationPage /> },
           { path: ROUTES.NOTIFICATION_SETTINGS.slice(1), element: <NotificationSettingsPage /> },
           { path: ROUTES.MY_DEBATES.slice(1), element: <MyDebatesPage /> },
+          { path: ROUTES.PARTICIPATED_DEBATES.slice(1), element: <ParticipatedDebatesPage /> },
           { path: ROUTES.MY_SANCTIONS.slice(1), element: <MySanctionsPage /> },
           { path: ROUTES.ADMIN_REPORTS.slice(1), element: <AdminReportsPage /> },
         ],

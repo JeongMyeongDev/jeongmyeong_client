@@ -10,6 +10,7 @@ export const ROUTES = {
   NOTIFICATIONS: '/notifications',
   NOTIFICATION_SETTINGS: '/notification-settings',
   MY_DEBATES: '/my-debates',
+  PARTICIPATED_DEBATES: '/participated-debates',
   MY_SANCTIONS: '/my-sanctions',
   ADMIN_REPORTS: '/admin/reports',
   LOGIN: '/login',
