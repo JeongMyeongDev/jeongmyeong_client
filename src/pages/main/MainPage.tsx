@@ -86,7 +86,7 @@ const getDebateTagLabels = (debate: Debate) => {
     ?.map((tag) => tag.name.trim())
     .filter(Boolean)
     .map((tag) => `#${tag}`);
-  return tags?.length ? tags : [];
+  return tags?.length ? tags : ['태그 없음'];
 };
 
 const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
@@ -117,7 +117,7 @@ const FeaturedCard = ({
   onOpenActions: (event: MouseEvent<HTMLButtonElement>) => void;
 }) => (
   <FCard data-feature-card="true" onClick={onClick}>
-    <CardActionButton type="button" aria-label="?좊줎 誘몃━蹂닿린 ?닿린" onClick={onOpenActions}>
+    <CardActionButton type="button" aria-label="토론 미리보기 열기" onClick={onOpenActions}>
       ...
     </CardActionButton>
     <FTitle>{item.title}</FTitle>
@@ -169,7 +169,7 @@ const DebateCard = ({
       </DTagList>
     </DLeft>
     <DRight>
-      <DCardActionButton type="button" aria-label="?좊줎 誘몃━蹂닿린 ?닿린" onClick={onOpenActions}>
+      <DCardActionButton type="button" aria-label="토론 미리보기 열기" onClick={onOpenActions}>
         ...
       </DCardActionButton>
       <DebateIconImg src={iconChat} alt="" />
@@ -279,10 +279,10 @@ const MainPage = () => {
     try {
       if (wasBookmarked) {
         await debateService.unbookmark(selectedCard.id);
-        setActionMessage('??μ쓣 ?댁젣?덉뒿?덈떎.');
+        setActionMessage('저장을 해제했습니다.');
       } else {
         await debateService.bookmark(selectedCard.id);
-        setActionMessage('?좊줎????ν뻽?듬땲??');
+        setActionMessage('토론을 저장했습니다.');
       }
     } catch {
       setSelectedCard((current) =>
@@ -304,10 +304,10 @@ const MainPage = () => {
     try {
       if (wasSubscribed) {
         await debateService.unsubscribe(selectedCard.id);
-        setActionMessage('?뚮┝???댁젣?덉뒿?덈떎.');
+        setActionMessage('알림을 해제했습니다.');
       } else {
         await debateService.subscribe(selectedCard.id);
-        setActionMessage('?뚮┝???ㅼ젙?덉뒿?덈떎.');
+        setActionMessage('알림을 설정했습니다.');
       }
     } catch {
       setSelectedCard((current) =>
@@ -354,11 +354,11 @@ const MainPage = () => {
       <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
       <FixedHeaderArea>
         {/* Logo */}
-        <Logo src={logoSymbol} alt="?뺣챸" />
+        <Logo src={logoSymbol} alt="정명" />
 
         {/* Header */}
         <Header>
-          <IconBtn onClick={() => setIsDrawerOpen(true)} aria-label="硫붾돱">
+          <IconBtn onClick={() => setIsDrawerOpen(true)} aria-label="메뉴">
             <MenuIcon />
           </IconBtn>
           <SearchBar>
@@ -366,11 +366,11 @@ const MainPage = () => {
             <SearchInput
               value={searchKeyword}
               onChange={(event) => setSearchKeyword(event.target.value)}
-              placeholder="?좊줎??寃?됲븯?몄슂."
+              placeholder="토론을 검색하세요."
               aria-label="토론 검색"
             />
           </SearchBar>
-          <IconBtn onClick={() => navigate(ROUTES.NOTIFICATIONS)} aria-label="?뚮┝">
+          <IconBtn onClick={() => navigate(ROUTES.NOTIFICATIONS)} aria-label="알림">
             <BellIcon />
           </IconBtn>
         </Header>
@@ -378,8 +378,8 @@ const MainPage = () => {
 
       {/* ?⑤뒗 ?좊줎 */}
       <Section>
-        <SectionTitle>理쒓렐 ?쒕컻???좊줎</SectionTitle>
-        <SectionSub>理쒓렐 ?낅뜲?댄듃??吏꾪뻾 以??좊줎?ㅼ씠?먯슂.</SectionSub>
+        <SectionTitle>최근 활발한 토론</SectionTitle>
+        <SectionSub>최근 업데이트된 진행 중인 토론이에요.</SectionSub>
         <CarouselWrapper
           ref={scrollRef}
           onScroll={handleScroll}
@@ -421,11 +421,11 @@ const MainPage = () => {
         <TagPicker
           selectedTags={selectedTags}
           onChange={setSelectedTags}
-          placeholder="?꾪꽣???쒓렇瑜?寃?됲븯?몄슂"
+          placeholder="필터할 태그를 검색하세요"
         />
         {selectedTags.length > 1 && (
           <ClearTagButton type="button" onClick={() => setSelectedTags([])}>
-            ?꾩껜 ?댁젣
+            전체 해제
           </ClearTagButton>
         )}
       </TagFilterArea>
@@ -454,12 +454,12 @@ const MainPage = () => {
         <ModalOverlay onClick={() => setSelectedCard(null)}>
           <ModalCard onClick={(e) => e.stopPropagation()}>
             <ModalTop>
-              <ModalIconButton type="button" aria-label="?リ린" onClick={() => setSelectedCard(null)}>
+              <ModalIconButton type="button" aria-label="닫기" onClick={() => setSelectedCard(null)}>
                 <BackIcon />
               </ModalIconButton>
               <ModalIconButton
                 type="button"
-                aria-label="?좊줎 ?뺣낫 蹂닿린"
+                aria-label="토론 정보 보기"
                 onClick={() => {
                   navigate(debateInfoPath(selectedCard.id));
                   setSelectedCard(null);
@@ -482,8 +482,8 @@ const MainPage = () => {
               <span>{selectedCard.creatorName}</span>
             </ModalAuthorRow>
 
-            <ModalMeta>?좊줎 諛⑹떇 : {selectedCard.debateTypeLabel}</ModalMeta>
-            <ModalMeta>李몄뿬 ?몄썝 : {selectedCard.participants}</ModalMeta>
+            <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
+            <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
             <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
             {actionMessage && <ModalSuccess>{actionMessage}</ModalSuccess>}
             {joinError && <ModalError>{joinError}</ModalError>}
@@ -500,7 +500,7 @@ const MainPage = () => {
               </ModalActionIconButton>
               <ModalActionIconButton
                 type="button"
-                aria-label="?뚮┝"
+                aria-label="알림"
                 $active={selectedCard.isSubscribed}
                 disabled={isActionProcessing}
                 onClick={() => void handleSubscriptionToggle()}
@@ -514,7 +514,7 @@ const MainPage = () => {
                   setSelectedCard(null);
                 }}
               >
-                ?좊줎 蹂닿린
+                토론 보기
               </JoinButton>
             </ModalActionRow>
           </ModalCard>

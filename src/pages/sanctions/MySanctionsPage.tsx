@@ -5,21 +5,21 @@ import { moderationService } from '../../services/moderationService';
 import type { Sanction } from '../../types/moderation';
 
 const SANCTION_TYPE_LABEL: Record<Sanction['type'], string> = {
-  WARNING: 'Warning',
-  WRITE_RESTRICTION: 'Write restriction',
-  DEBATE_CREATE_RESTRICTION: 'Debate creation restriction',
-  TEMP_SUSPENSION: 'Temporary suspension',
-  PERMANENT_SUSPENSION: 'Permanent suspension',
+  WARNING: '경고',
+  WRITE_RESTRICTION: '작성 제한',
+  DEBATE_CREATE_RESTRICTION: '토론 생성 제한',
+  TEMP_SUSPENSION: '임시 정지',
+  PERMANENT_SUSPENSION: '영구 정지',
 };
 
 const SANCTION_STATUS_LABEL: Record<Sanction['status'], string> = {
-  ACTIVE: 'Active',
-  EXPIRED: 'Expired',
-  REVOKED: 'Revoked',
+  ACTIVE: '적용 중',
+  EXPIRED: '만료됨',
+  REVOKED: '철회됨',
 };
 
 const formatDateTime = (value?: string | null) => {
-  if (!value) return 'No end date';
+  if (!value) return '종료일 없음';
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -40,7 +40,7 @@ const getErrorMessage = (error: unknown) => {
     if (Array.isArray(message)) return message.join(', ');
   }
 
-  return 'Failed to load sanction history.';
+  return '제재 내역을 불러오지 못했습니다.';
 };
 
 const MySanctionsPage = () => {
@@ -87,14 +87,14 @@ const MySanctionsPage = () => {
     <Wrapper>
       <TopSpacing />
       <Header>
-        <Title>Sanction history</Title>
-        <Subtitle>Review account sanctions and confirm that you have read them.</Subtitle>
+        <Title>제재 내역</Title>
+        <Subtitle>계정에 적용된 제재를 확인하고 읽음 처리할 수 있습니다.</Subtitle>
       </Header>
 
       {errorMessage && <ErrorText>{errorMessage}</ErrorText>}
-      {isLoading && <StateText>Loading sanctions...</StateText>}
+      {isLoading && <StateText>제재 내역을 불러오는 중입니다...</StateText>}
 
-      {!isLoading && sanctions.length === 0 && <EmptyState>No sanction history found.</EmptyState>}
+      {!isLoading && sanctions.length === 0 && <EmptyState>제재 내역이 없습니다.</EmptyState>}
 
       <List>
         {sanctions.map((sanction) => {
@@ -111,13 +111,13 @@ const MySanctionsPage = () => {
               <Reason>{sanction.reason}</Reason>
 
               <DetailGrid>
-                <DetailLabel>Start date</DetailLabel>
+                <DetailLabel>시작일</DetailLabel>
                 <DetailValue>{formatDateTime(sanction.startsAt)}</DetailValue>
-                <DetailLabel>End date</DetailLabel>
+                <DetailLabel>종료일</DetailLabel>
                 <DetailValue>{formatDateTime(sanction.endsAt)}</DetailValue>
-                <DetailLabel>Acknowledgement</DetailLabel>
+                <DetailLabel>확인 여부</DetailLabel>
                 <DetailValue>
-                  {isAcknowledged ? `Acknowledged at ${formatDateTime(acknowledgedAt)}` : 'Not acknowledged'}
+                  {isAcknowledged ? `${formatDateTime(acknowledgedAt)} 확인` : '아직 확인하지 않음'}
                 </DetailValue>
               </DetailGrid>
 
@@ -127,7 +127,7 @@ const MySanctionsPage = () => {
                   onClick={() => void handleAcknowledge(sanction.id)}
                   disabled={acknowledgingId === sanction.id}
                 >
-                  {acknowledgingId === sanction.id ? 'Acknowledging...' : 'Acknowledge'}
+                  {acknowledgingId === sanction.id ? '확인 처리 중...' : '제재 내역 확인'}
                 </AcknowledgeButton>
               )}
             </SanctionItem>

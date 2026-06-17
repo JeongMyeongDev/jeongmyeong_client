@@ -7,14 +7,13 @@ const SuspendedAccountPage = () => {
   return (
     <Wrapper>
       <Panel>
-        <Title>Account suspended</Title>
-        <Message>This account is suspended. Please check your sanction history.</Message>
+        <Title>계정 정지</Title>
+        <Message>정지된 계정입니다. 제재 내역을 확인해 주세요.</Message>
         <Description>
-          Suspended accounts cannot sign in right now. Contact support if you need help reviewing
-          or appealing this sanction.
+          현재 이 계정으로는 로그인할 수 없습니다. 제재 검토나 이의 제기가 필요하면 관리자에게 문의해 주세요.
         </Description>
         <BackButton type="button" onClick={() => navigate('/login')}>
-          Back to login
+          로그인으로 돌아가기
         </BackButton>
       </Panel>
     </Wrapper>
