@@ -23,6 +23,7 @@ export const shouldHideBottomNav = (pathname: string) => {
   const isDebateThread = /^\/debate\/(?!archive$|create$)[^/]+$/.test(pathname);
   return (
     pathname.startsWith(ROUTES.DEBATE_CREATE) ||
+    pathname === ROUTES.ADMIN_REPORTS ||
     pathname.endsWith('/info') ||
     pathname === ROUTES.ONBOARDING ||
     isDebateThread
