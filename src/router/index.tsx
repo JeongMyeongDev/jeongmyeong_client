@@ -3,10 +3,7 @@ import App from '../App';
 import AuthRoute from '../components/common/AuthRoute';
 import ProtectedRoute from '../components/common/ProtectedRoute';
 import LoginPage from '../pages/auth/LoginPage';
-import GoogleSignUpPage from '../pages/auth/GoogleSignUpPage';
 import SignUpPage from '../pages/auth/SignUpPage';
-import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
-import PasswordResetPage from '../pages/auth/PasswordResetPage';
 import SuspendedAccountPage from '../pages/auth/SuspendedAccountPage';
 import MainPage from '../pages/main/MainPage';
 import DebatePage from '../pages/debate/DebatePage';
@@ -28,11 +25,8 @@ const router = createBrowserRouter([
   {
     element: <AuthRoute />,
     children: [
-      { path: ROUTES.LOGIN, element: <LoginPage /> },
-      { path: '/google-signup', element: <GoogleSignUpPage /> },
+      { path: '/login', element: <LoginPage /> },
       { path: '/signup', element: <SignUpPage /> },
-      { path: '/verify-email', element: <VerifyEmailPage /> },
-      { path: '/password-reset', element: <PasswordResetPage /> },
       { path: '/account-suspended', element: <SuspendedAccountPage /> },
     ],
   },

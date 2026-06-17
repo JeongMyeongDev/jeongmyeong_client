@@ -19,9 +19,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const requestUrl = error.config?.url ?? '';
-    const isAuthRequest = AUTH_EXEMPT_PATH_PREFIXES.some((path) =>
-      requestUrl.startsWith(path),
-    );
+    const isAuthRequest =
+      requestUrl.startsWith('/auth/login') ||
+      requestUrl.startsWith('/auth/signup');
 
     if (error.response?.status === 401 && !isAuthRequest) {
       localStorage.removeItem('accessToken');
