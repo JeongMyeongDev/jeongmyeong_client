@@ -5,83 +5,7 @@ import styled from 'styled-components';
 import logoSymbol from '../../assets/logo_symbol.svg';
 import { useAuth } from '../../hooks/useAuth';
 
-type GoogleCredentialResponse = {
-  credential?: string;
-};
-
-type GoogleAccounts = {
-  id: {
-    initialize: (options: {
-      client_id: string;
-      callback: (response: GoogleCredentialResponse) => void;
-    }) => void;
-    renderButton: (
-      parent: HTMLElement,
-      options: {
-        theme: 'outline' | 'filled_blue' | 'filled_black';
-        size: 'large' | 'medium' | 'small';
-        shape: 'pill' | 'rectangular' | 'circle' | 'square';
-        text: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
-        width: string;
-      },
-    ) => void;
-  };
-};
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: GoogleAccounts;
-    };
-  }
-}
-
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const SUSPENDED_ACCOUNT_MESSAGE = 'This account is suspended. Please check your sanction history.';
-
-const getStringField = (value: unknown, field: string) => {
-  if (!value || typeof value !== 'object') return undefined;
-
-  const fieldValue = (value as Record<string, unknown>)[field];
-  return typeof fieldValue === 'string' ? fieldValue : undefined;
-};
-
-const getEmailFromGoogleCredential = (credential: string) => {
-  try {
-    const payload = credential.split('.')[1];
-    if (!payload) return undefined;
-
-    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const paddedPayload = normalizedPayload.padEnd(
-      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
-      '=',
-    );
-    const parsedPayload = JSON.parse(atob(paddedPayload)) as { email?: unknown };
-
-    return typeof parsedPayload.email === 'string' ? parsedPayload.email : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const getGoogleSignupEmail = (error: unknown, credential: string) => {
-  if (!isAxiosError(error)) return getEmailFromGoogleCredential(credential);
-
-  const responseData = error.response?.data;
-  const responseMessage = getStringField(responseData, 'message');
-  const messageObject =
-    responseData && typeof responseData === 'object'
-      ? (responseData as Record<string, unknown>).message
-      : undefined;
-
-  return (
-    getStringField(responseData, 'email') ??
-    getStringField(responseData, 'data') ??
-    getStringField(messageObject, 'email') ??
-    (responseMessage?.includes('@') ? responseMessage : undefined) ??
-    getEmailFromGoogleCredential(credential)
-  );
-};
 
 const EyeIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -187,9 +111,6 @@ const LoginPage = () => {
         </LoginButton>
         <SignUpLink type="button" onClick={() => navigate('/signup')}>
           회원가입
-        </SignUpLink>
-        <SignUpLink type="button" onClick={() => navigate('/password-reset')}>
-          비밀번호를 잊으셨나요?
         </SignUpLink>
       </Form>
     </Wrapper>

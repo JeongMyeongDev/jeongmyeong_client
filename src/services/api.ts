@@ -19,8 +19,7 @@ api.interceptors.response.use(
     const requestUrl = error.config?.url ?? '';
     const isAuthRequest =
       requestUrl.startsWith('/auth/login') ||
-      requestUrl.startsWith('/auth/signup') ||
-      requestUrl.startsWith('/auth/verify-email');
+      requestUrl.startsWith('/auth/signup');
 
     if (error.response?.status === 401 && !isAuthRequest) {
       localStorage.removeItem('accessToken');

@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../../hooks/useAuth';
 import { sanitizePlainText } from '../../utils/textSanitizer';
-
-const EMAIL_VERIFIED_EVENT_KEY = 'emailVerifiedEvent';
 
 const EyeIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -70,26 +68,6 @@ const SignUpPage = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isEmailVerified, setIsEmailVerified] = useState(false);
-
-  useEffect(() => {
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key !== EMAIL_VERIFIED_EVENT_KEY || !event.newValue) return;
-
-      try {
-        const payload = JSON.parse(event.newValue) as { email?: string };
-        if (payload.email === email) {
-          setIsEmailVerified(true);
-          setSuccessMessage('이메일 인증이 완료되었습니다. 이제 로그인할 수 있습니다.');
-        }
-      } catch {
-        return;
-      }
-    };
-
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, [email]);
 
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
@@ -105,7 +83,6 @@ const SignUpPage = () => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
-    setIsEmailVerified(false);
 
     if (!agreed) return;
     if (!nickname.trim()) {
@@ -120,7 +97,7 @@ const SignUpPage = () => {
     setIsSubmitting(true);
     try {
       await signup(email, nickname.trim(), password, passwordConfirm);
-      setSuccessMessage('인증 메일을 보냈습니다. 이메일 인증을 완료하면 계정이 생성됩니다.');
+      setSuccessMessage('회원가입이 완료되었습니다. 이제 로그인할 수 있습니다.');
     } catch (error) {
       setError(getErrorMessage(error));
     } finally {
@@ -179,7 +156,7 @@ const SignUpPage = () => {
         </ConsentSection>
         {error && <ErrorText>{error}</ErrorText>}
         {successMessage && <SuccessText>{successMessage}</SuccessText>}
-        {isEmailVerified ? (
+        {successMessage ? (
           <SubmitButton type="button" disabled={false} onClick={() => navigate('/login')}>
             로그인하러 가기
           </SubmitButton>
