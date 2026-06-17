@@ -47,7 +47,7 @@ const BackIcon = () => (
 
 const ModalMenuIcon = () => <img src={iconShowInfo} width="34" height="34" alt="" />;
 
-const FEATURED_CARD_TAG_LIMIT = 2;
+const FEATURED_CARD_TAG_LIMIT = 1;
 
 // ??? Mock Data ?????????????????????????????????????????????????????????????????
 
@@ -787,7 +787,7 @@ const TagPill = styled.span`
   align-items: center;
   justify-content: flex-start;
   max-width: min(96px, 26vw);
-  min-width: 0;
+  min-width: 36px;
   padding: 0 clamp(10px, 3.2vw, 14px);
   border-radius: 999px;
   border: 2px solid #a8a8a8;
