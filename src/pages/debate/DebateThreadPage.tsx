@@ -444,6 +444,8 @@ const DebateThreadPage = () => {
   const [definitionPickerTab, setDefinitionPickerTab] =
     useState<DefinitionReferenceType>("DEBATE_STANDARD");
   const [debateDefinitions, setDebateDefinitions] = useState<Definition[]>([]);
+  const [isDefinitionPanelExpanded, setIsDefinitionPanelExpanded] =
+    useState(false);
   const [globalDefinitions, setGlobalDefinitions] = useState<Definition[]>([]);
   const [globalDefinitionKeyword, setGlobalDefinitionKeyword] = useState("");
   const [activeDefinitionReference, setActiveDefinitionReference] =
@@ -524,6 +526,11 @@ const DebateThreadPage = () => {
     setConsensuses(data.consensuses);
   };
 
+  const refreshDebateDefinitions = async (id: string) => {
+    const { data } = await definitionService.getByDebate(id);
+    setDebateDefinitions(data.definitions);
+  };
+
   const refreshChildDebates = async (id: string) => {
     try {
       const { data } = await debateService.getChildDebates(id);
@@ -569,6 +576,7 @@ const DebateThreadPage = () => {
           fetchDebate(debateId),
           fetchMessages(debateId),
           refreshConsensuses(debateId),
+          refreshDebateDefinitions(debateId),
           refreshChildDebates(debateId),
           refreshParentDebate(debateId),
           refreshProgress(debateId),
@@ -673,6 +681,11 @@ const DebateThreadPage = () => {
   ).length;
   const isConsensusDebate = currentDebate?.debateType === "CONSENSUS";
   const isProsConsDebate = currentDebate?.debateType === "PROS_CONS";
+  const shouldShowDefinitionPanel =
+    debateDefinitions.length > 0 || isConsensusDebate;
+  const visibleDebateDefinitions = isDefinitionPanelExpanded
+    ? debateDefinitions
+    : debateDefinitions.slice(0, 3);
   const parentDebate = parentDebateInfo?.parentDebate ?? null;
   const parentDebateSelectedText =
     parentDebateInfo?.selectedText ??
@@ -1774,6 +1787,7 @@ const DebateThreadPage = () => {
       setSelectedConsensus(data.consensus);
       await refreshConsensuses(debateId);
       if (action === "approve") {
+        await refreshDebateDefinitions(debateId);
         await fetchDebate(debateId);
       }
       setSubmitError("");
@@ -2403,6 +2417,49 @@ const DebateThreadPage = () => {
             진행 중 합의안 {openConsensusCount}개 · 승인된 기준 정의{" "}
             {approvedConsensusCount}개
           </ConsensusSummaryPanel>
+        )}
+        {shouldShowDefinitionPanel && (
+          <DefinitionPanel>
+            <DefinitionPanelHeader>
+              <DefinitionPanelTitle>이 토론의 기준 정의</DefinitionPanelTitle>
+              {debateDefinitions.length > 3 && (
+                <DefinitionPanelToggle
+                  type="button"
+                  onClick={() =>
+                    setIsDefinitionPanelExpanded((isExpanded) => !isExpanded)
+                  }
+                >
+                  {isDefinitionPanelExpanded ? "접기" : "전체 보기"}
+                </DefinitionPanelToggle>
+              )}
+            </DefinitionPanelHeader>
+            {debateDefinitions.length > 0 ? (
+              <DefinitionPanelList>
+                {visibleDebateDefinitions.map((definition) => (
+                  <DefinitionPanelItem key={definition.id}>
+                    <DefinitionPanelTerm>{definition.term}</DefinitionPanelTerm>
+                    <DefinitionPanelContent>
+                      {definition.content}
+                    </DefinitionPanelContent>
+                    {definition.sourceConsensus?.title && (
+                      <DefinitionPanelMeta>
+                        합의안: {definition.sourceConsensus.title}
+                      </DefinitionPanelMeta>
+                    )}
+                    {definition.selectionTarget?.selectedText && (
+                      <DefinitionPanelQuote>
+                        "{getShortPreview(definition.selectionTarget.selectedText, 88)}"
+                      </DefinitionPanelQuote>
+                    )}
+                  </DefinitionPanelItem>
+                ))}
+              </DefinitionPanelList>
+            ) : (
+              <DefinitionPanelEmpty>
+                아직 승인된 기준 정의가 없습니다.
+              </DefinitionPanelEmpty>
+            )}
+          </DefinitionPanel>
         )}
         {isProsConsDebate && (
           <StancePanel>
@@ -3931,6 +3988,96 @@ const ConsensusSummaryPanel = styled.div`
   font-size: 12px;
   font-weight: 700;
   padding: 10px 12px;
+`;
+
+const DefinitionPanel = styled(ConsensusSummaryPanel)`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #ffffff;
+  color: #555555;
+  font-weight: 500;
+`;
+
+const DefinitionPanelHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const DefinitionPanelTitle = styled.strong`
+  color: #555555;
+  font-size: 12px;
+  font-weight: 700;
+`;
+
+const DefinitionPanelToggle = styled.button`
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #2dcd97;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+`;
+
+const DefinitionPanelList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+`;
+
+const DefinitionPanelItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 8px;
+  background: #f7f7f7;
+  padding: 8px 10px;
+`;
+
+const DefinitionPanelTerm = styled.span`
+  color: #2f3238;
+  font-size: 13px;
+  font-weight: 700;
+`;
+
+const DefinitionPanelContent = styled.p`
+  margin: 0;
+  color: #666666;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const DefinitionPanelMeta = styled.span`
+  color: #8f8f8f;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const DefinitionPanelQuote = styled.blockquote`
+  margin: 0;
+  border-left: 3px solid #d8f5ec;
+  padding-left: 8px;
+  color: #9a9a9a;
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const DefinitionPanelEmpty = styled.p`
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.35;
 `;
 
 const StancePanel = styled(ConsensusSummaryPanel)`

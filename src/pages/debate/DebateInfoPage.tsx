@@ -337,6 +337,31 @@ const DebateInfoPage = () => {
         <InfoText>참여 인원 : {debate.participantCount ?? debate.participants?.length ?? 0}명</InfoText>
       </InfoCard>
 
+      <SummaryCard>
+        <SummaryText>진행된 의견 : {postCount}개</SummaryText>
+        <DefinitionTitle>이 토론의 기준 정의</DefinitionTitle>
+        {definitions.length > 0 ? (
+          <DefinitionList>
+            {definitions.map((definition) => (
+              <DefinitionItem key={definition.id}>
+                <DefinitionTerm>{definition.term}</DefinitionTerm>
+                <DefinitionContent>{definition.content}</DefinitionContent>
+                {definition.sourceConsensus?.title && (
+                  <DefinitionMeta>합의안: {definition.sourceConsensus.title}</DefinitionMeta>
+                )}
+                {definition.selectionTarget?.selectedText && (
+                  <DefinitionQuote>
+                    선택 문장: "{getShortText(definition.selectionTarget.selectedText, 88)}"
+                  </DefinitionQuote>
+                )}
+              </DefinitionItem>
+            ))}
+          </DefinitionList>
+        ) : (
+          <EmptyText>아직 승인된 기준 정의가 없습니다.</EmptyText>
+        )}
+      </SummaryCard>
+
       {(parentDebate || childDebates.length > 0) && (
         <RelationCard>
           {parentDebate && (
@@ -400,23 +425,6 @@ const DebateInfoPage = () => {
           )}
         </ParticipantsList>
       </ParticipantsCard>
-
-      <SummaryCard>
-        <SummaryText>진행된 의견 : {postCount}개</SummaryText>
-        <DefinitionTitle>이 토론의 기준 정의</DefinitionTitle>
-        {definitions.length > 0 ? (
-          <DefinitionList>
-            {definitions.map((definition) => (
-              <DefinitionItem key={definition.id}>
-                <DefinitionTerm>{definition.term}</DefinitionTerm>
-                <DefinitionContent>{definition.content}</DefinitionContent>
-              </DefinitionItem>
-            ))}
-          </DefinitionList>
-        ) : (
-          <EmptyText>아직 승인된 기준 정의가 없습니다.</EmptyText>
-        )}
-      </SummaryCard>
 
       {isCloseModalOpen && (
         <ModalBackdrop onClick={() => setIsCloseModalOpen(false)}>
@@ -818,7 +826,10 @@ const DefinitionList = styled.div`
 const DefinitionItem = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  border-radius: 8px;
+  background: #f7f7f7;
+  padding: 9px 10px;
 `;
 
 const DefinitionTerm = styled.span`
@@ -833,6 +844,26 @@ const DefinitionContent = styled.p`
   color: #9a9a9a;
   line-height: 1.4;
   white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const DefinitionMeta = styled.span`
+  color: #8f8f8f;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const DefinitionQuote = styled.blockquote`
+  margin: 0;
+  border-left: 3px solid #d8f5ec;
+  padding-left: 8px;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.4;
   word-break: keep-all;
   overflow-wrap: anywhere;
 `;

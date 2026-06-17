@@ -95,6 +95,7 @@ export interface DebateDefinition {
     title: string;
     status: ConsensusStatus;
   } | null;
+  selectionTarget?: SelectionTargetSummary | null;
   creator?: {
     id: string;
     nickname: string;
