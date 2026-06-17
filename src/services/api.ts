@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_TIMEOUT_MS, AUTH_EXEMPT_PATH_PREFIXES } from '../constants/api';
+import { API_TIMEOUT_MS } from '../constants/api';
 import { loginExpiredPath, ROUTES } from '../constants/routes';
 
 const api = axios.create({
