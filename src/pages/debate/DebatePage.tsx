@@ -4,6 +4,7 @@ import SideDrawer from '../../components/common/SideDrawer';
 import styled from 'styled-components';
 import { LoadingContent } from '../../components/common/LoadingContent';
 import { DebateRoomCardSkeleton } from '../../components/common/PageSkeletons';
+import DebateRelationMeta from '../../components/debate/DebateRelationMeta';
 import TagPicker from '../../components/tags/TagPicker';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconAlarm2 from '../../assets/icon_alarm2.svg';
@@ -41,6 +42,7 @@ type DebateRoomCard = {
   participants: number;
   tagLabels: string[];
   createdDateLabel: string;
+  relationData: Debate;
 };
 
 const getDebateParticipantCount = (debate: Debate) =>
@@ -66,6 +68,7 @@ const mapToRoomCard = (debate: Debate): DebateRoomCard => ({
   participants: getDebateParticipantCount(debate),
   tagLabels: getDebateTagLabels(debate),
   createdDateLabel: formatDateLabel(debate.createdAt),
+  relationData: debate,
 });
 
 const BackIcon = () => (
@@ -285,6 +288,11 @@ const DebatePage = () => {
                 </CardTopRight>
               </CardTop>
               <CardTitle>{card.title}</CardTitle>
+              <DebateRelationMeta
+                debate={card.relationData}
+                compact
+                onParentClick={(parentId) => navigate(debateThreadPath(parentId))}
+              />
               <TypeBadge>{card.debateTypeLabel}</TypeBadge>
               <CardDesc>{card.description}</CardDesc>
               {card.tagLabels.length > 0 && (

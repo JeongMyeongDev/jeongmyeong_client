@@ -14,6 +14,12 @@ export interface DebateTag {
   name: string;
 }
 
+export type DebateSummary = Pick<Debate, "id" | "title" | "status" | "debateType">;
+export type SelectionTargetSummary = Pick<
+  SelectionTarget,
+  "id" | "selectedText" | "sourceType" | "sourceId"
+>;
+
 export interface Debate {
   id: string;
   title: string;
@@ -64,7 +70,9 @@ export interface Debate {
       profileImage?: string | null;
     };
   } | null;
-  sourceSelectionTarget?: SelectionTarget;
+  parentDebate?: DebateSummary | null;
+  sourceSelectionTarget?: SelectionTargetSummary | SelectionTarget | null;
+  childDebates?: DebateSummary[];
 
 }
 
@@ -87,6 +95,7 @@ export interface DebateDefinition {
     title: string;
     status: ConsensusStatus;
   } | null;
+  selectionTarget?: SelectionTargetSummary | null;
   creator?: {
     id: string;
     nickname: string;

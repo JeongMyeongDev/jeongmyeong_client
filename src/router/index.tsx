@@ -15,10 +15,13 @@ import OnboardingPage from '../pages/onboarding/OnboardingPage';
 import DefinitionSearchPage from '../pages/definition/DefinitionSearchPage';
 import MessagePage from '../pages/message/MessagePage';
 import ProfilePage from '../pages/profile/ProfilePage';
+import SupportPage from '../pages/support/SupportPage';
 import NotificationPage from '../pages/notification/NotificationPage';
 import NotificationSettingsPage from '../pages/notification/NotificationSettingsPage';
 import MyDebatesPage from '../pages/myDebates/MyDebatesPage';
+import ParticipatedDebatesPage from '../pages/participatedDebates/ParticipatedDebatesPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
+import AdminSupportInquiriesPage from '../pages/admin/AdminSupportInquiriesPage';
 import MySanctionsPage from '../pages/sanctions/MySanctionsPage';
 import { ROUTES } from '../constants/routes';
 
@@ -48,11 +51,14 @@ const router = createBrowserRouter([
           { path: ROUTES.DEFINITIONS.slice(1), element: <DefinitionSearchPage /> },
           { path: 'message', element: <MessagePage /> },
           { path: ROUTES.PROFILE.slice(1), element: <ProfilePage /> },
+          { path: ROUTES.SUPPORT.slice(1), element: <SupportPage /> },
           { path: ROUTES.NOTIFICATIONS.slice(1), element: <NotificationPage /> },
           { path: ROUTES.NOTIFICATION_SETTINGS.slice(1), element: <NotificationSettingsPage /> },
           { path: ROUTES.MY_DEBATES.slice(1), element: <MyDebatesPage /> },
+          { path: ROUTES.PARTICIPATED_DEBATES.slice(1), element: <ParticipatedDebatesPage /> },
           { path: ROUTES.MY_SANCTIONS.slice(1), element: <MySanctionsPage /> },
           { path: ROUTES.ADMIN_REPORTS.slice(1), element: <AdminReportsPage /> },
+          { path: ROUTES.ADMIN_SUPPORT_INQUIRIES.slice(1), element: <AdminSupportInquiriesPage /> },
         ],
       },
     ],

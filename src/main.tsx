@@ -13,6 +13,7 @@ const GlobalStyle = createGlobalStyle`
 
   html, body, #root {
     height: 100%;
+    color-scheme: light;
   }
 
   body {
@@ -22,6 +23,13 @@ const GlobalStyle = createGlobalStyle`
     -webkit-font-smoothing: antialiased;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    color-scheme: light;
   }
 
   button {

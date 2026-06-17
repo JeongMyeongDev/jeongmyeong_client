@@ -37,6 +37,12 @@ const formatCreatedDate = (createdAt?: string) => {
   return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
 };
 
+const getShortText = (value: string, maxLength = 56) => {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength)}...`;
+};
+
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (isAxiosError(error)) {
     const message = error.response?.data?.message;
@@ -95,16 +101,12 @@ const DebateInfoPage = () => {
           detailResponse,
           postsResponse,
           definitionsResponse,
-          childDebatesResponse,
-          parentResponse,
           progressResponse,
           stanceSummaryResponse,
         ] = await Promise.all([
           debateService.getById(debateId),
           debateService.getMessages(debateId, { page: 1, limit: 50 }),
           definitionService.getByDebate(debateId),
-          debateService.getChildDebates(debateId),
-          debateService.getParent(debateId),
           debateService.getProgress(debateId),
           debateService.getStanceSummary(debateId),
         ]);
@@ -121,11 +123,21 @@ const DebateInfoPage = () => {
         setDefinitions(definitionsResponse.data.definitions);
         setParticipantNames(participantNames.slice(0, 6));
         setPostCount(postsResponse.data.totalCount ?? posts.length);
-        setChildDebates(childDebatesResponse.data.childDebates);
-        setParentDebate(parentResponse.data.parentDebate);
-        setParentSelectionTarget(parentResponse.data.sourceSelectionTarget ?? null);
         setProgress(progressResponse.data.progress);
         setStanceSummary(stanceSummaryResponse.data.summary);
+
+        const [childDebatesResponse, parentResponse] = await Promise.allSettled([
+          debateService.getChildDebates(debateId),
+          debateService.getParent(debateId),
+        ]);
+
+        if (childDebatesResponse.status === 'fulfilled') {
+          setChildDebates(childDebatesResponse.value.data.childDebates);
+        }
+        if (parentResponse.status === 'fulfilled') {
+          setParentDebate(parentResponse.value.data.parentDebate);
+          setParentSelectionTarget(parentResponse.value.data.sourceSelectionTarget ?? null);
+        }
       });
     };
 
@@ -325,13 +337,41 @@ const DebateInfoPage = () => {
         <InfoText>참여 인원 : {debate.participantCount ?? debate.participants?.length ?? 0}명</InfoText>
       </InfoCard>
 
+      <SummaryCard>
+        <SummaryText>진행된 의견 : {postCount}개</SummaryText>
+        <DefinitionTitle>이 토론의 기준 정의</DefinitionTitle>
+        {definitions.length > 0 ? (
+          <DefinitionList>
+            {definitions.map((definition) => (
+              <DefinitionItem key={definition.id}>
+                <DefinitionTerm>{definition.term}</DefinitionTerm>
+                <DefinitionContent>{definition.content}</DefinitionContent>
+                {definition.sourceConsensus?.title && (
+                  <DefinitionMeta>합의안: {definition.sourceConsensus.title}</DefinitionMeta>
+                )}
+                {definition.selectionTarget?.selectedText && (
+                  <DefinitionQuote>
+                    선택 문장: "{getShortText(definition.selectionTarget.selectedText, 88)}"
+                  </DefinitionQuote>
+                )}
+              </DefinitionItem>
+            ))}
+          </DefinitionList>
+        ) : (
+          <EmptyText>아직 승인된 기준 정의가 없습니다.</EmptyText>
+        )}
+      </SummaryCard>
+
       {(parentDebate || childDebates.length > 0) && (
         <RelationCard>
           {parentDebate && (
             <RelationBlock>
               <RelationTitle>상위 토론</RelationTitle>
+              <RelationHelpText>
+                이 토론은 "{parentDebate.title}"에서 파생된 하위 토론입니다.
+              </RelationHelpText>
               {parentSelectionTarget?.selectedText && (
-                <RelationQuote>{parentSelectionTarget.selectedText}</RelationQuote>
+                <RelationQuote>분기 기준: "{getShortText(parentSelectionTarget.selectedText)}"</RelationQuote>
               )}
               <RelationButton
                 type="button"
@@ -343,14 +383,17 @@ const DebateInfoPage = () => {
           )}
           {childDebates.length > 0 && (
             <RelationBlock>
-              <RelationTitle>하위 토론</RelationTitle>
+              <RelationTitle>연결된 하위 토론</RelationTitle>
               <RelationList>
                 {childDebates.map((childDebate) => (
                   <RelationItem key={childDebate.id}>
                     <RelationItemText>
                       <strong>{childDebate.title}</strong>
+                      <small>
+                        {STATUS_LABEL_MAP[childDebate.status]} · {DEBATE_TYPE_LABEL_MAP[childDebate.debateType]}
+                      </small>
                       {childDebate.sourceSelectionTarget?.selectedText && (
-                        <span>{childDebate.sourceSelectionTarget.selectedText}</span>
+                        <span>분기 기준: "{getShortText(childDebate.sourceSelectionTarget.selectedText)}"</span>
                       )}
                     </RelationItemText>
                     <RelationSmallButton
@@ -382,23 +425,6 @@ const DebateInfoPage = () => {
           )}
         </ParticipantsList>
       </ParticipantsCard>
-
-      <SummaryCard>
-        <SummaryText>진행된 의견 : {postCount}개</SummaryText>
-        <DefinitionTitle>이 토론의 기준 정의</DefinitionTitle>
-        {definitions.length > 0 ? (
-          <DefinitionList>
-            {definitions.map((definition) => (
-              <DefinitionItem key={definition.id}>
-                <DefinitionTerm>{definition.term}</DefinitionTerm>
-                <DefinitionContent>{definition.content}</DefinitionContent>
-              </DefinitionItem>
-            ))}
-          </DefinitionList>
-        ) : (
-          <EmptyText>아직 승인된 기준 정의가 없습니다.</EmptyText>
-        )}
-      </SummaryCard>
 
       {isCloseModalOpen && (
         <ModalBackdrop onClick={() => setIsCloseModalOpen(false)}>
@@ -632,6 +658,15 @@ const RelationTitle = styled.h2`
   font-weight: 700;
 `;
 
+const RelationHelpText = styled.p`
+  margin: 0;
+  color: #555555;
+  font-size: var(--body-sm);
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
 const RelationQuote = styled.p`
   margin: 0;
   border-left: 3px solid #2dcd97;
@@ -680,6 +715,7 @@ const RelationItemText = styled.div`
   gap: 3px;
 
   strong,
+  small,
   span {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -694,6 +730,11 @@ const RelationItemText = styled.div`
   span {
     color: #9a9a9a;
     font-size: 12px;
+  }
+
+  small {
+    color: #7f7f7f;
+    font-size: 11px;
   }
 `;
 
@@ -785,7 +826,10 @@ const DefinitionList = styled.div`
 const DefinitionItem = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  border-radius: 8px;
+  background: #f7f7f7;
+  padding: 9px 10px;
 `;
 
 const DefinitionTerm = styled.span`
@@ -800,6 +844,26 @@ const DefinitionContent = styled.p`
   color: #9a9a9a;
   line-height: 1.4;
   white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+`;
+
+const DefinitionMeta = styled.span`
+  color: #8f8f8f;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const DefinitionQuote = styled.blockquote`
+  margin: 0;
+  border-left: 3px solid #d8f5ec;
+  padding-left: 8px;
+  color: #9a9a9a;
+  font-size: 12px;
+  line-height: 1.4;
   word-break: keep-all;
   overflow-wrap: anywhere;
 `;
