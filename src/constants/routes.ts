@@ -7,12 +7,14 @@ export const ROUTES = {
   DEBATE_INFO: '/debate/:id/info',
   DEFINITIONS: '/definitions',
   PROFILE: '/profile',
+  SUPPORT: '/profile/support',
   NOTIFICATIONS: '/notifications',
   NOTIFICATION_SETTINGS: '/notification-settings',
   MY_DEBATES: '/my-debates',
   PARTICIPATED_DEBATES: '/participated-debates',
   MY_SANCTIONS: '/my-sanctions',
   ADMIN_REPORTS: '/admin/reports',
+  ADMIN_SUPPORT_INQUIRIES: '/admin/support-inquiries',
   LOGIN: '/login',
   ONBOARDING: '/onboarding',
 } as const;
@@ -26,6 +28,7 @@ export const shouldHideBottomNav = (pathname: string) => {
   return (
     pathname.startsWith(ROUTES.DEBATE_CREATE) ||
     pathname === ROUTES.ADMIN_REPORTS ||
+    pathname === ROUTES.ADMIN_SUPPORT_INQUIRIES ||
     pathname.endsWith('/info') ||
     pathname === ROUTES.ONBOARDING ||
     isDebateThread

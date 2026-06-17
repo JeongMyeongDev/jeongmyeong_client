@@ -108,13 +108,17 @@ const ProfilePage = () => {
   const settingRows = useMemo<MenuRow[]>(
     () => [
       { label: '알림 설정', action: () => navigate(ROUTES.NOTIFICATION_SETTINGS) },
+      { label: '문의하기', action: () => navigate(ROUTES.SUPPORT) },
       { label: '튜토리얼 다시 보기', action: () => navigate(ROUTES.ONBOARDING) },
     ],
     [navigate],
   );
 
   const adminRows = useMemo<MenuRow[]>(
-    () => [{ label: '신고 관리', action: () => navigate(ROUTES.ADMIN_REPORTS) }],
+    () => [
+      { label: '신고 관리', action: () => navigate(ROUTES.ADMIN_REPORTS) },
+      { label: '문의 관리', action: () => navigate(ROUTES.ADMIN_SUPPORT_INQUIRIES) },
+    ],
     [navigate],
   );
 
