@@ -112,6 +112,36 @@ const StatusBadge = ({ status }: { status: string }) => {
   return <Badge $active={status === 'OPEN'}>{label}</Badge>;
 };
 
+const FeaturedRelationMeta = ({
+  debate,
+  onParentClick,
+}: {
+  debate: Pick<Debate, 'parentDebateId' | 'parentDebate'>;
+  onParentClick: (parentDebateId: string) => void;
+}) => {
+  if (!debate.parentDebateId) return null;
+
+  const parentDebateId = debate.parentDebateId;
+  const parentTitle = debate.parentDebate?.title?.trim();
+
+  const handleParentClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onParentClick(parentDebateId);
+  };
+
+  return (
+    <FRelation>
+      <FRelationBadge>하위토론</FRelationBadge>
+      {parentTitle && (
+        <FParentButton type="button" onClick={handleParentClick}>
+          <FParentLabel>상위토론</FParentLabel>
+          <FParentTitle>{parentTitle}</FParentTitle>
+        </FParentButton>
+      )}
+    </FRelation>
+  );
+};
+
 const FeaturedCard = ({
   item,
   onClick,
@@ -128,9 +158,8 @@ const FeaturedCard = ({
       ...
     </CardActionButton>
     <FTitle>{item.title}</FTitle>
-    <DebateRelationMeta
+    <FeaturedRelationMeta
       debate={item.relationData}
-      compact
       onParentClick={onParentClick}
     />
     <FDesc>{item.description}</FDesc>
@@ -178,11 +207,11 @@ const DebateCard = ({
         <DTypeBadge>{item.modalData.debateTypeLabel}</DTypeBadge>
       </DMetaRow>
       <DTitle>{item.title}</DTitle>
-    <DebateRelationMeta
-      debate={item.relationData}
-      compact
-      onParentClick={onParentClick}
-    />
+      <DebateRelationMeta
+        debate={item.relationData}
+        compact
+        onParentClick={onParentClick}
+      />
       <DDesc>{item.description}</DDesc>
       <DTagList>
         {item.modalData.tags.map((tag) => (
@@ -663,7 +692,7 @@ const CarouselWrapper = styled.div`
 const FCard = styled.div`
   width: min(330px, calc(100vw - var(--page-x) - var(--page-x)));
   min-width: min(330px, calc(100vw - var(--page-x) - var(--page-x)));
-  min-height: clamp(220px, 57.7vw, 248px);
+  min-height: clamp(236px, 63vw, 270px);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -697,7 +726,7 @@ const CardActionButton = styled.button`
 `;
 
 const FTitle = styled.h3`
-  margin: 4px 0 10px;
+  margin: 4px 34px 10px;
   text-align: center;
   font-size: var(--title-sm);
   line-height: 1.2;
@@ -708,8 +737,71 @@ const FTitle = styled.h3`
   white-space: nowrap;
 `;
 
+const FRelation = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 26px;
+  margin: 0 0 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #f4faf7;
+  box-sizing: border-box;
+`;
+
+const FRelationBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #2d8f73;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+`;
+
+const FParentButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: #5f6663;
+  text-align: left;
+`;
+
+const FParentLabel = styled.span`
+  flex-shrink: 0;
+  color: #7d8883;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+`;
+
+const FParentTitle = styled.span`
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #3f4643;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+`;
+
 const FDesc = styled.p`
-  margin: 0 clamp(16px, 6.9vw, 29.5px) clamp(14px, 4.2vw, 18px);
+  margin: 0 clamp(10px, 4.8vw, 20px) clamp(12px, 3.7vw, 16px);
   text-align: left;
   font-size: var(--body-sm);
   line-height: 1.3;
@@ -726,7 +818,7 @@ const FMeta = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0 clamp(16px, 6.9vw, 29.5px) clamp(14px, 4.2vw, 18px);
+  margin: 0 clamp(10px, 4.8vw, 20px) clamp(14px, 4.2vw, 18px);
 `;
 
 const FAuthor = styled.div`
@@ -763,13 +855,10 @@ const FParticipants = styled.div`
 const FTags = styled.div`
   display: flex;
   align-items: center;
-  position: absolute;
-  left: clamp(24px, 11.5vw, 49.5px);
-  right: clamp(24px, 11.5vw, 49.5px);
-  bottom: clamp(36px, 11.1vw, 48px);
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
+  margin: auto clamp(10px, 4.8vw, 20px) 0;
 `;
 
 const FTagList = styled.div`
