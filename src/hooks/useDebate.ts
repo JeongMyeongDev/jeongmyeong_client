@@ -10,6 +10,11 @@ import type {
   ListDebatesParams,
 } from '../services/debateService';
 
+// 가장 마지막으로 요청한 토론/메시지 id를 추적해, 늦게 도착한 이전 요청 응답이
+// 이후에 탐색한 토론의 상태를 덮어쓰지 않도록 막는다 (네트워크 응답 순서 역전 대비).
+let latestRequestedDebateId: string | null = null;
+let latestRequestedMessagesId: string | null = null;
+
 export const useDebate = () => {
   const { debates, currentDebate, messages, setDebates, setCurrentDebate, setMessages, addMessage } =
     useDebateStore();
@@ -25,12 +30,16 @@ export const useDebate = () => {
   }, [setDebates]);
 
   const fetchDebate = useCallback(async (id: string) => {
+    latestRequestedDebateId = id;
     const { data } = await debateService.getById(id);
+    if (latestRequestedDebateId !== id) return;
     setCurrentDebate(data.debate);
   }, [setCurrentDebate]);
 
   const fetchMessages = useCallback(async (id: string) => {
+    latestRequestedMessagesId = id;
     const { data } = await debateService.getMessages(id);
+    if (latestRequestedMessagesId !== id) return;
     setMessages(data.posts);
   }, [setMessages]);
 

@@ -471,8 +471,12 @@ const DebateThreadPage = () => {
   const [expandedChildDebateStacks, setExpandedChildDebateStacks] = useState<Record<string, boolean>>({});
   const canFinalizeConsensus =
     user?.role === "ADMIN" || currentDebate?.creator?.id === user?.id;
+  const isCurrentDebateSynced = currentDebate?.id === debateId;
+  const currentDebateStatus = isCurrentDebateSynced
+    ? currentDebate?.status
+    : undefined;
   const isDebateReadOnly =
-    currentDebate?.status === "CLOSED" || currentDebate?.status === "ARCHIVED";
+    currentDebateStatus === "CLOSED" || currentDebateStatus === "ARCHIVED";
   const isConsensusBlocked =
     currentDebate?.debateType === "CONSENSUS" && Boolean(progress?.isBlocked);
   const isSanctionWriteBlocked = !canWrite();
@@ -495,9 +499,9 @@ const DebateThreadPage = () => {
       ? "정지된 계정입니다. 제재 내역을 확인해 주세요."
       : isSanctionWriteBlocked
       ? "제재로 인해 현재 작성할 수 없습니다."
-      : currentDebate?.status === "ARCHIVED"
+      : currentDebateStatus === "ARCHIVED"
       ? "아카이브된 토론입니다."
-      : currentDebate?.status === "CLOSED"
+      : currentDebateStatus === "CLOSED"
         ? "종료된 토론입니다."
         : "";
 
@@ -553,6 +557,18 @@ const DebateThreadPage = () => {
 
     void loadThread();
   }, [debateId, fetchDebate, fetchMessages, executeAsync, user]);
+
+  useEffect(() => {
+    setSubmitError("");
+    setActionMessage("");
+    setPendingSelection(null);
+    setComposerSelection(null);
+    setEditSelection(null);
+    setConsensusDraft(null);
+    setChildDebateDraft(null);
+    setReplyTarget(null);
+    setEditTarget(null);
+  }, [debateId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => inputRef.current?.focus(), 250);
@@ -804,7 +820,7 @@ const DebateThreadPage = () => {
       return false;
     }
 
-    if (currentDebate?.status !== "OPEN") {
+    if (currentDebateStatus !== "OPEN") {
       setPendingSelection(null);
       setActionMessage(
         "종료되었거나 보관된 토론에서는 선택 액션을 사용할 수 없습니다.",
@@ -973,7 +989,14 @@ const DebateThreadPage = () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
       clearSelectionTimers();
     };
-  }, [activeCardMenuKey, composerSelection, editSelection, pendingSelection]);
+  }, [
+    activeCardMenuKey,
+    composerSelection,
+    editSelection,
+    pendingSelection,
+    debateId,
+    currentDebateStatus,
+  ]);
 
   const handleComposerSelection = () => {
     window.setTimeout(() => {
@@ -989,17 +1012,17 @@ const DebateThreadPage = () => {
         return;
       }
 
-      if (currentDebate?.status === "CLOSED") {
+      if (currentDebateStatus === "CLOSED") {
         setActionMessage("종료된 토론에서는 정의를 연결할 수 없습니다.");
         setComposerSelection(null);
         return;
       }
-      if (currentDebate?.status === "ARCHIVED") {
+      if (currentDebateStatus === "ARCHIVED") {
         setActionMessage("아카이브된 토론은 읽기 전용입니다.");
         setComposerSelection(null);
         return;
       }
-      if (currentDebate?.status !== "OPEN") {
+      if (currentDebateStatus !== "OPEN") {
         setComposerSelection(null);
         return;
       }
@@ -1029,17 +1052,17 @@ const DebateThreadPage = () => {
         return;
       }
 
-      if (currentDebate?.status === "CLOSED") {
+      if (currentDebateStatus === "CLOSED") {
         setActionMessage("종료된 토론에서는 정의를 연결할 수 없습니다.");
         setEditSelection(null);
         return;
       }
-      if (currentDebate?.status === "ARCHIVED") {
+      if (currentDebateStatus === "ARCHIVED") {
         setActionMessage("아카이브된 토론은 읽기 전용입니다.");
         setEditSelection(null);
         return;
       }
-      if (currentDebate?.status !== "OPEN") {
+      if (currentDebateStatus !== "OPEN") {
         setEditSelection(null);
         return;
       }
@@ -1516,7 +1539,7 @@ const DebateThreadPage = () => {
 
   const handleSelectionAction = async (action: SelectionAction) => {
     if (!pendingSelection) return;
-    if (currentDebate?.status !== "OPEN") {
+    if (currentDebateStatus !== "OPEN") {
       setSubmitError(
         "종료되었거나 보관된 토론에서는 선택 액션을 사용할 수 없습니다.",
       );
@@ -1770,7 +1793,7 @@ const DebateThreadPage = () => {
   ) => {
     setActiveCardMenuKey(null);
 
-    if (currentDebate?.status !== "OPEN") {
+    if (currentDebateStatus !== "OPEN") {
       setActionMessage(
         "종료되었거나 보관된 토론에서는 선택 액션을 사용할 수 없습니다.",
       );
