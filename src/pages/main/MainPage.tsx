@@ -47,6 +47,8 @@ const BackIcon = () => (
 
 const ModalMenuIcon = () => <img src={iconShowInfo} width="34" height="34" alt="" />;
 
+const FEATURED_CARD_TAG_LIMIT = 1;
+
 // ??? Mock Data ?????????????????????????????????????????????????????????????????
 
 type ModalDebateItem = {
@@ -135,9 +137,12 @@ const FeaturedCard = ({
     <FTags>
       <StatusBadge status={item.status} />
       <FTagList>
-        {item.tags.map((tag) => (
+        {item.tags.slice(0, FEATURED_CARD_TAG_LIMIT).map((tag) => (
           <TagPill key={tag}>{tag}</TagPill>
         ))}
+        {item.tags.length > FEATURED_CARD_TAG_LIMIT && (
+          <TagOverflowBadge>+{item.tags.length - FEATURED_CARD_TAG_LIMIT}</TagOverflowBadge>
+        )}
       </FTagList>
     </FTags>
   </FCard>
@@ -780,19 +785,35 @@ const TagPill = styled.span`
   height: clamp(32px, 8.8vw, 38px);
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  max-width: min(120px, 32vw);
-  min-width: 0;
+  justify-content: flex-start;
+  max-width: min(96px, 26vw);
+  min-width: 36px;
   padding: 0 clamp(10px, 3.2vw, 14px);
   border-radius: 999px;
   border: 2px solid #a8a8a8;
   font-size: var(--body-md);
   background: transparent;
   color: #9f9f9f;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const TagOverflowBadge = styled.span`
+  height: clamp(32px, 8.8vw, 38px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 clamp(10px, 3.2vw, 14px);
+  border-radius: 999px;
+  border: 2px solid #a8a8a8;
+  font-size: var(--body-md);
+  background: transparent;
+  color: #9f9f9f;
+  flex: 0 0 auto;
+  line-height: 1;
   white-space: nowrap;
 `;
 
