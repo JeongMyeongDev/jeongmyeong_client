@@ -1,8 +1,10 @@
 import axios from 'axios';
+import { API_TIMEOUT_MS, AUTH_EXEMPT_PATH_PREFIXES } from '../constants/api';
+import { loginExpiredPath, ROUTES } from '../constants/routes';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5173/',
-  timeout: 10000,
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/',
+  timeout: API_TIMEOUT_MS,
 });
 
 api.interceptors.request.use((config) => {
@@ -17,17 +19,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const requestUrl = error.config?.url ?? '';
-    const isAuthRequest =
-      requestUrl.startsWith('/auth/login') ||
-      requestUrl.startsWith('/auth/signup') ||
-      requestUrl.startsWith('/auth/google') ||
-      requestUrl.startsWith('/auth/google/signup') ||
-      requestUrl.startsWith('/auth/verify-email');
+    const isAuthRequest = AUTH_EXEMPT_PATH_PREFIXES.some((path) =>
+      requestUrl.startsWith(path),
+    );
 
     if (error.response?.status === 401 && !isAuthRequest) {
       localStorage.removeItem('accessToken');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login?expired=1';
+      if (window.location.pathname !== ROUTES.LOGIN) {
+        window.location.href = loginExpiredPath();
       }
     }
     return Promise.reject(error);

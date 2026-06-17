@@ -2,15 +2,11 @@ import { Outlet, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import BottomNav from './components/layout/BottomNav';
 import SanctionNotice from './components/moderation/SanctionNotice';
+import { shouldHideBottomNav } from './constants/routes';
 
 const App = () => {
   const location = useLocation();
-  const isDebateThread = /^\/debate\/(?!archive$|create$)[^/]+$/.test(location.pathname);
-  const hideBottomNav =
-    location.pathname.startsWith('/debate/create') ||
-    location.pathname.endsWith('/info') ||
-    location.pathname === '/onboarding' ||
-    isDebateThread;
+  const hideBottomNav = shouldHideBottomNav(location.pathname);
 
   return (
     <Layout>

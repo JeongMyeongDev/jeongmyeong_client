@@ -1,5 +1,7 @@
 import styled from 'styled-components';
-import type { Debate, DebateType } from '../../types/debate';
+import { DEBATE_TYPE_LABELS } from '../../constants/debate';
+import { MESSAGES } from '../../constants/messages';
+import type { Debate } from '../../types/debate';
 
 interface DebateMetadataModalProps {
   debate: Debate;
@@ -7,17 +9,11 @@ interface DebateMetadataModalProps {
   onJoin: () => void;
 }
 
-const DEBATE_TYPE_LABEL: Record<DebateType, string> = {
-  PROS_CONS: '찬반토론',
-  CONSENSUS: '합의토론',
-  FREE: '일반 토론',
-};
-
 const formatDate = (date?: string) => {
-  if (!date) return '날짜 정보 없음';
+  if (!date) return MESSAGES.NO_DATE_INFO;
 
   const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return date;
+  if (Number.isNaN(parsed.getTime())) return MESSAGES.NO_DATE_INFO;
 
   return parsed.toLocaleDateString('ko-KR', {
     year: 'numeric',
@@ -28,7 +24,7 @@ const formatDate = (date?: string) => {
 
 const DebateMetadataModal = ({ debate, onClose, onJoin }: DebateMetadataModalProps) => {
   const tagName = debate.tagMaps?.[0]?.tag.name;
-  const creatorName = debate.creator?.nickname ?? '사용자 이름';
+  const creatorName = debate.creator?.nickname ?? MESSAGES.NO_USER_INFO;
   const participantCount = debate.participantCount ?? debate.participants?.length ?? 0;
 
   return (
@@ -36,10 +32,7 @@ const DebateMetadataModal = ({ debate, onClose, onJoin }: DebateMetadataModalPro
       <ModalCard>
         <TopRow>
           <IconButton type="button" aria-label="닫기" onClick={onClose}>
-            ←
-          </IconButton>
-          <IconButton type="button" aria-label="더보기">
-            ⋮
+            ×
           </IconButton>
         </TopRow>
 
@@ -54,20 +47,12 @@ const DebateMetadataModal = ({ debate, onClose, onJoin }: DebateMetadataModalPro
             <CreatorName>{creatorName}</CreatorName>
           </ProfileRow>
 
-          <MetaText>토론 방식 : {DEBATE_TYPE_LABEL[debate.debateType]}</MetaText>
+          <MetaText>토론 방식 : {DEBATE_TYPE_LABELS[debate.debateType]}</MetaText>
           <MetaText>참여 인원 : {participantCount}</MetaText>
           <MetaText>{formatDate(debate.createdAt)}</MetaText>
         </Content>
 
         <BottomRow>
-          <SmallActions>
-            <SmallIconButton type="button" aria-label="저장">
-              ☆
-            </SmallIconButton>
-            <SmallIconButton type="button" aria-label="알림">
-              ♧
-            </SmallIconButton>
-          </SmallActions>
           <JoinButton type="button" onClick={onJoin}>
             참여하기
           </JoinButton>
@@ -102,7 +87,7 @@ const ModalCard = styled.section`
 const TopRow = styled.div`
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
 `;
 
 const IconButton = styled.button`
@@ -183,23 +168,7 @@ const MetaText = styled.p`
 const BottomRow = styled.div`
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: clamp(10px, 3.7vw, 16px);
-`;
-
-const SmallActions = styled.div`
-  display: flex;
-  align-items: center;
-  gap: clamp(10px, 3.7vw, 16px);
-`;
-
-const SmallIconButton = styled.button`
-  width: clamp(36px, 9.3vw, 40px);
-  height: clamp(36px, 9.3vw, 40px);
-  border: none;
-  background: transparent;
-  color: #2f3238;
-  font-size: clamp(22px, 5.6vw, 24px);
+  justify-content: flex-end;
 `;
 
 const JoinButton = styled.button`

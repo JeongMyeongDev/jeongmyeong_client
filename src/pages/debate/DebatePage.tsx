@@ -13,39 +13,34 @@ import iconSearch from '../../assets/icon_search.svg';
 import iconShowInfo from '../../assets/icon_show_info.svg';
 import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
+import {
+  ALL_DEBATE_FILTER_LABEL,
+  DEBATE_STATUS_LABELS,
+  DEBATE_TYPE_FILTER_ITEMS,
+  DEBATE_TYPE_FILTER_MAP,
+  SHORT_DEBATE_TYPE_LABELS,
+} from '../../constants/debate';
+import { MESSAGES } from '../../constants/messages';
+import { DEBATE_ROOM_LIMIT } from '../../constants/pagination';
+import { debateInfoPath, debateThreadPath, ROUTES } from '../../constants/routes';
 import { useDebate } from '../../hooks/useDebate';
 import { usePageLoading } from '../../hooks/usePageLoading';
+import { debateService } from '../../services/debateService';
 import type { Debate, DebateTag } from '../../types/debate';
+import { formatDateLabel } from '../../utils/dateFormat';
 
 type DebateRoomCard = {
   id: string;
   title: string;
   description: string;
-  statusLabel: '준비중' | '진행중';
+  status: Debate['status'];
+  isBookmarked: boolean;
+  isSubscribed: boolean;
   creatorName: string;
   debateTypeLabel: string;
   participants: number;
   tagLabels: string[];
   createdDateLabel: string;
-};
-
-const FILTER_ITEMS = ['찬반토론', '합의토론', '자유토론'];
-const FILTER_TYPE_MAP: Record<string, 'PROS_CONS' | 'CONSENSUS' | 'FREE'> = {
-  찬반토론: 'PROS_CONS',
-  합의토론: 'CONSENSUS',
-  자유토론: 'FREE',
-};
-const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
-  PROS_CONS: '찬반',
-  CONSENSUS: '합의',
-  FREE: '자유',
-};
-
-const formatCreatedDate = (createdAt?: string) => {
-  if (!createdAt) return '20XX. YY. ZZ';
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return '20XX. YY. ZZ';
-  return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
 };
 
 const getDebateParticipantCount = (debate: Debate) =>
@@ -56,19 +51,21 @@ const getDebateTagLabels = (debate: Debate) => {
     ?.map((tag) => tag.name.trim())
     .filter(Boolean)
     .map((tag) => `#${tag}`);
-  return tags?.length ? tags : ['#기타'];
+  return tags?.length ? tags : [];
 };
 
 const mapToRoomCard = (debate: Debate): DebateRoomCard => ({
   id: debate.id,
   title: debate.title,
   description: debate.description,
-  statusLabel: debate.status === 'OPEN' ? '진행중' : '준비중',
-  creatorName: debate.creator?.nickname ?? '사용자 이름',
-  debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
+  status: debate.status,
+  isBookmarked: Boolean(debate.isBookmarked),
+  isSubscribed: Boolean(debate.isSubscribed),
+  creatorName: debate.creator?.nickname ?? MESSAGES.NO_USER_INFO,
+  debateTypeLabel: SHORT_DEBATE_TYPE_LABELS[debate.debateType],
   participants: getDebateParticipantCount(debate),
   tagLabels: getDebateTagLabels(debate),
-  createdDateLabel: formatCreatedDate(debate.createdAt),
+  createdDateLabel: formatDateLabel(debate.createdAt),
 });
 
 const BackIcon = () => (
@@ -84,25 +81,29 @@ const DebatePage = () => {
   const navigate = useNavigate();
   const { debates, fetchDebates } = useDebate();
   const { isLoading, showLoadingUI, error: loadError, executeAsync } = usePageLoading();
-  const [activeFilter, setActiveFilter] = useState('찬반토론');
+  const [activeFilter, setActiveFilter] = useState<string>(ALL_DEBATE_FILTER_LABEL);
   const [selectedCard, setSelectedCard] = useState<DebateRoomCard | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [submittedKeyword, setSubmittedKeyword] = useState('');
   const [selectedTags, setSelectedTags] = useState<DebateTag[]>([]);
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [isActionProcessing, setIsActionProcessing] = useState(false);
 
   useEffect(() => {
     const loadDebates = async () => {
       await executeAsync(async () => {
+        const type = DEBATE_TYPE_FILTER_MAP[activeFilter];
         await fetchDebates({
           status: 'OPEN',
-          type: FILTER_TYPE_MAP[activeFilter],
+          ...(type ? { type } : {}),
           tagIds: selectedTags.length ? selectedTags.map((tag) => tag.id).join(',') : undefined,
           ...(submittedKeyword.trim() ? { keyword: submittedKeyword.trim() } : {}),
           sort: 'updatedAt',
           direction: 'desc',
-          limit: 20,
+          limit: DEBATE_ROOM_LIMIT,
         });
       });
     };
@@ -115,12 +116,20 @@ const DebatePage = () => {
   };
 
   const cards = useMemo(
-    () => debates.slice(0, 8).map(mapToRoomCard),
+    () => debates.map(mapToRoomCard),
     [debates],
   );
 
-  const openDebateModal = (card: DebateRoomCard) => {
+  const openDebateModal = async (card: DebateRoomCard) => {
+    setActionMessage('');
+    setActionError('');
     setSelectedCard(card);
+    try {
+      const { data } = await debateService.getById(card.id);
+      setSelectedCard(mapToRoomCard(data.debate));
+    } catch {
+      setActionError(MESSAGES.REQUEST_FAILED);
+    }
   };
 
   const openActionModalFromButton = (
@@ -128,7 +137,57 @@ const DebatePage = () => {
     card: DebateRoomCard,
   ) => {
     event.stopPropagation();
-    openDebateModal(card);
+    void openDebateModal(card);
+  };
+
+  const handleBookmarkToggle = async () => {
+    if (!selectedCard || isActionProcessing) return;
+    const wasBookmarked = selectedCard.isBookmarked;
+    setActionMessage('');
+    setActionError('');
+    setIsActionProcessing(true);
+    setSelectedCard({ ...selectedCard, isBookmarked: !wasBookmarked });
+    try {
+      if (wasBookmarked) {
+        await debateService.unbookmark(selectedCard.id);
+        setActionMessage('저장을 해제했습니다.');
+      } else {
+        await debateService.bookmark(selectedCard.id);
+        setActionMessage('토론을 저장했습니다.');
+      }
+    } catch {
+      setSelectedCard((current) =>
+        current?.id === selectedCard.id ? { ...current, isBookmarked: wasBookmarked } : current,
+      );
+      setActionError(MESSAGES.REQUEST_FAILED);
+    } finally {
+      setIsActionProcessing(false);
+    }
+  };
+
+  const handleSubscriptionToggle = async () => {
+    if (!selectedCard || isActionProcessing) return;
+    const wasSubscribed = selectedCard.isSubscribed;
+    setActionMessage('');
+    setActionError('');
+    setIsActionProcessing(true);
+    setSelectedCard({ ...selectedCard, isSubscribed: !wasSubscribed });
+    try {
+      if (wasSubscribed) {
+        await debateService.unsubscribe(selectedCard.id);
+        setActionMessage('알림을 해제했습니다.');
+      } else {
+        await debateService.subscribe(selectedCard.id);
+        setActionMessage('알림을 설정했습니다.');
+      }
+    } catch {
+      setSelectedCard((current) =>
+        current?.id === selectedCard.id ? { ...current, isSubscribed: wasSubscribed } : current,
+      );
+      setActionError(MESSAGES.REQUEST_FAILED);
+    } finally {
+      setIsActionProcessing(false);
+    }
   };
 
   return (
@@ -141,7 +200,7 @@ const DebatePage = () => {
         tabIndex={0}
         onClick={() => navigate('/')}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') navigate('/');
+          if (event.key === 'Enter' || event.key === ' ') navigate(ROUTES.HOME);
         }}
       />
 
@@ -157,7 +216,7 @@ const DebatePage = () => {
           >
             <TopIcon src={iconSearch} alt="" />
           </SideButton>
-          <SideButton type="button" aria-label="알림" onClick={() => navigate('/notifications')}>
+          <SideButton type="button" aria-label="알림" onClick={() => navigate(ROUTES.NOTIFICATIONS)}>
             <TopIcon src={iconAlarm} alt="" />
           </SideButton>
         </HeaderRight>
@@ -175,7 +234,7 @@ const DebatePage = () => {
       )}
 
       <FilterRow>
-        {FILTER_ITEMS.map((item) => (
+        {DEBATE_TYPE_FILTER_ITEMS.map((item) => (
           <FilterChip
             key={item}
             type="button"
@@ -207,12 +266,12 @@ const DebatePage = () => {
           showLoadingUI={showLoadingUI}
           skeleton={<DebateRoomCardSkeleton count={4} />}
         >
-          {!loadError && cards.length === 0 && <ErrorText>등록된 토론이 없습니다.</ErrorText>}
+          {!loadError && cards.length === 0 && <ErrorText>{MESSAGES.NO_REGISTERED_DEBATES}</ErrorText>}
           {cards.map((card) => (
-            <Card key={card.id} onClick={() => navigate(`/debate/${card.id}`)}>
+            <Card key={card.id} onClick={() => navigate(debateThreadPath(card.id))}>
               <CardTop>
-                <StatusBadge $running={card.statusLabel === '진행중'}>
-                  {card.statusLabel.replace(/\s+/g, '')}
+                <StatusBadge $running={card.status === 'OPEN'}>
+                  {DEBATE_STATUS_LABELS[card.status].replace(/\s+/g, '')}
                 </StatusBadge>
                 <CardTopRight>
                   <CardActionButton
@@ -228,11 +287,13 @@ const DebatePage = () => {
               <CardTitle>{card.title}</CardTitle>
               <TypeBadge>{card.debateTypeLabel}</TypeBadge>
               <CardDesc>{card.description}</CardDesc>
-              <CardTagList>
-                {card.tagLabels.map((tag) => (
-                  <CardTag key={tag}>{tag}</CardTag>
-                ))}
-              </CardTagList>
+              {card.tagLabels.length > 0 && (
+                <CardTagList>
+                  {card.tagLabels.map((tag) => (
+                    <CardTag key={tag}>{tag}</CardTag>
+                  ))}
+                </CardTagList>
+              )}
             </Card>
           ))}
         </LoadingContent>
@@ -249,7 +310,7 @@ const DebatePage = () => {
                 type="button"
                 aria-label="토론 정보 보기"
                 onClick={() => {
-                  navigate(`/debate/${selectedCard.id}/info`);
+                  navigate(debateInfoPath(selectedCard.id));
                   setSelectedCard(null);
                 }}
               >
@@ -273,18 +334,32 @@ const DebatePage = () => {
             <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
             <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
             <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
+            {actionMessage && <ModalSuccess>{actionMessage}</ModalSuccess>}
+            {actionError && <ErrorText>{actionError}</ErrorText>}
 
             <ModalActionRow>
-              <ModalActionIconButton type="button" aria-label="저장">
+              <ModalActionIconButton
+                type="button"
+                aria-label="저장"
+                $active={selectedCard.isBookmarked}
+                disabled={isActionProcessing}
+                onClick={() => void handleBookmarkToggle()}
+              >
                 <ModalActionIcon src={iconStar} alt="" />
               </ModalActionIconButton>
-              <ModalActionIconButton type="button" aria-label="알림">
+              <ModalActionIconButton
+                type="button"
+                aria-label="알림"
+                $active={selectedCard.isSubscribed}
+                disabled={isActionProcessing}
+                onClick={() => void handleSubscriptionToggle()}
+              >
                 <ModalAlarmIcon src={iconAlarm2} alt="" />
               </ModalActionIconButton>
               <JoinButton
                 type="button"
                 onClick={() => {
-                  navigate(`/debate/${selectedCard.id}`);
+                  navigate(debateThreadPath(selectedCard.id));
                   setSelectedCard(null);
                 }}
               >
@@ -658,15 +733,20 @@ const ModalActionRow = styled.div`
   margin-top: 26px;
 `;
 
-const ModalActionIconButton = styled.button`
+const ModalActionIconButton = styled.button<{ $active?: boolean }>`
   width: clamp(42px, 11.2vw, 48px);
   height: clamp(42px, 11.2vw, 48px);
   border: none;
-  background: transparent;
+  background: ${({ $active }) => ($active ? '#eefaf6' : 'transparent')};
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  opacity: ${({ disabled }) => (disabled ? 0.6 : 1)};
+`;
+
+const ModalSuccess = styled(ErrorText)`
+  color: #2d8f73;
 `;
 
 const ModalActionIcon = styled.img`

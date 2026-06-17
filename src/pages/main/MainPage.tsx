@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+﻿import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import SideDrawer from '../../components/common/SideDrawer';
@@ -13,12 +13,17 @@ import iconSearch from '../../assets/icon_search.svg';
 import iconShowInfo from '../../assets/icon_show_info.svg';
 import iconStar from '../../assets/icon_star.svg';
 import logoSymbol from '../../assets/logo_symbol.svg';
+import { DEBATE_STATUS_LABELS, DEBATE_TYPE_LABELS } from '../../constants/debate';
+import { MESSAGES } from '../../constants/messages';
+import { FEATURED_DEBATE_LIMIT, HOME_DEBATE_LIMIT } from '../../constants/pagination';
+import { debateInfoPath, debateThreadPath, ROUTES } from '../../constants/routes';
 import { useDebate } from '../../hooks/useDebate';
 import { usePageLoading } from '../../hooks/usePageLoading';
 import { debateService } from '../../services/debateService';
 import type { Debate, DebateTag } from '../../types/debate';
+import { formatDateLabel } from '../../utils/dateFormat';
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
+// ??? Icons ????????????????????????????????????????????????????????????????????
 
 const MenuIcon = () => <img src={iconMenu} width="22" height="22" alt="" />;
 
@@ -42,7 +47,7 @@ const BackIcon = () => (
 
 const ModalMenuIcon = () => <img src={iconShowInfo} width="34" height="34" alt="" />;
 
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
+// ??? Mock Data ?????????????????????????????????????????????????????????????????
 
 type ModalDebateItem = {
   id: string;
@@ -71,28 +76,7 @@ type FeaturedItem = {
   modalData: ModalDebateItem;
 };
 
-// ─── Sub Components ────────────────────────────────────────────────────────────
-
-const STATUS_LABEL: Record<string, string> = {
-  OPEN: '진행중',
-  CLOSED: '종료',
-  ARCHIVED: '보관',
-  IN_PROGRESS: '진행중',
-  WAITING: '준비중',
-};
-
-const DEBATE_TYPE_LABEL_MAP: Record<Debate['debateType'], string> = {
-  PROS_CONS: '찬반토론',
-  CONSENSUS: '합의토론',
-  FREE: '자유토론',
-};
-
-const formatCreatedDate = (createdAt?: string) => {
-  if (!createdAt) return '20XX. YY. ZZ';
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return '20XX. YY. ZZ';
-  return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')}`;
-};
+// ??? Sub Components ????????????????????????????????????????????????????????????
 
 const getDebateParticipantCount = (debate: Debate) =>
   debate.participantCount ?? debate.participants?.length ?? 0;
@@ -102,25 +86,25 @@ const getDebateTagLabels = (debate: Debate) => {
     ?.map((tag) => tag.name.trim())
     .filter(Boolean)
     .map((tag) => `#${tag}`);
-  return tags?.length ? tags : ['#기타'];
+  return tags?.length ? tags : [];
 };
 
 const mapDebateToModalItem = (debate: Debate): ModalDebateItem => ({
   id: debate.id,
   title: debate.title,
   description: debate.description,
-  creatorName: debate.creator?.nickname ?? '사용자 이름',
-  debateTypeLabel: DEBATE_TYPE_LABEL_MAP[debate.debateType],
+  creatorName: debate.creator?.nickname ?? MESSAGES.NO_USER_INFO,
+  debateTypeLabel: DEBATE_TYPE_LABELS[debate.debateType],
   participants: getDebateParticipantCount(debate),
   tags: getDebateTagLabels(debate),
-  createdDateLabel: formatCreatedDate(debate.createdAt),
+  createdDateLabel: formatDateLabel(debate.createdAt),
   isBookmarked: Boolean(debate.isBookmarked),
   isSubscribed: Boolean(debate.isSubscribed),
 });
 
 const StatusBadge = ({ status }: { status: string }) => {
-  const label = (STATUS_LABEL[status] ?? status).replace(/\s+/g, '');
-  return <Badge $active={status === 'OPEN' || status === 'IN_PROGRESS'}>{label}</Badge>;
+  const label = (DEBATE_STATUS_LABELS[status as Debate['status']] ?? status).replace(/\s+/g, '');
+  return <Badge $active={status === 'OPEN'}>{label}</Badge>;
 };
 
 const FeaturedCard = ({
@@ -133,7 +117,7 @@ const FeaturedCard = ({
   onOpenActions: (event: MouseEvent<HTMLButtonElement>) => void;
 }) => (
   <FCard data-feature-card="true" onClick={onClick}>
-    <CardActionButton type="button" aria-label="토론 미리보기 열기" onClick={onOpenActions}>
+    <CardActionButton type="button" aria-label="?좊줎 誘몃━蹂닿린 ?닿린" onClick={onOpenActions}>
       ...
     </CardActionButton>
     <FTitle>{item.title}</FTitle>
@@ -172,7 +156,7 @@ const DebateCard = ({
     <DLeft>
       <DMetaRow>
         <DStatusBadge>
-          {(item.status === 'OPEN' ? '진행중' : '준비중').replace(/\s+/g, '')}
+          {DEBATE_STATUS_LABELS[item.status].replace(/\s+/g, '')}
         </DStatusBadge>
         <DTypeBadge>{item.modalData.debateTypeLabel}</DTypeBadge>
       </DMetaRow>
@@ -185,7 +169,7 @@ const DebateCard = ({
       </DTagList>
     </DLeft>
     <DRight>
-      <DCardActionButton type="button" aria-label="토론 미리보기 열기" onClick={onOpenActions}>
+      <DCardActionButton type="button" aria-label="?좊줎 誘몃━蹂닿린 ?닿린" onClick={onOpenActions}>
         ...
       </DCardActionButton>
       <DebateIconImg src={iconChat} alt="" />
@@ -193,7 +177,7 @@ const DebateCard = ({
   </DCard>
 );
 
-// ─── Main Page ─────────────────────────────────────────────────────────────────
+// ??? Main Page ?????????????????????????????????????????????????????????????????
 
 const MainPage = () => {
   const navigate = useNavigate();
@@ -228,7 +212,7 @@ const MainPage = () => {
           status: 'OPEN',
           sort: 'updatedAt',
           direction: 'desc',
-          limit: 30,
+          limit: HOME_DEBATE_LIMIT,
         });
       });
     };
@@ -266,7 +250,7 @@ const MainPage = () => {
         current?.id === item.id ? mapDebateToModalItem(data.debate) : current,
       );
     } catch {
-      setJoinError('요청 처리에 실패했습니다.');
+      setJoinError(MESSAGES.REQUEST_FAILED);
     }
   };
 
@@ -274,7 +258,7 @@ const MainPage = () => {
     if (scrollRef.current && Math.abs(scrollRef.current.scrollLeft - lastScrollLeftRef.current) > 2) {
       return;
     }
-    navigate(`/debate/${debateId}`);
+    navigate(debateThreadPath(debateId));
   };
 
   const openActionModalFromButton = (
@@ -295,16 +279,16 @@ const MainPage = () => {
     try {
       if (wasBookmarked) {
         await debateService.unbookmark(selectedCard.id);
-        setActionMessage('저장을 해제했습니다.');
+        setActionMessage('??μ쓣 ?댁젣?덉뒿?덈떎.');
       } else {
         await debateService.bookmark(selectedCard.id);
-        setActionMessage('토론을 저장했습니다.');
+        setActionMessage('?좊줎????ν뻽?듬땲??');
       }
     } catch {
       setSelectedCard((current) =>
         current?.id === selectedCard.id ? { ...current, isBookmarked: wasBookmarked } : current,
       );
-      setJoinError('요청 처리에 실패했습니다.');
+      setJoinError(MESSAGES.REQUEST_FAILED);
     } finally {
       setIsActionProcessing(false);
     }
@@ -320,16 +304,16 @@ const MainPage = () => {
     try {
       if (wasSubscribed) {
         await debateService.unsubscribe(selectedCard.id);
-        setActionMessage('알림을 해제했습니다.');
+        setActionMessage('?뚮┝???댁젣?덉뒿?덈떎.');
       } else {
         await debateService.subscribe(selectedCard.id);
-        setActionMessage('알림을 설정했습니다.');
+        setActionMessage('?뚮┝???ㅼ젙?덉뒿?덈떎.');
       }
     } catch {
       setSelectedCard((current) =>
         current?.id === selectedCard.id ? { ...current, isSubscribed: wasSubscribed } : current,
       );
-      setJoinError('요청 처리에 실패했습니다.');
+      setJoinError(MESSAGES.REQUEST_FAILED);
     } finally {
       setIsActionProcessing(false);
     }
@@ -351,13 +335,14 @@ const MainPage = () => {
     modalData: mapDebateToModalItem(debate),
   }));
 
-  const featuredItems: FeaturedItem[] = debates.slice(0, 5).map((debate) => ({
+  // TODO: replace updatedAt sort with lastActivityAt/recentPostCount when backend supports activity ranking.
+  const featuredItems: FeaturedItem[] = debates.slice(0, FEATURED_DEBATE_LIMIT).map((debate) => ({
     id: debate.id,
     title: debate.title,
     description: debate.description,
-    author: debate.creator?.nickname ?? '사용자',
+    author: debate.creator?.nickname ?? MESSAGES.NO_USER_INFO,
     participants: getDebateParticipantCount(debate),
-    status: debate.status === 'OPEN' ? 'OPEN' : 'WAITING',
+    status: debate.status,
     tags: getDebateTagLabels(debate),
     modalData: mapDebateToModalItem(debate),
   }));
@@ -369,11 +354,11 @@ const MainPage = () => {
       <SideDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
       <FixedHeaderArea>
         {/* Logo */}
-        <Logo src={logoSymbol} alt="정명" />
+        <Logo src={logoSymbol} alt="?뺣챸" />
 
         {/* Header */}
         <Header>
-          <IconBtn onClick={() => setIsDrawerOpen(true)} aria-label="메뉴">
+          <IconBtn onClick={() => setIsDrawerOpen(true)} aria-label="硫붾돱">
             <MenuIcon />
           </IconBtn>
           <SearchBar>
@@ -381,20 +366,20 @@ const MainPage = () => {
             <SearchInput
               value={searchKeyword}
               onChange={(event) => setSearchKeyword(event.target.value)}
-              placeholder="토론을 검색하세요."
+              placeholder="?좊줎??寃?됲븯?몄슂."
               aria-label="토론 검색"
             />
           </SearchBar>
-          <IconBtn onClick={() => navigate('/notifications')} aria-label="알림">
+          <IconBtn onClick={() => navigate(ROUTES.NOTIFICATIONS)} aria-label="?뚮┝">
             <BellIcon />
           </IconBtn>
         </Header>
       </FixedHeaderArea>
 
-      {/* 뜨는 토론 */}
+      {/* ?⑤뒗 ?좊줎 */}
       <Section>
-        <SectionTitle>최근 활발한 토론</SectionTitle>
-        <SectionSub>최근 업데이트된 진행 중 토론들이에요.</SectionSub>
+        <SectionTitle>理쒓렐 ?쒕컻???좊줎</SectionTitle>
+        <SectionSub>理쒓렐 ?낅뜲?댄듃??吏꾪뻾 以??좊줎?ㅼ씠?먯슂.</SectionSub>
         <CarouselWrapper
           ref={scrollRef}
           onScroll={handleScroll}
@@ -436,11 +421,11 @@ const MainPage = () => {
         <TagPicker
           selectedTags={selectedTags}
           onChange={setSelectedTags}
-          placeholder="필터할 태그를 검색하세요"
+          placeholder="?꾪꽣???쒓렇瑜?寃?됲븯?몄슂"
         />
         {selectedTags.length > 1 && (
           <ClearTagButton type="button" onClick={() => setSelectedTags([])}>
-            전체 해제
+            ?꾩껜 ?댁젣
           </ClearTagButton>
         )}
       </TagFilterArea>
@@ -453,12 +438,12 @@ const MainPage = () => {
           showLoadingUI={showLoadingUI}
           skeleton={<DebateListItemSkeleton count={4} />}
         >
-          {!loadError && debateItems.length === 0 && <ListError>표시할 토론이 없습니다.</ListError>}
+          {!loadError && debateItems.length === 0 && <ListError>{MESSAGES.NO_DISPLAY_DEBATES}</ListError>}
           {debateItems.map((item) => (
             <DebateCard
               key={item.id}
               item={item}
-              onClick={() => navigate(`/debate/${item.id}`)}
+              onClick={() => navigate(debateThreadPath(item.id))}
               onOpenActions={(event) => openActionModalFromButton(event, item.modalData)}
             />
           ))}
@@ -469,14 +454,14 @@ const MainPage = () => {
         <ModalOverlay onClick={() => setSelectedCard(null)}>
           <ModalCard onClick={(e) => e.stopPropagation()}>
             <ModalTop>
-              <ModalIconButton type="button" aria-label="닫기" onClick={() => setSelectedCard(null)}>
+              <ModalIconButton type="button" aria-label="?リ린" onClick={() => setSelectedCard(null)}>
                 <BackIcon />
               </ModalIconButton>
               <ModalIconButton
                 type="button"
-                aria-label="토론 정보 보기"
+                aria-label="?좊줎 ?뺣낫 蹂닿린"
                 onClick={() => {
-                  navigate(`/debate/${selectedCard.id}/info`);
+                  navigate(debateInfoPath(selectedCard.id));
                   setSelectedCard(null);
                 }}
               >
@@ -497,8 +482,8 @@ const MainPage = () => {
               <span>{selectedCard.creatorName}</span>
             </ModalAuthorRow>
 
-            <ModalMeta>토론 방식 : {selectedCard.debateTypeLabel}</ModalMeta>
-            <ModalMeta>참여 인원 : {selectedCard.participants}</ModalMeta>
+            <ModalMeta>?좊줎 諛⑹떇 : {selectedCard.debateTypeLabel}</ModalMeta>
+            <ModalMeta>李몄뿬 ?몄썝 : {selectedCard.participants}</ModalMeta>
             <ModalMeta>{selectedCard.createdDateLabel}</ModalMeta>
             {actionMessage && <ModalSuccess>{actionMessage}</ModalSuccess>}
             {joinError && <ModalError>{joinError}</ModalError>}
@@ -515,7 +500,7 @@ const MainPage = () => {
               </ModalActionIconButton>
               <ModalActionIconButton
                 type="button"
-                aria-label="알림"
+                aria-label="?뚮┝"
                 $active={selectedCard.isSubscribed}
                 disabled={isActionProcessing}
                 onClick={() => void handleSubscriptionToggle()}
@@ -525,11 +510,11 @@ const MainPage = () => {
               <JoinButton
                 type="button"
                 onClick={() => {
-                  navigate(`/debate/${selectedCard.id}`);
+                  navigate(debateThreadPath(selectedCard.id));
                   setSelectedCard(null);
                 }}
               >
-                토론 보기
+                ?좊줎 蹂닿린
               </JoinButton>
             </ModalActionRow>
           </ModalCard>
@@ -539,7 +524,7 @@ const MainPage = () => {
   );
 };
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
+// ??? Styles ????????????????????????????????????????????????????????????????????
 
 const Wrapper = styled.div`
   background: #f5f5f5;
@@ -1156,3 +1141,4 @@ const JoinButton = styled.button`
 `;
 
 export default MainPage;
+

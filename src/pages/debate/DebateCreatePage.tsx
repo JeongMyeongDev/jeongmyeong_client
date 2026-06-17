@@ -3,17 +3,26 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import TagPicker from '../../components/tags/TagPicker';
+import {
+  DEFAULT_CLOSE_CONDITION_TYPE,
+  DEFAULT_DEBATE_TYPE,
+  DEBATE_TYPE_LABELS,
+} from '../../constants/debate';
+import { MESSAGES } from '../../constants/messages';
+import { ROUTES } from '../../constants/routes';
 import { useDebate } from '../../hooks/useDebate';
 import { useAuthStore } from '../../stores/authStore';
 import { useModerationStore } from '../../stores/moderationStore';
 import type { DebateTag, DebateType } from '../../types/debate';
+import {
+  getCommunityTextValidationError,
+  sanitizeCommunityText,
+} from '../../utils/communityTextValidation';
 
 const TITLE_MAX_LENGTH = 40;
 const DESCRIPTION_MAX_LENGTH = 120;
 const TAG_MAX_COUNT = 5;
-const DEFAULT_DEBATE_TYPE = 'FREE' as const;
 const DRAFT_KEY = 'debate-create:draft';
-const SPECIAL_CHARACTER_PATTERN = /[^\p{L}\p{N}\s]/gu;
 
 const DEBATE_TYPE_OPTIONS: Array<{
   value: DebateType;
@@ -22,41 +31,20 @@ const DEBATE_TYPE_OPTIONS: Array<{
 }> = [
   {
     value: 'FREE',
-    label: '자유 토론',
+    label: DEBATE_TYPE_LABELS.FREE,
     description: '합의안과 하위 토론이 진행되어도 본 토론 작성을 계속할 수 있습니다.',
   },
   {
     value: 'CONSENSUS',
-    label: '합의형 토론',
+    label: DEBATE_TYPE_LABELS.CONSENSUS,
     description: '진행 중인 합의안이나 하위 토론이 있으면 본 토론 작성을 잠시 멈춥니다.',
   },
   {
     value: 'PROS_CONS',
-    label: '찬반 토론',
+    label: DEBATE_TYPE_LABELS.PROS_CONS,
     description: '찬성, 반대, 중립 입장을 선택하고 의견을 남깁니다.',
   },
 ];
-
-const sanitizeDebateText = (value: string, maxLength: number) =>
-  value.replace(SPECIAL_CHARACTER_PATTERN, '').slice(0, maxLength);
-
-const getCommunityTextValidationError = (input: string, fieldName = '내용') => {
-  const text = input.normalize('NFC');
-
-  if (text.length > 5000) {
-    return `${fieldName}은 5000자 이하로 입력해 주세요.`;
-  }
-
-  if (/\p{Mark}{4,}/u.test(text)) {
-    return '같은 문자에 특수 기호가 과도하게 반복되었습니다.';
-  }
-
-  if (/(.)\1{30,}/u.test(text)) {
-    return '같은 문자를 과도하게 반복할 수 없습니다.';
-  }
-
-  return '';
-};
 
 const getInitialDraft = () => {
   const rawDraft = localStorage.getItem(DRAFT_KEY);
@@ -136,17 +124,17 @@ const DebateCreatePage = () => {
     if (isSubmitting) return;
 
     if (!isAuthenticated) {
-      navigate('/login');
+      navigate(ROUTES.LOGIN);
       return;
     }
 
     if (isSuspended()) {
-      setError('정지된 계정입니다. 제재 내역을 확인해 주세요.');
+      setError(MESSAGES.SUSPENDED_ACCOUNT);
       return;
     }
 
     if (!canCreateDebate()) {
-      setError('제재로 인해 현재 토론을 생성할 수 없습니다.');
+      setError(MESSAGES.CANNOT_CREATE_DEBATE_BY_SANCTION);
       return;
     }
 
@@ -188,15 +176,21 @@ const DebateCreatePage = () => {
         description: description.trim(),
         debateType,
         tagIds: selectedTagIds,
-        closeConditionType: 'MANUAL',
+        // TODO: expose close condition UI when TIME_LIMIT/TARGET_REACHED are implemented.
+        closeConditionType: DEFAULT_CLOSE_CONDITION_TYPE,
       });
       localStorage.removeItem(DRAFT_KEY);
-      navigate('/debate-room');
+      navigate(ROUTES.DEBATE_ROOM);
     } catch (error) {
       setError(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSaveDraft = () => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, tags, debateType }));
+    setError(MESSAGES.DRAFT_SAVED);
   };
 
   return (
@@ -215,7 +209,7 @@ const DebateCreatePage = () => {
           <SectionTitle>토론 제목</SectionTitle>
           <TitleInput
             value={title}
-            onChange={(e) => setTitle(sanitizeDebateText(e.target.value, TITLE_MAX_LENGTH))}
+            onChange={(e) => setTitle(sanitizeCommunityText(e.target.value, TITLE_MAX_LENGTH))}
             placeholder="토론 제목을 입력하세요..."
             maxLength={TITLE_MAX_LENGTH}
           />
@@ -226,7 +220,7 @@ const DebateCreatePage = () => {
           <SectionTitle>토론 설명</SectionTitle>
           <DescriptionInput
             value={description}
-            onChange={(e) => setDescription(sanitizeDebateText(e.target.value, DESCRIPTION_MAX_LENGTH))}
+            onChange={(e) => setDescription(sanitizeCommunityText(e.target.value, DESCRIPTION_MAX_LENGTH))}
             placeholder="설명을 입력하세요..."
             maxLength={DESCRIPTION_MAX_LENGTH}
           />
@@ -256,7 +250,7 @@ const DebateCreatePage = () => {
         </SectionCard>
 
         <ActionRow>
-          <SaveButton type="button">보관</SaveButton>
+          <SaveButton type="button" onClick={handleSaveDraft}>임시저장</SaveButton>
           <CreateButton type="button" onClick={handleCreate} disabled={isSubmitting}>
             {isSubmitting ? '생성 중...' : '생성'}
           </CreateButton>
