@@ -1,4 +1,4 @@
-export const SPECIAL_CHARACTER_PATTERN = /[^\p{L}\p{N}\s]/gu;
+export const SPECIAL_CHARACTER_PATTERN = /[^\p{L}\p{N}\s.,!?@#$%&*()_+=:;'"/\\[\]{}<>~^|\-]/gu;
 
 export const sanitizeCommunityText = (value: string, maxLength: number) =>
   value.replace(SPECIAL_CHARACTER_PATTERN, '').slice(0, maxLength);

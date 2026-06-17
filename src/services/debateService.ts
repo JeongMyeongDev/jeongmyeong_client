@@ -185,6 +185,8 @@ export const debateService = {
     api.get<DebateListResponse>("/debates/archive", { params }),
   getMyDebates: (params?: ListDebatesParams) =>
     api.get<DebateListResponse>("/debates/my", { params }),
+  getParticipatedDebates: (params?: ListDebatesParams) =>
+    api.get<DebateListResponse>("/debates/participated", { params }),
   getBookmarks: (params?: ListDebatesParams) =>
     api.get<DebateListResponse>("/debates/bookmarks", { params }),
 

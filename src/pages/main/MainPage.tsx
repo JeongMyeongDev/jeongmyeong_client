@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import SideDrawer from '../../components/common/SideDrawer';
 import { LoadingContent } from '../../components/common/LoadingContent';
 import { DebateListItemSkeleton, FeaturedCardSkeleton } from '../../components/common/PageSkeletons';
+import DebateRelationMeta from '../../components/debate/DebateRelationMeta';
 import TagPicker from '../../components/tags/TagPicker';
 import iconAlarm from '../../assets/icon_alarm.svg';
 import iconAlarm2 from '../../assets/icon_alarm2.svg';
@@ -66,6 +67,7 @@ type ModalDebateItem = {
 
 type DebateListItem = Pick<Debate, 'id' | 'title' | 'description' | 'status'> & {
   modalData: ModalDebateItem;
+  relationData: Debate;
 };
 type FeaturedItem = {
   id: string;
@@ -76,6 +78,7 @@ type FeaturedItem = {
   status: string;
   tags: string[];
   modalData: ModalDebateItem;
+  relationData: Debate;
 };
 
 // ??? Sub Components ????????????????????????????????????????????????????????????
@@ -113,16 +116,23 @@ const FeaturedCard = ({
   item,
   onClick,
   onOpenActions,
+  onParentClick,
 }: {
   item: FeaturedItem;
   onClick: () => void;
   onOpenActions: (event: MouseEvent<HTMLButtonElement>) => void;
+  onParentClick: (parentDebateId: string) => void;
 }) => (
   <FCard data-feature-card="true" onClick={onClick}>
     <CardActionButton type="button" aria-label="토론 미리보기 열기" onClick={onOpenActions}>
       ...
     </CardActionButton>
     <FTitle>{item.title}</FTitle>
+    <DebateRelationMeta
+      debate={item.relationData}
+      compact
+      onParentClick={onParentClick}
+    />
     <FDesc>{item.description}</FDesc>
     <FMeta>
       <FAuthor>
@@ -152,10 +162,12 @@ const DebateCard = ({
   item,
   onClick,
   onOpenActions,
+  onParentClick,
 }: {
   item: DebateListItem;
   onClick: () => void;
   onOpenActions: (event: MouseEvent<HTMLButtonElement>) => void;
+  onParentClick: (parentDebateId: string) => void;
 }) => (
   <DCard onClick={onClick}>
     <DLeft>
@@ -166,6 +178,11 @@ const DebateCard = ({
         <DTypeBadge>{item.modalData.debateTypeLabel}</DTypeBadge>
       </DMetaRow>
       <DTitle>{item.title}</DTitle>
+    <DebateRelationMeta
+      debate={item.relationData}
+      compact
+      onParentClick={onParentClick}
+    />
       <DDesc>{item.description}</DDesc>
       <DTagList>
         {item.modalData.tags.map((tag) => (
@@ -338,6 +355,7 @@ const MainPage = () => {
     description: debate.description,
     status: debate.status,
     modalData: mapDebateToModalItem(debate),
+    relationData: debate,
   }));
 
   // TODO: replace updatedAt sort with lastActivityAt/recentPostCount when backend supports activity ranking.
@@ -350,6 +368,7 @@ const MainPage = () => {
     status: debate.status,
     tags: getDebateTagLabels(debate),
     modalData: mapDebateToModalItem(debate),
+    relationData: debate,
   }));
 
   const currentDot = Math.min(activeDot, Math.max(0, featuredItems.length - 1));
@@ -411,6 +430,7 @@ const MainPage = () => {
                   }
                   openActionModalFromButton(event, item.modalData);
                 }}
+                onParentClick={(parentId) => navigate(debateThreadPath(parentId))}
               />
             ))}
           </LoadingContent>
@@ -450,6 +470,7 @@ const MainPage = () => {
               item={item}
               onClick={() => navigate(debateThreadPath(item.id))}
               onOpenActions={(event) => openActionModalFromButton(event, item.modalData)}
+              onParentClick={(parentId) => navigate(debateThreadPath(parentId))}
             />
           ))}
         </LoadingContent>

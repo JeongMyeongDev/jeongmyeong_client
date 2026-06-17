@@ -14,7 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
   ARCHIVED: '보관',
 };
 
-const MyDebatesPage = () => {
+const ParticipatedDebatesPage = () => {
   const navigate = useNavigate();
   const { isLoading, showLoadingUI, error, executeAsync } = usePageLoading();
   const [debates, setDebates] = useState<Debate[]>([]);
@@ -22,7 +22,7 @@ const MyDebatesPage = () => {
   useEffect(() => {
     const load = async () => {
       const result = await executeAsync(async () => {
-        const { data } = await debateService.getMyDebates({ sort: 'createdAt', direction: 'desc', limit: 50 });
+        const { data } = await debateService.getParticipatedDebates({ limit: 50 });
         return data;
       });
       if (result) {
@@ -41,12 +41,12 @@ const MyDebatesPage = () => {
             <polyline points="10 6 4 12 10 18" />
           </BackIcon>
         </BackButton>
-        <TopTitle>내 토론</TopTitle>
+        <TopTitle>참여한 토론</TopTitle>
       </TopBar>
 
       {error && <CenterText $error>{error}</CenterText>}
       {!isLoading && !error && debates.length === 0 && (
-        <CenterText>만든 토론이 없습니다.</CenterText>
+        <CenterText>참여한 토론이 없습니다.</CenterText>
       )}
 
       <List>
@@ -184,4 +184,4 @@ const CardTag = styled.span`
   color: #b0b0b0;
 `;
 
-export default MyDebatesPage;
+export default ParticipatedDebatesPage;
