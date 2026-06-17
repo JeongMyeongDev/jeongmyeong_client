@@ -1,18 +1,11 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import { SIDE_DRAWER_ITEMS } from '../../constants/ui';
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
 };
-
-const NAV_ITEMS = [
-  { label: '홈', path: '/' },
-  { label: '토론 방', path: '/debate-room' },
-  { label: '보관함', path: '/debate/archive' },
-  { label: '내 토론', path: '/my-debates' },
-  { label: '프로필', path: '/profile' },
-];
 
 const SideDrawer = ({ isOpen, onClose }: Props) => {
   const navigate = useNavigate();
@@ -36,7 +29,7 @@ const SideDrawer = ({ isOpen, onClose }: Props) => {
           </CloseButton>
         </DrawerHeader>
         <NavList>
-          {NAV_ITEMS.map((item) => (
+          {SIDE_DRAWER_ITEMS.map((item) => (
             <NavItem
               key={item.path}
               type="button"

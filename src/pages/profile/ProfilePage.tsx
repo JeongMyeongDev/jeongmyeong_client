@@ -7,6 +7,7 @@ import ProfileEditCard from '../../components/profile/ProfileEditCard';
 import ProfileHeaderCard from '../../components/profile/ProfileHeaderCard';
 import ProfileMenuRow from '../../components/profile/ProfileMenuRow';
 import ProfileSection from '../../components/profile/ProfileSection';
+import { ROUTES } from '../../constants/routes';
 import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
 import { useAuthStore } from '../../stores/authStore';
@@ -33,7 +34,7 @@ const ProfilePage = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      navigate('/login', { replace: true });
+      navigate(ROUTES.LOGIN, { replace: true });
     }
   }, [isAuthenticated, navigate, user]);
 
@@ -96,23 +97,23 @@ const ProfilePage = () => {
 
   const activityRows = useMemo<MenuRow[]>(
     () => [
-      { label: '내 토론', action: () => navigate('/my-debates') },
-      { label: '알림', action: () => navigate('/notifications') },
-      { label: '제재 내역', action: () => navigate('/my-sanctions') },
+      { label: '내 토론', action: () => navigate(ROUTES.MY_DEBATES) },
+      { label: '알림', action: () => navigate(ROUTES.NOTIFICATIONS) },
+      { label: '제재 내역', action: () => navigate(ROUTES.MY_SANCTIONS) },
     ],
     [navigate],
   );
 
   const settingRows = useMemo<MenuRow[]>(
     () => [
-      { label: '알림 설정', action: () => navigate('/notifications') },
-      { label: '튜토리얼 다시 보기', action: () => showToast('튜토리얼 기능은 준비 중입니다.') },
+      { label: '알림 설정', action: () => navigate(ROUTES.NOTIFICATIONS) },
+      { label: '튜토리얼 다시 보기', action: () => navigate(ROUTES.ONBOARDING) },
     ],
     [navigate],
   );
 
   const adminRows = useMemo<MenuRow[]>(
-    () => [{ label: '신고 관리', action: () => navigate('/admin/reports') }],
+    () => [{ label: '신고 관리', action: () => navigate(ROUTES.ADMIN_REPORTS) }],
     [navigate],
   );
 
@@ -132,7 +133,7 @@ const ProfilePage = () => {
       localStorage.removeItem('accessToken');
       clearAuth();
       setIsLogoutLoading(false);
-      navigate('/login');
+      navigate(ROUTES.LOGIN);
     }
   };
 
@@ -149,7 +150,7 @@ const ProfilePage = () => {
       await userService.deleteMe();
       localStorage.removeItem('accessToken');
       clearAuth();
-      navigate('/login', { replace: true });
+      navigate(ROUTES.LOGIN, { replace: true });
     } catch (error) {
       const message = isAxiosError(error) ? error.response?.data?.message : null;
       showToast(typeof message === 'string' ? message : '회원 탈퇴 처리에 실패했습니다.');

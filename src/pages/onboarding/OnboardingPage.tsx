@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { isAxiosError } from 'axios';
@@ -78,12 +78,6 @@ const OnboardingPage = () => {
   const currentMission = MISSIONS[stepIndex];
   const progressLabel = `${stepIndex + 1} / ${MISSIONS.length}`;
 
-  useEffect(() => {
-    if (user?.hasCompletedOnboarding) {
-      navigate('/', { replace: true });
-    }
-  }, [navigate, user?.hasCompletedOnboarding]);
-
   const canGoNext = useMemo(() => {
     switch (currentMission.key) {
       case 'concept':
@@ -127,7 +121,9 @@ const OnboardingPage = () => {
     setError('');
     setIsSubmitting(true);
     try {
-      await completeOnboarding();
+      if (!user?.hasCompletedOnboarding) {
+        await completeOnboarding();
+      }
       navigate('/', { replace: true });
     } catch (error) {
       setError(getErrorMessage(error));
