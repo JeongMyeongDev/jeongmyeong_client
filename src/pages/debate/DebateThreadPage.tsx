@@ -664,6 +664,151 @@ const DebateThreadPage = () => {
     if (input) input.setSelectionRange(input.selectionEnd ?? 0, input.selectionEnd ?? 0);
   };
 
+  const cancelPendingSelectionClear = () => {
+    if (selectionClearTimerRef.current) {
+      window.clearTimeout(selectionClearTimerRef.current);
+      selectionClearTimerRef.current = null;
+    }
+  };
+
+  const clearPendingSelectionAfterDelay = (delay = 160) => {
+    cancelPendingSelectionClear();
+    selectionClearTimerRef.current = window.setTimeout(() => {
+      selectionClearTimerRef.current = null;
+      if (!window.getSelection()?.toString().trim()) {
+        setPendingSelection(null);
+      }
+    }, delay);
+  };
+
+  const resetSelectionDragSourceAfterDelay = (delay = 220) => {
+    window.setTimeout(() => {
+      selectionDragSourceRef.current = null;
+    }, delay);
+  };
+
+  const extractPendingSelectionFromWindowSelection = () => {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString() ?? "";
+
+    if (!selection || selection.rangeCount === 0 || !selectedText.trim()) {
+      clearPendingSelectionAfterDelay();
+      return false;
+    }
+
+    cancelPendingSelectionClear();
+
+    const range = selection.getRangeAt(0);
+    const anchorSource = getSelectionSourceElement(selection.anchorNode);
+    const focusSource = getSelectionSourceElement(selection.focusNode);
+    const dragSource = selectionDragSourceRef.current;
+    const source =
+      anchorSource && anchorSource === focusSource
+        ? anchorSource
+        : dragSource &&
+            dragSource.contains(range.startContainer) &&
+            dragSource.contains(range.endContainer)
+          ? dragSource
+          : null;
+
+    if (!source) {
+      setPendingSelection(null);
+      setActionMessage("하나의 의견 또는 댓글 안에서만 선택할 수 있습니다.");
+      selection.removeAllRanges();
+      return false;
+    }
+
+    if (
+      !source.contains(range.startContainer) ||
+      !source.contains(range.endContainer)
+    ) {
+      setPendingSelection(null);
+      setActionMessage("하나의 의견 또는 댓글 안에서만 선택할 수 있습니다.");
+      selection.removeAllRanges();
+      return false;
+    }
+
+    if (currentDebate?.status !== "OPEN") {
+      setPendingSelection(null);
+      setActionMessage(
+        "종료되었거나 보관된 토론에서는 선택 액션을 사용할 수 없습니다.",
+      );
+      selection.removeAllRanges();
+      return false;
+    }
+
+    const sourceText = source.textContent ?? "";
+    const startOffset = getOffsetInsideElement(
+      source,
+      range.startContainer,
+      range.startOffset,
+    );
+    const endOffset = getOffsetInsideElement(
+      source,
+      range.endContainer,
+      range.endOffset,
+    );
+    const normalizedStartOffset = Math.min(startOffset, endOffset);
+    const normalizedEndOffset = Math.max(startOffset, endOffset);
+    const sourceSelectedText = sourceText.slice(
+      normalizedStartOffset,
+      normalizedEndOffset,
+    );
+
+    if (!sourceSelectedText.trim()) {
+      clearPendingSelectionAfterDelay();
+      return false;
+    }
+
+    const rects = Array.from(range.getClientRects());
+    const rect = rects[0] ?? range.getBoundingClientRect();
+    const sourceRect = source.getBoundingClientRect();
+    const hasRangeRect = rect.width > 0 || rect.height > 0;
+    const menuX = clampMenuCoordinate(
+      hasRangeRect
+        ? rect.left + rect.width / 2
+        : sourceRect.left + sourceRect.width / 2,
+      88,
+      window.innerWidth - 88,
+    );
+    const preferredMenuY = hasRangeRect ? rect.top - 10 : sourceRect.top - 10;
+    const fallbackMenuY = hasRangeRect ? rect.bottom + 48 : sourceRect.bottom + 48;
+    const menuY = clampMenuCoordinate(
+      preferredMenuY < 72 ? fallbackMenuY : preferredMenuY,
+      72,
+      window.innerHeight - 88,
+    );
+
+    setActionMessage("");
+    setPendingSelection({
+      sourceType: source.dataset.selectionSourceType as SelectionSource,
+      sourceId: source.dataset.selectionSourceId ?? "",
+      selectedText: sourceSelectedText,
+      startOffset: normalizedStartOffset,
+      endOffset: normalizedEndOffset,
+      menuX,
+      menuY,
+    });
+    return true;
+  };
+
+  const scheduleSelectionExtraction = (delay: number, resetDragSource = false) => {
+    if (selectionReadTimerRef.current) {
+      window.clearTimeout(selectionReadTimerRef.current);
+    }
+
+    selectionReadTimerRef.current = window.setTimeout(() => {
+      selectionReadTimerRef.current = null;
+      extractPendingSelectionFromWindowSelection();
+      handleComposerSelection();
+      handleEditSelection();
+
+      if (resetDragSource) {
+        resetSelectionDragSourceAfterDelay();
+      }
+    }, delay);
+  };
+
   const handleComposerMessageChange = (nextMessage: string) => {
     setMessage(nextMessage);
     setPendingDefinitionReferences((prev) =>
@@ -719,39 +864,17 @@ const DebateThreadPage = () => {
       }
     };
 
-    const scheduleSelectionRead = (delay: number) => {
-      if (selectionReadTimerRef.current) {
-        window.clearTimeout(selectionReadTimerRef.current);
-      }
-
-      selectionReadTimerRef.current = window.setTimeout(() => {
-        selectionReadTimerRef.current = null;
-        handleTextSelection();
-        handleComposerSelection();
-        handleEditSelection();
-
-        window.setTimeout(() => {
-          selectionDragSourceRef.current = null;
-        }, 30);
-      }, delay);
-    };
-
     const handlePointerUp = (event: PointerEvent) => {
       const delay = event.pointerType === "touch" ? 150 : 0;
-      scheduleSelectionRead(delay);
+      scheduleSelectionExtraction(delay, event.pointerType !== "touch");
+    };
+
+    const handleTouchEnd = () => {
+      scheduleSelectionExtraction(170, true);
     };
 
     const handleSelectionChange = () => {
-      if (selectionClearTimerRef.current) {
-        window.clearTimeout(selectionClearTimerRef.current);
-      }
-
-      selectionClearTimerRef.current = window.setTimeout(() => {
-        selectionClearTimerRef.current = null;
-        if (!window.getSelection()?.toString().trim()) {
-          setPendingSelection(null);
-        }
-      }, 120);
+      scheduleSelectionExtraction(140);
     };
 
     const clearSelectionTimers = () => {
@@ -763,9 +886,7 @@ const DebateThreadPage = () => {
         window.clearTimeout(selectionClearTimerRef.current);
         selectionClearTimerRef.current = null;
       }
-      window.setTimeout(() => {
-        selectionDragSourceRef.current = null;
-      }, 0);
+      resetSelectionDragSourceAfterDelay(0);
     };
 
     const handleCardMenuPointerDown = (event: PointerEvent) => {
@@ -781,101 +902,17 @@ const DebateThreadPage = () => {
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("pointerdown", handleCardMenuPointerDown);
     document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("touchend", handleTouchEnd);
     document.addEventListener("selectionchange", handleSelectionChange);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("pointerdown", handleCardMenuPointerDown);
       document.removeEventListener("pointerup", handlePointerUp);
+      document.removeEventListener("touchend", handleTouchEnd);
       document.removeEventListener("selectionchange", handleSelectionChange);
       clearSelectionTimers();
     };
   }, [activeCardMenuKey, composerSelection, editSelection, pendingSelection]);
-
-  const handleTextSelection = () => {
-    const selection = window.getSelection();
-    const selectedText = selection?.toString() ?? "";
-    if (!selection || selection.rangeCount === 0 || !selectedText.trim()) {
-      setPendingSelection(null);
-      return;
-    }
-
-    const anchorSource = getSelectionSourceElement(selection.anchorNode);
-    const focusSource = getSelectionSourceElement(selection.focusNode);
-    const source =
-      selectionDragSourceRef.current ?? anchorSource ?? focusSource;
-    if (!source) return;
-
-    if (anchorSource !== focusSource && !selectionDragSourceRef.current) {
-      setPendingSelection(null);
-      setActionMessage("하나의 의견 또는 댓글 안에서만 선택할 수 있습니다.");
-      selection.removeAllRanges();
-      return;
-    }
-
-    if (currentDebate?.status !== "OPEN") {
-      setPendingSelection(null);
-      setActionMessage(
-        "종료되었거나 보관된 토론에서는 선택 액션을 사용할 수 없습니다.",
-      );
-      selection.removeAllRanges();
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    if (
-      !selectionDragSourceRef.current &&
-      (!source.contains(range.startContainer) ||
-        !source.contains(range.endContainer))
-    ) {
-      setPendingSelection(null);
-      setActionMessage("하나의 의견 또는 댓글 안에서만 선택할 수 있습니다.");
-      selection.removeAllRanges();
-      return;
-    }
-
-    const sourceText = source.textContent ?? "";
-    const startOffset = source.contains(range.startContainer)
-      ? getOffsetInsideElement(source, range.startContainer, range.startOffset)
-      : 0;
-    const endOffset = source.contains(range.endContainer)
-      ? getOffsetInsideElement(source, range.endContainer, range.endOffset)
-      : sourceText.length;
-    const normalizedStartOffset = Math.min(startOffset, endOffset);
-    const normalizedEndOffset = Math.max(startOffset, endOffset);
-    const sourceSelectedText = sourceText.slice(
-      normalizedStartOffset,
-      normalizedEndOffset,
-    );
-    if (!sourceSelectedText.trim()) {
-      setPendingSelection(null);
-      return;
-    }
-    const rect = range.getBoundingClientRect();
-    const sourceRect = source.getBoundingClientRect();
-    const menuX = clampMenuCoordinate(
-      rect.width
-        ? rect.left + rect.width / 2
-        : sourceRect.left + sourceRect.width / 2,
-      88,
-      window.innerWidth - 88,
-    );
-    const menuY = clampMenuCoordinate(
-      (rect.height ? rect.top : sourceRect.top) - 10,
-      72,
-      window.innerHeight - 88,
-    );
-
-    setActionMessage("");
-    setPendingSelection({
-      sourceType: source.dataset.selectionSourceType as SelectionSource,
-      sourceId: source.dataset.selectionSourceId ?? "",
-      selectedText: sourceSelectedText,
-      startOffset: normalizedStartOffset,
-      endOffset: normalizedEndOffset,
-      menuX,
-      menuY,
-    });
-  };
 
   const handleComposerSelection = () => {
     window.setTimeout(() => {
@@ -1477,6 +1514,10 @@ const DebateThreadPage = () => {
     }
   };
 
+  const preserveSelectionForMenuAction = (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+  };
+
   const handleSubmitConsensusDraft = async () => {
     if (!debateId || !consensusDraft || isSubmitting) return;
     if (!canWrite()) {
@@ -1675,27 +1716,26 @@ const DebateThreadPage = () => {
       return;
     }
 
-    const selectedText = window.prompt(
-      "액션에 사용할 텍스트를 입력하세요.",
-      content,
+    const source = Array.from(
+      document.querySelectorAll<HTMLElement>(SELECTION_SOURCE_SELECTOR),
+    ).find(
+      (element) =>
+        element.dataset.selectionSourceType === sourceType &&
+        element.dataset.selectionSourceId === sourceId,
     );
-    if (!selectedText?.trim()) return;
 
-    const startOffset = content.indexOf(selectedText);
-    if (startOffset < 0) {
+    if (!source || !content.trim()) {
       setActionMessage("입력한 텍스트를 원문에서 찾을 수 없습니다.");
       return;
     }
 
-    setPendingSelection({
-      sourceType,
-      sourceId,
-      selectedText,
-      startOffset,
-      endOffset: startOffset + selectedText.length,
-      menuX: window.innerWidth / 2,
-      menuY: Math.max(88, window.innerHeight - 180),
-    });
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(source);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    selectionDragSourceRef.current = source;
+    scheduleSelectionExtraction(0, true);
   };
 
   const toggleCardMenu = (menuKey: string) => {
@@ -2031,7 +2071,7 @@ const DebateThreadPage = () => {
                         )
                       }
                     >
-                      선택
+                      전체 선택
                     </CardMenuButton>
                     <CardMenuButton
                       type="button"
@@ -2363,7 +2403,7 @@ const DebateThreadPage = () => {
                               )
                             }
                           >
-                            선택
+                            전체 선택
                           </CardMenuButton>
                           <CardMenuButton
                             type="button"
@@ -2541,6 +2581,8 @@ const DebateThreadPage = () => {
         >
           <SelectionMenuButton
             type="button"
+            onPointerDown={preserveSelectionForMenuAction}
+            onMouseDown={preserveSelectionForMenuAction}
             onClick={() => void handleSelectionAction("consensus")}
           >
             합의안
@@ -2548,12 +2590,19 @@ const DebateThreadPage = () => {
           {currentDebate?.status === "OPEN" && (
             <SelectionMenuButton
               type="button"
+              onPointerDown={preserveSelectionForMenuAction}
+              onMouseDown={preserveSelectionForMenuAction}
               onClick={() => void handleSelectionAction("child")}
             >
               하위 토론
             </SelectionMenuButton>
           )}
-          <SelectionMenuButton type="button" onClick={handleCopySelection}>
+          <SelectionMenuButton
+            type="button"
+            onPointerDown={preserveSelectionForMenuAction}
+            onMouseDown={preserveSelectionForMenuAction}
+            onClick={handleCopySelection}
+          >
             복사
           </SelectionMenuButton>
         </SelectionMenu>
@@ -3483,6 +3532,7 @@ const MessageText = styled.p`
   user-select: text;
   -webkit-user-select: text;
   -webkit-touch-callout: default;
+  touch-action: auto;
 `;
 
 const DefinitionReferenceMark = styled.button`
